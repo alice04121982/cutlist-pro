@@ -173,27 +173,106 @@ tr:hover td{background:var(--bg3)}
 
 /* Mobile */
 @media(max-width:768px){
-  .sidebar{position:fixed;left:-100%;top:0;bottom:0;width:90vw;max-width:360px;transition:left .3s ease;z-index:100}
+  html{font-size:15px}
+  /* Sidebar drawer */
+  .sidebar{position:fixed;left:-100%;top:0;bottom:0;width:92vw;max-width:380px;transition:left .3s ease;z-index:100}
   .sidebar.open{left:0}
-  .sidebar-close{display:block;font-size:1.8rem;top:8px;right:8px}
+  .sidebar-scroll{padding:16px 18px 100px}
+  .sidebar-close{display:block;font-size:2rem;top:10px;right:12px;width:40px;height:40px;display:flex;align-items:center;justify-content:center}
   .overlay.open{display:block}
-  .hamburger{display:block}
-  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
-  .tab{padding:10px 12px;font-size:.75rem}
-  .tpl-grid{grid-template-columns:repeat(3,1fr);gap:6px}
-  .tpl-btn{padding:10px 4px;font-size:.65rem}
-  .tpl-btn .ico{font-size:1.3rem}
-  .gen-btn{padding:14px;font-size:1rem}
-  .content{padding:12px}
-  table{font-size:.7rem}
-  th,td{padding:6px 8px}
-  .topbar{padding:8px 12px;gap:4px}
-  .hamburger span{width:24px;height:2.5px;margin:5px 0}
-  input,select{font-size:.9rem;padding:10px 12px}
-  label{font-size:.8rem;margin-bottom:4px}
-  .section-title{font-size:.75rem}
-  .row{gap:8px;margin-bottom:8px}
+  .hamburger{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius)}
+  .hamburger span{width:20px;height:2px;margin:3px 0}
+  .hamburger::after{content:'Settings';font-size:.75rem;color:var(--text2);font-family:var(--font)}
+
+  /* Top bar — mobile friendly */
+  .topbar{padding:8px 10px;gap:4px;flex-wrap:nowrap;min-height:52px}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;gap:0;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:10px 10px;font-size:.8rem;flex-shrink:0}
+  .tab.active{font-weight:600}
+  .unit-toggle{flex-shrink:0}
+  .unit-toggle button{padding:6px 10px;font-size:.75rem}
+
+  /* Content area */
+  .content{padding:14px 12px}
+
+  /* Forms — much bigger touch targets */
+  input,select,button{font-size:1rem;padding:12px 14px;min-height:44px}
+  select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a09a8e' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+  label{font-size:.85rem;margin-bottom:5px;color:var(--text2)}
+  .row{gap:10px;margin-bottom:10px}
+  .section{margin-bottom:18px}
+  .section-title{font-size:.8rem;margin-bottom:8px}
+
+  /* Template grid — bigger touch targets */
+  .tpl-grid{grid-template-columns:repeat(3,1fr);gap:8px}
+  .tpl-btn{padding:12px 6px;font-size:.7rem;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .tpl-btn .ico{font-size:1.5rem;margin-bottom:4px}
+
+  /* Generate button — big, fat, obvious */
+  .gen-btn{padding:16px;font-size:1.1rem;border-radius:10px;position:sticky;bottom:0;z-index:10;box-shadow:0 -4px 20px rgba(0,0,0,.5)}
+
+  /* Step indicators */
+  .step-bar{margin-bottom:14px}
+  .step-pip{height:5px}
+  .step-label{font-size:.8rem;margin-bottom:10px}
+  .step-label .step-num{width:22px;height:22px;font-size:.7rem}
+
+  /* Tips */
+  .tip{font-size:.8rem;padding:10px 12px;line-height:1.6}
+
+  /* Tables — card layout on mobile */
+  table{font-size:.8rem}
+  th{font-size:.75rem;padding:8px 10px}
+  td{padding:8px 10px}
+
+  /* Sheet layout */
+  .sheet-container{flex-direction:column}
+  .sheet-card{width:100%}
+  .sheet-card svg{width:100%;height:auto}
+
+  /* Fittings */
+  .fitting-card{padding:14px}
+  .fitting-card h4{font-size:.9rem}
+  .fitting-card p{font-size:.8rem}
+
+  /* Pricing */
+  .price-row{padding:10px 0;font-size:.85rem}
+  .price-row input{width:90px;font-size:.9rem}
+  .price-total{font-size:1.2rem;padding:14px 0}
+
+  /* Export grid */
+  .export-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .export-btn{padding:20px 12px}
+  .export-btn .ico{font-size:1.8rem}
+  .export-btn span{font-size:.8rem}
+
+  /* AR buttons */
+  .ar-btn{padding:12px;font-size:.9rem;min-height:48px}
+
+  /* Welcome */
   .welcome-card h1{font-size:1.8rem}
+  .welcome-step h3{font-size:.9rem}
+  .welcome-step p{font-size:.75rem;line-height:1.5}
+  .welcome-start{padding:16px;font-size:1.1rem}
+
+  /* Overrides */
+  .override-item{padding:10px}
+  .override-item .name{font-size:.8rem}
+
+  /* Project bar */
+  .project-bar button{padding:8px 12px;font-size:.8rem;min-height:40px}
+
+  /* Logo */
+  .logo{font-size:1.4rem;padding:8px 0}
+  .logo small{font-size:.6rem}
+
+  /* Camera measure */
+  .cm-phase{font-size:.9rem}
+  .cm-inst{font-size:.8rem;line-height:1.6}
+  .cm-dist{font-size:1.1rem}
+  .cm-actions button{padding:12px;font-size:.9rem;min-height:48px}
+  .cm-top button{min-height:40px}
 }
 
 /* AR Measure */
@@ -705,9 +784,10 @@ function renderTab(){
 
 // ── Preview (2D SVG) ──
 function renderPreview(){
-  if(!S.parts.length) return '<div class="info">Pick a template in the sidebar and tap <strong>Generate my cut list</strong> to get started.</div>';
+  if(!S.parts.length) return `<div style="text-align:center;padding:40px 20px"><div style="font-size:2rem;margin-bottom:12px">&#x1F4D0;</div><div style="font-size:1rem;color:var(--text);margin-bottom:8px">Ready to plan your build?</div><div style="font-size:.85rem;color:var(--text3);margin-bottom:16px">Tap <strong style="color:var(--amber)">Settings</strong> to choose what you're building and enter your measurements.</div><button onclick="openSidebar()" style="padding:12px 24px;background:var(--amber);color:var(--bg);border:none;border-radius:var(--radius);font-size:.9rem;font-weight:600;cursor:pointer">Open Settings</button></div>`;
   const tplName=TEMPLATES.find(x=>x.id===S.template)?.name||'';
-  let header=`<div style="margin-bottom:12px"><div style="font-size:.85rem;color:var(--amber);font-weight:600">${tplName} Preview</div><div style="font-size:.7rem;color:var(--text3)">${S.parts.reduce((s,p)=>s+p.qty,0)} parts from ${S.sheets.length} sheet${S.sheets.length!==1?'s':''} | Swipe tabs above for cut list, pricing & more</div></div>`;
+  const isMobile=window.innerWidth<=768;
+  let header=`<div style="margin-bottom:12px"><div style="font-size:${isMobile?'1rem':'.85rem'};color:var(--amber);font-weight:600">${tplName}</div><div style="font-size:${isMobile?'.85rem':'.7rem'};color:var(--text3);line-height:1.6">${S.parts.reduce((s,p)=>s+p.qty,0)} parts from ${S.sheets.length} sheet${S.sheets.length!==1?'s':''}<br>${isMobile?'Swipe the tabs above':'Switch tabs'} to see the cut list, sheet layout, pricing and export options</div></div>`;
   const W=700,H=550,pad=60;
   const ow=gv('dimW'),oh=gv('dimH'),od=gv('dimD');
   const scale=Math.min((W-2*pad)/ow,(H-2*pad)/oh);
