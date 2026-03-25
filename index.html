@@ -149,13 +149,27 @@ tr:hover td{background:var(--bg3)}
 .tip{font-size:.7rem;color:var(--text3);padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:var(--radius);margin-bottom:8px;line-height:1.5}
 .tip strong{color:var(--text2)}
 
-/* Measure helper (iOS fallback) */
-.measure-helper{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:8px}
-.measure-helper h4{font-size:.75rem;color:var(--amber);margin-bottom:6px}
-.measure-helper p{font-size:.7rem;color:var(--text3);line-height:1.5;margin-bottom:8px}
-.measure-helper .mh-steps{list-style:none;padding:0}
-.measure-helper .mh-steps li{font-size:.7rem;color:var(--text2);padding:4px 0 4px 20px;position:relative}
-.measure-helper .mh-steps li::before{content:attr(data-n);position:absolute;left:0;color:var(--amber);font-weight:600}
+/* Camera Measure */
+#camMeasure{position:fixed;inset:0;z-index:200;background:var(--bg);display:none;flex-direction:column}
+#camMeasure.open{display:flex}
+.cm-top{padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.cm-top .cm-title{flex:1;font-size:.85rem;color:var(--amber);font-weight:600}
+.cm-top button{padding:6px 12px;font-size:.75rem}
+.cm-canvas-wrap{flex:1;position:relative;overflow:hidden;touch-action:none}
+.cm-canvas-wrap canvas{position:absolute;top:0;left:0}
+.cm-bottom{padding:12px 16px;background:var(--bg2);border-top:1px solid var(--border)}
+.cm-phase{font-size:.8rem;color:var(--amber);font-weight:600;margin-bottom:4px}
+.cm-inst{font-size:.7rem;color:var(--text2);line-height:1.5;margin-bottom:8px}
+.cm-dist{font-size:1.3rem;color:var(--text);font-weight:700;margin-bottom:4px}
+.cm-actions{display:flex;gap:8px;flex-wrap:wrap}
+.cm-actions button{padding:10px 16px;font-size:.8rem;flex:1}
+.cm-actions .primary{background:var(--amber);color:var(--bg);border-color:var(--amber);font-weight:600}
+.cm-dot{position:absolute;width:20px;height:20px;border-radius:50%;border:3px solid #fff;transform:translate(-50%,-50%);pointer-events:none;z-index:5;box-shadow:0 0 8px #0008}
+.cm-dot.a{background:var(--green)}
+.cm-dot.b{background:var(--red)}
+.cm-dot.ref{background:var(--amber)}
+.cm-line{position:absolute;pointer-events:none;z-index:4}
+.cm-label{position:absolute;background:rgba(15,14,12,.9);color:var(--amber);padding:4px 10px;border-radius:4px;font-size:.85rem;font-weight:700;transform:translate(-50%,-100%);margin-top:-12px;pointer-events:none;z-index:6;white-space:nowrap;box-shadow:0 2px 8px #0006}
 
 /* Mobile */
 @media(max-width:768px){
@@ -306,7 +320,8 @@ tr:hover td{background:var(--bg3)}
             <div><label>Roof pitch (&deg;)</label><input type="number" id="dimPitch" class="full-w" value="35"></div>
           </div>
         </details>
-        <button class="ar-btn" id="arBtn" style="display:none" onclick="startAR()"><span class="ar-ico">&#x1F4F1;</span> Measure with your camera (AR)</button>
+        <button class="ar-btn" id="camMeasureBtn" onclick="cmOpen()"><span class="ar-ico">&#x1F4F0;</span> Measure from a photo</button>
+        <button class="ar-btn" id="arBtn" style="display:none" onclick="startAR()"><span class="ar-ico">&#x1F4F1;</span> AR Measure (Android)</button>
         <div id="arNoSupport" style="display:none"></div>
       </div>
 
@@ -332,7 +347,7 @@ tr:hover td{background:var(--bg3)}
     <div class="content" id="content"></div>
   </div>
 
-  <!-- AR Overlay -->
+  <!-- AR Overlay (Android WebXR) -->
   <div id="arOverlay" style="display:none">
     <div id="arHud">
       <div class="ar-label">Measuring: <span id="arTarget">Width</span></div>
@@ -342,6 +357,26 @@ tr:hover td{background:var(--bg3)}
       <button onclick="arNext()" id="arNextBtn">Next</button>
       <button class="ar-done" onclick="arDone()" id="arDoneBtn">Done</button>
       <button class="ar-cancel" onclick="arCancel()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Camera Measure (works on all phones) -->
+  <div id="camMeasure">
+    <div class="cm-top">
+      <div class="cm-title" id="cmTitle">Step 1: Take a photo</div>
+      <button onclick="cmReset()">Reset</button>
+      <button onclick="cmClose()">Close</button>
+    </div>
+    <div class="cm-canvas-wrap" id="cmWrap">
+      <canvas id="cmCanvas"></canvas>
+    </div>
+    <div class="cm-bottom">
+      <div class="cm-phase" id="cmPhase">Take a photo of your wall</div>
+      <div class="cm-inst" id="cmInst">Include a <strong>bank card</strong> (or A4 paper) flat against the wall for scale. Hold the phone straight-on.</div>
+      <div class="cm-dist" id="cmDist"></div>
+      <div class="cm-actions" id="cmActions">
+        <button class="primary" onclick="cmCapture()">Take photo</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1054,7 +1089,278 @@ function newProject(){
   selectTemplate('shelving');
 }
 
-// ── AR Measure ──
+// ── Camera Measure (works on all phones including iPhone) ──
+const CM = {
+  phase: 'capture',   // 'capture' | 'calibrate' | 'measure'
+  img: null,          // loaded Image object
+  canvas: null,
+  ctx: null,
+  points: [],         // [{x,y}] screen coords on canvas
+  scale: 1,           // px per mm (calculated from reference)
+  refSizeMM: 85.6,    // credit card width = 85.6mm (ISO standard)
+  refType: 'card',    // 'card' | 'a4'
+  measureTarget: 'width',
+  targetIdx: 0,
+  targets: ['width','height','depth'],
+  measurements: {},
+  imgScale: 1,        // ratio of displayed image to natural size
+};
+
+function cmOpen(){
+  const el=document.getElementById('camMeasure');
+  el.classList.add('open');
+  closeSidebar();
+  CM.phase='capture';
+  CM.points=[];
+  CM.measurements={};
+  CM.targetIdx=0;
+  CM.measureTarget='width';
+  cmUpdateUI();
+}
+
+function cmClose(){
+  document.getElementById('camMeasure').classList.remove('open');
+}
+
+function cmReset(){
+  CM.phase='capture';
+  CM.points=[];
+  CM.img=null;
+  CM.measurements={};
+  CM.targetIdx=0;
+  CM.measureTarget='width';
+  const c=document.getElementById('cmCanvas');
+  if(c.getContext) c.getContext('2d').clearRect(0,0,c.width,c.height);
+  // Clear any dots/labels
+  document.querySelectorAll('.cm-dot,.cm-line,.cm-label').forEach(e=>e.remove());
+  cmUpdateUI();
+}
+
+function cmCapture(){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  input.capture='environment'; // rear camera
+  input.onchange=e=>{
+    const file=e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        CM.img=img;
+        CM.phase='calibrate';
+        CM.points=[];
+        cmDrawImage();
+        cmUpdateUI();
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function cmDrawImage(){
+  const wrap=document.getElementById('cmWrap');
+  const canvas=document.getElementById('cmCanvas');
+  const ctx=canvas.getContext('2d');
+  CM.canvas=canvas;
+  CM.ctx=ctx;
+
+  const wrapW=wrap.clientWidth;
+  const wrapH=wrap.clientHeight;
+  const imgAspect=CM.img.width/CM.img.height;
+  const wrapAspect=wrapW/wrapH;
+
+  let drawW,drawH;
+  if(imgAspect>wrapAspect){
+    drawW=wrapW;
+    drawH=wrapW/imgAspect;
+  } else {
+    drawH=wrapH;
+    drawW=wrapH*imgAspect;
+  }
+
+  canvas.width=drawW;
+  canvas.height=drawH;
+  canvas.style.width=drawW+'px';
+  canvas.style.height=drawH+'px';
+  canvas.style.left=((wrapW-drawW)/2)+'px';
+  canvas.style.top=((wrapH-drawH)/2)+'px';
+
+  CM.imgScale=drawW/CM.img.width;
+
+  ctx.drawImage(CM.img,0,0,drawW,drawH);
+
+  // Clear existing dots
+  document.querySelectorAll('.cm-dot,.cm-line,.cm-label').forEach(e=>e.remove());
+
+  // Add tap handler
+  canvas.onclick=cmTap;
+}
+
+function cmTap(e){
+  const rect=CM.canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left;
+  const y=e.clientY-rect.top;
+
+  if(CM.phase==='calibrate'){
+    CM.points.push({x,y});
+    cmAddDot(x,y,'ref',CM.points.length);
+
+    if(CM.points.length===2){
+      // Calculate scale: px distance / known mm
+      const dx=CM.points[1].x-CM.points[0].x;
+      const dy=CM.points[1].y-CM.points[0].y;
+      const pxDist=Math.sqrt(dx*dx+dy*dy);
+      CM.scale=pxDist/CM.refSizeMM;
+      cmDrawLine(CM.points[0],CM.points[1],'#d4920a',CM.refSizeMM.toFixed(0)+'mm (ref)');
+      CM.phase='measure';
+      CM.points=[];
+      cmUpdateUI();
+    } else {
+      cmUpdateUI();
+    }
+  } else if(CM.phase==='measure'){
+    CM.points.push({x,y});
+    cmAddDot(x,y,CM.points.length===1?'a':'b',CM.points.length);
+
+    if(CM.points.length===2){
+      const dx=CM.points[1].x-CM.points[0].x;
+      const dy=CM.points[1].y-CM.points[0].y;
+      const pxDist=Math.sqrt(dx*dx+dy*dy);
+      const mmDist=Math.round(pxDist/CM.scale);
+      CM.measurements[CM.measureTarget]=mmDist;
+      cmDrawLine(CM.points[0],CM.points[1],'#4a4',mmDist+'mm');
+      cmUpdateUI();
+    } else {
+      cmUpdateUI();
+    }
+  }
+}
+
+function cmAddDot(x,y,cls,n){
+  const wrap=document.getElementById('cmWrap');
+  const canvas=CM.canvas;
+  const rect=canvas.getBoundingClientRect();
+  const wrapRect=wrap.getBoundingClientRect();
+  const dot=document.createElement('div');
+  dot.className='cm-dot '+cls;
+  dot.style.left=(rect.left-wrapRect.left+x)+'px';
+  dot.style.top=(rect.top-wrapRect.top+y)+'px';
+  wrap.appendChild(dot);
+}
+
+function cmDrawLine(p1,p2,color,label){
+  const wrap=document.getElementById('cmWrap');
+  const canvas=CM.canvas;
+  const rect=canvas.getBoundingClientRect();
+  const wrapRect=wrap.getBoundingClientRect();
+  const ox=rect.left-wrapRect.left;
+  const oy=rect.top-wrapRect.top;
+
+  // Draw on canvas
+  CM.ctx.beginPath();
+  CM.ctx.moveTo(p1.x,p1.y);
+  CM.ctx.lineTo(p2.x,p2.y);
+  CM.ctx.strokeStyle=color;
+  CM.ctx.lineWidth=2;
+  CM.ctx.setLineDash([6,4]);
+  CM.ctx.stroke();
+  CM.ctx.setLineDash([]);
+
+  // Floating label
+  const lbl=document.createElement('div');
+  lbl.className='cm-label';
+  lbl.textContent=label;
+  lbl.style.left=(ox+(p1.x+p2.x)/2)+'px';
+  lbl.style.top=(oy+Math.min(p1.y,p2.y)-4)+'px';
+  wrap.appendChild(lbl);
+}
+
+function cmNextMeasure(){
+  CM.targetIdx++;
+  if(CM.targetIdx>=CM.targets.length) CM.targetIdx=0;
+  CM.measureTarget=CM.targets[CM.targetIdx];
+  CM.points=[];
+  cmUpdateUI();
+}
+
+function cmDone(){
+  if(CM.measurements.width) sv('dimW',CM.measurements.width);
+  if(CM.measurements.height) sv('dimH',CM.measurements.height);
+  if(CM.measurements.depth) sv('dimD',CM.measurements.depth);
+  cmClose();
+  generate();
+}
+
+function cmSetRef(type){
+  CM.refType=type;
+  CM.refSizeMM=type==='card'?85.6:297; // card width or A4 long edge
+  cmUpdateUI();
+}
+
+function cmUpdateUI(){
+  const title=document.getElementById('cmTitle');
+  const phase=document.getElementById('cmPhase');
+  const inst=document.getElementById('cmInst');
+  const dist=document.getElementById('cmDist');
+  const actions=document.getElementById('cmActions');
+
+  if(CM.phase==='capture'){
+    title.textContent='Step 1: Take a photo';
+    phase.textContent='Take a photo of your wall';
+    inst.innerHTML='Place a <strong>bank card</strong> flat against the wall for scale reference. Then take a photo holding the phone straight-on.';
+    dist.textContent='';
+    actions.innerHTML=`
+      <button class="primary" onclick="cmCapture()">Take photo</button>
+    `;
+  } else if(CM.phase==='calibrate'){
+    title.textContent='Step 2: Mark the reference';
+    phase.textContent='Tap both ends of your '+( CM.refType==='card'?'bank card':'A4 sheet');
+    const refLabel=CM.refType==='card'?'bank card (85.6mm wide)':'A4 paper (297mm long edge)';
+    if(CM.points.length===0){
+      inst.innerHTML=`Tap the <strong>left edge</strong> of your ${refLabel}.<br><br><span style="font-size:.65rem;color:var(--text3)">Using something else? <a href="#" onclick="cmSetRef('${CM.refType==='card'?'a4':'card'}');return false" style="color:var(--amber)">Switch to ${CM.refType==='card'?'A4 paper':'bank card'}</a></span>`;
+    } else {
+      inst.innerHTML=`Now tap the <strong>right edge</strong> of your ${refLabel}.`;
+    }
+    dist.textContent=CM.points.length+'/2 points';
+    actions.innerHTML=`<button onclick="cmReset()">Start over</button>`;
+  } else if(CM.phase==='measure'){
+    const t=CM.measureTarget;
+    const tName=t.charAt(0).toUpperCase()+t.slice(1);
+    title.textContent='Step 3: Measure '+tName;
+    phase.textContent='Measuring: '+tName;
+
+    if(CM.points.length===0){
+      inst.innerHTML=`Tap <strong>one end</strong> of the ${t} you want to measure.`;
+    } else if(CM.points.length===1){
+      inst.innerHTML=`Now tap the <strong>other end</strong>.`;
+    } else {
+      const v=CM.measurements[t];
+      inst.innerHTML=`<strong>${tName}: ${v}mm</strong> (${mm2in(v)}"). Tap Next to measure another dimension, or Done to use these.`;
+    }
+
+    // Show all measurements so far
+    const parts=CM.targets.map(x=>{
+      const v=CM.measurements[x];
+      return x.charAt(0).toUpperCase()+x.slice(1)+': '+(v?v+'mm':'--');
+    });
+    dist.textContent=parts.join('  |  ');
+
+    let btns='';
+    if(CM.points.length>=2){
+      btns+=`<button onclick="cmNextMeasure()">Next dimension</button>`;
+      btns+=`<button class="primary" onclick="cmDone()">Done (${Object.keys(CM.measurements).length}/3)</button>`;
+    } else {
+      btns+=`<button onclick="cmReset()">Start over</button>`;
+    }
+    actions.innerHTML=btns;
+  }
+}
+
+// ── AR Measure (WebXR — Android only) ──
 const AR = {
   session: null,
   refSpace: null,
@@ -1074,27 +1380,10 @@ const AR = {
 
 function checkARSupport(){
   const btn=document.getElementById('arBtn');
-  const noSup=document.getElementById('arNoSupport');
-  const showMeasureHelper=()=>{
-    noSup.style.display='block';
-    noSup.innerHTML=`<div class="measure-helper">
-      <h4>How to measure your space</h4>
-      <p>AR measuring isn't available on this device, but measuring by hand is easy and more accurate!</p>
-      <ol class="mh-steps">
-        <li data-n="1.">Get a tape measure (or use the Measure app on your iPhone)</li>
-        <li data-n="2.">Measure the <strong>width</strong> of the space — wall to wall</li>
-        <li data-n="3.">Measure the <strong>height</strong> — floor to ceiling (or desired height)</li>
-        <li data-n="4.">Measure the <strong>depth</strong> — how far it sticks out from the wall</li>
-        <li data-n="5.">Type the numbers above in <strong>millimetres</strong></li>
-      </ol>
-      <p style="margin-top:8px;font-size:.65rem;color:var(--text3)">Quick conversion: 1 inch = 25.4mm. A standard kitchen is usually 600mm deep, 900mm worktop height.</p>
-    </div>`;
-  };
-  if(!navigator.xr){showMeasureHelper();return}
+  if(!navigator.xr) return;
   navigator.xr.isSessionSupported('immersive-ar').then(ok=>{
     if(ok) btn.style.display='block';
-    else showMeasureHelper();
-  }).catch(showMeasureHelper);
+  }).catch(()=>{});
 }
 
 async function startAR(){
