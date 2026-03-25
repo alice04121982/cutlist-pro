@@ -518,52 +518,65 @@ function renderTab(){
 // ── Preview (2D SVG) ──
 function renderPreview(){
   if(!S.parts.length) return '<div class="info">Select a template and press Generate.</div>';
-  const W=700,H=500,pad=60;
+  const W=700,H=550,pad=60;
   const ow=gv('dimW'),oh=gv('dimH'),od=gv('dimD');
   const scale=Math.min((W-2*pad)/ow,(H-2*pad)/oh);
   let svg=`<svg id="previewSvg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
   svg+=`<rect width="${W}" height="${H}" fill="#0f0e0c"/>`;
+  // Grid lines
+  for(let gx=0;gx<W;gx+=50) svg+=`<line x1="${gx}" y1="0" x2="${gx}" y2="${H}" stroke="#1a1917" stroke-width=".5"/>`;
+  for(let gy=0;gy<H;gy+=50) svg+=`<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="#1a1917" stroke-width=".5"/>`;
 
   const bw=ow*scale,bh=oh*scale;
   const bx=(W-bw)/2,by=(H-bh)/2;
-  svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="none" stroke="#d4920a" stroke-width="1.5"/>`;
+  svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="none" stroke="#d4920a" stroke-width="2"/>`;
 
   const thick=gv('thickness')*scale;
   const t=S.template;
   if(['shelving','wardrobe','kitchenbase','kitchenwall'].includes(t)){
-    svg+=`<rect x="${bx}" y="${by}" width="${thick}" height="${bh}" fill="#d4920a22" stroke="#d4920a55"/>`;
-    svg+=`<rect x="${bx+bw-thick}" y="${by}" width="${thick}" height="${bh}" fill="#d4920a22" stroke="#d4920a55"/>`;
-    svg+=`<rect x="${bx+thick}" y="${by}" width="${bw-2*thick}" height="${thick}" fill="#a6730822" stroke="#a6730855"/>`;
-    svg+=`<rect x="${bx+thick}" y="${by+bh-thick}" width="${bw-2*thick}" height="${thick}" fill="#a6730822" stroke="#a6730855"/>`;
+    // Sides
+    svg+=`<rect x="${bx}" y="${by}" width="${thick}" height="${bh}" fill="#d4920a55" stroke="#d4920a"/>`;
+    svg+=`<rect x="${bx+bw-thick}" y="${by}" width="${thick}" height="${bh}" fill="#d4920a55" stroke="#d4920a"/>`;
+    // Top / Bottom
+    svg+=`<rect x="${bx+thick}" y="${by}" width="${bw-2*thick}" height="${thick}" fill="#a6730866" stroke="#a67308"/>`;
+    svg+=`<rect x="${bx+thick}" y="${by+bh-thick}" width="${bw-2*thick}" height="${thick}" fill="#a6730866" stroke="#a67308"/>`;
+    // Shelves
     const ns=gv('dimShelves');
     const innerH=bh-2*thick;
     for(let i=1;i<=ns;i++){
       const sy2=by+thick+innerH*i/(ns+1)-thick/2;
-      svg+=`<rect x="${bx+thick}" y="${sy2}" width="${bw-2*thick}" height="${thick}" fill="#4a416622" stroke="#4a416655"/>`;
+      svg+=`<rect x="${bx+thick}" y="${sy2}" width="${bw-2*thick}" height="${thick}" fill="#6b5b4566" stroke="#8B7355"/>`;
     }
     if(t==='wardrobe'){
       const dw=(bw-2*thick)/2;
-      svg+=`<line x1="${bx+thick+dw}" y1="${by+thick}" x2="${bx+thick+dw}" y2="${by+bh-thick}" stroke="#d4920a33" stroke-dasharray="4"/>`;
+      svg+=`<line x1="${bx+thick+dw}" y1="${by+thick}" x2="${bx+thick+dw}" y2="${by+bh-thick}" stroke="#d4920a88" stroke-width="1.5" stroke-dasharray="6 3"/>`;
     }
     if(t==='kitchenbase'){
       const plinth=100*scale;
-      svg+=`<rect x="${bx}" y="${by+bh-plinth}" width="${bw}" height="${plinth}" fill="#33201022" stroke="#d4920a33"/>`;
+      svg+=`<rect x="${bx}" y="${by+bh-plinth}" width="${bw}" height="${plinth}" fill="#33201055" stroke="#d4920a88"/>`;
     }
   } else {
+    // Framing: studs/joists
     const spacing=gv('dimSpacing')*scale;
     const count=Math.floor(bw/spacing)+1;
     for(let i=0;i<count;i++){
       const x2=bx+Math.min(i*spacing,bw-thick);
-      svg+=`<rect x="${x2}" y="${by+thick}" width="${thick}" height="${bh-2*thick}" fill="#d4920a15" stroke="#d4920a44"/>`;
+      svg+=`<rect x="${x2}" y="${by+thick}" width="${thick}" height="${bh-2*thick}" fill="#d4920a44" stroke="#d4920a99"/>`;
     }
-    svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${thick}" fill="#d4920a22" stroke="#d4920a55"/>`;
-    svg+=`<rect x="${bx}" y="${by+bh-thick}" width="${bw}" height="${thick}" fill="#d4920a22" stroke="#d4920a55"/>`;
+    // Plates
+    svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${thick}" fill="#d4920a55" stroke="#d4920a"/>`;
+    svg+=`<rect x="${bx}" y="${by+bh-thick}" width="${bw}" height="${thick}" fill="#d4920a55" stroke="#d4920a"/>`;
     if(t==='pitchedroof'){
       const apex=by+bh*0.15;
-      svg+=`<line x1="${bx}" y1="${by+bh}" x2="${bx+bw/2}" y2="${apex}" stroke="#d4920a" stroke-width="1" stroke-dasharray="6"/>`;
-      svg+=`<line x1="${bx+bw}" y1="${by+bh}" x2="${bx+bw/2}" y2="${apex}" stroke="#d4920a" stroke-width="1" stroke-dasharray="6"/>`;
+      svg+=`<line x1="${bx}" y1="${by+bh}" x2="${bx+bw/2}" y2="${apex}" stroke="#d4920a" stroke-width="2" stroke-dasharray="8 4"/>`;
+      svg+=`<line x1="${bx+bw}" y1="${by+bh}" x2="${bx+bw/2}" y2="${apex}" stroke="#d4920a" stroke-width="2" stroke-dasharray="8 4"/>`;
     }
   }
+
+  // Part labels
+  const labelY=by+bh+30;
+  svg+=`<text x="${W/2}" y="${labelY}" fill="#d4920a" font-size="13" font-family="IBM Plex Mono" text-anchor="middle" font-weight="600">${TEMPLATES.find(x=>x.id===t)?.name||''}</text>`;
+  svg+=`<text x="${W/2}" y="${labelY+16}" fill="#6b6660" font-size="10" font-family="IBM Plex Mono" text-anchor="middle">${fmt(ow)} \u00D7 ${fmt(oh)} \u00D7 ${fmt(od)}</text>`;
 
   svg+=dimLine(bx,by-20,bx+bw,by-20,fmt(ow));
   svg+=dimLine(bx-20,by,bx-20,by+bh,fmt(oh));
