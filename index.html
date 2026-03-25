@@ -1,23 +1,926 @@
-<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Authentication Required</title><script type=text/llms.txt>
-## Note to agents accessing this page:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CutList Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0e0c;--bg2:#1a1917;--bg3:#252320;--bg4:#302e2a;
+  --amber:#d4920a;--amber-dim:#a67308;--amber-glow:#d4920a33;
+  --text:#e8e2d6;--text2:#a09a8e;--text3:#6b6660;
+  --border:#332f2a;--border2:#444038;
+  --red:#c44;--green:#4a4;--blue:#48a;
+  --font:'IBM Plex Mono',monospace;--serif:'Instrument Serif',serif;
+  --radius:6px;--sidebar-w:340px;
+}
+html{font-size:14px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+input,select,button,textarea{font-family:var(--font);font-size:.85rem;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;outline:none}
+input:focus,select:focus{border-color:var(--amber)}
+button{cursor:pointer;transition:all .15s}
+button:hover{border-color:var(--amber)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-This page requires Vercel authentication. Here are your options:
+/* Layout */
+.app{display:flex;height:100vh}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:100}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);min-height:48px}
+.content{flex:1;overflow:auto;padding:16px;position:relative}
 
-Option 1: vercel curl (Recommended if Vercel CLI installed)
-If the Vercel CLI is installed and authenticated, use the `vercel curl` command. Docs at: https://vercel.com/docs/cli/curl
+/* Hamburger */
+.hamburger{display:none;background:none;border:none;padding:4px;cursor:pointer}
+.hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:.3s}
+.overlay{display:none;position:fixed;inset:0;background:#000a;z-index:99}
+.sidebar-close{display:none;position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text2);font-size:1.4rem;cursor:pointer}
 
-Option 2: Vercel MCP Server (Recommended if Vercel CLI not installed)
-If the Vercel CLI is not installed, the easiest way to get a token is using the get_access_to_vercel_url or web_fetch_vercel_url functions of the Vercel MCP server at https://mcp.vercel.com (Docs at https://vercel.com/docs/mcp/vercel-mcp)
-  
-Option 3: Bypass token (Manual)
-This URL documents how to use the bypass token: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
-You need to prompt the user to provide the bypass token to access this page. The URL above also explains how the user can
-access the bypass token. Then you can calculate a URL of the following form and successfully access it: `https://current-domain/current-pathname?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=$bypass_token`.
-  </script><style>/*!normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css*/html{line-height:1.15;-webkit-text-size-adjust:100%;height:-webkit-fill-available}body{margin:0}main{display:block}h1{font-size:2em;margin:.67em 0}hr{box-sizing:content-box;height:0;overflow:visible}pre{font-family:monospace,monospace;font-size:1em}a{background-color:#0000}abbr[title]{border-bottom:none;text-decoration:underline;text-decoration:underline dotted}b,strong{font-weight:bolder}code,kbd,samp{font-family:monospace,monospace;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}img{border-style:none}button,input,optgroup,select,textarea{font-family:inherit;font-size:100%;line-height:1.15;margin:0}button,input{overflow:visible}button,select{text-transform:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button}[type=button]::-moz-focus-inner,[type=reset]::-moz-focus-inner,[type=submit]::-moz-focus-inner,button::-moz-focus-inner{border-style:none;padding:0}[type=button]:-moz-focusring,[type=reset]:-moz-focusring,[type=submit]:-moz-focusring,button:-moz-focusring{outline:1px dotted ButtonText}fieldset{padding:.35em .75em .625em}legend{box-sizing:border-box;color:inherit;display:table;max-width:100%;padding:0;white-space:normal}progress{vertical-align:baseline}textarea{overflow:auto}[type=checkbox],[type=radio]{box-sizing:border-box;padding:0}[type=number]::-webkit-inner-spin-button,[type=number]::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}[type=search]::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}details{display:block}summary{display:list-item}template{display:none}[hidden]{display:none}*,*::before,*::after{box-sizing:border-box}body{--foreground-color: #000000;--background-color: #ffffff;--border-color: #eaeaea;--text-color: #444;--disabled-background: #fafafa;--error-color: #e00;--blue-color: #0057FF;--secondary-text: #666;--link-color: inherit;--spinner-color: #8F8F8F;--button-hover-color: #333;--ds-focus-ring: 0 0 0 2px var(--background-color), 0 0 0 6px var(--blue-color);--monospace-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:var(--background-color);color:var(--foreground-color);display:block;font-family:-apple-system,BlinkMacSystemFont,segoe ui,roboto,oxygen,ubuntu,cantarell,fira sans,droid sans,helvetica neue,sans-serif;height:100vh;height:-webkit-fill-available;margin:0;padding:0;-webkit-font-smoothing:antialiased}button,.link-button{appearance:none;-webkit-appearance:none;background:var(--foreground-color);border:none;border-radius:6px;color:var(--background-color);cursor:pointer;font-size:14px;font-weight:500;height:42px;outline:none;padding:0;transition:all .2s ease 0s;user-select:none;width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none;gap:6px;padding:0 12px}button:hover,.link-button:hover{background-color:var(--button-hover-color);color:var(--background-color)}button:focus-visible,.link-button:focus-visible{box-shadow:var(--ds-focus-ring);outline:none;border:0}button:disabled{background:var(--disabled-background);color:#0000;cursor:not-allowed}h1{color:var(--foreground-color);font-size:24px;font-style:normal;font-weight:600;line-height:32px;letter-spacing:-.5px;margin:0;margin-bottom:20px;text-align:center}hr{border:none;border-top:1px solid var(--border-color);margin:0}input{appearance:none;-webkit-appearance:none;border:1px solid var(--border-color);border-radius:6px;background:var(--background-color);caret-color:var(--foreground-color);color:var(--foreground-color);font-size:14px;height:42px;outline:0;padding:0 16px;transition:border .2s ease 0s,color .2s ease 0s,box-shadow .2s ease 0s}input:focus{border-color:var(--foreground-color);box-shadow:0 0 0 4px #b4b4b466!important}p{color:var(--text-color);font-size:16px;letter-spacing:-.163333px;line-height:24px;margin:0;text-align:center}.card{max-width:380px;width:100%;padding:32px;display:flex;flex-direction:column;margin-bottom:16px}.alert{display:none;margin-top:10px;margin-bottom:20px}.error input{color:var(--error-color);border-color:var(--error-color)}.error .alert{display:flex}.error .message{color:var(--error-color)}.footer{color:var(--secondary-text);font-size:13px;line-height:24px;font-family:var(--monospace-font);text-align:center;margin-top:auto;position:absolute;bottom:30px;width:100%}.footer a{color:var(--link-color);font-weight:500;text-decoration:none;display:flex;justify-content:center;align-items:center}.footer a:hover{text-decoration:underline}.message{font-size:14px;line-height:20px;margin-left:10px}.message b{font-weight:600}.or{display:none;margin-top:24px;margin-bottom:24px;font-family:var(--monospace-font);color:var(--secondary-text);position:relative}.or .badge{align-items:center;background:var(--background-color);display:flex;font-size:12px;font-weight:500;height:20px;justify-content:center;left:50%;line-height:16px;position:absolute;text-align:center;top:50%;transform:translate(-50%,-50%);width:32px}.password{display:none}.password-enabled .password{display:block}.password button{position:relative}.password button .spinner-wrapper{position:absolute;transform:(0.8)}.password-enabled.sso-enabled .or{display:block}.sso{display:none}.sso button .vercel{margin-right:10px;transform:translateY(1px)}.sso-enabled .sso{display:block}.sso.error .link-button{border:1px solid var(--error-color)}.auto-redirect{display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:8px}.auto-redirect h1{margin:0}.auto-redirect-backup{font-size:14px;color:var(--secondary-text);animation:fade-in .2s .5s ease-out;animation-fill-mode:forwards;opacity:0}.auto-redirect-backup a{color:var(--foreground-color);display:inline}.spinner-wrapper{display:none;height:20px;width:20px;position:relative}.auto-redirect .spinner-wrapper{margin-bottom:16px}form.submitting .spinner-wrapper,.auto-redirect .spinner-wrapper{display:block}.spinner{position:relative;top:50%;left:50%;transform-origin:0 0;height:20px;width:20px}.spinner-bar{-webkit-animation:spinner-spin 1.2s linear infinite;animation:spinner-spin 1.2s linear infinite;background:var(--spinner-color);border-radius:5px;height:8%;left:-10%;position:absolute;top:-3.9%;width:24%}.spinner-bar:nth-child(1){animation-delay:-1.2s;transform:rotate(0.0001deg) translate(146%)}.spinner-bar:nth-child(2){animation-delay:-1.1s;transform:rotate(30deg) translate(146%)}.spinner-bar:nth-child(3){animation-delay:-1s;transform:rotate(60deg) translate(146%)}.spinner-bar:nth-child(4){animation-delay:-.9s;transform:rotate(90deg) translate(146%)}.spinner-bar:nth-child(5){animation-delay:-.8s;transform:rotate(120deg) translate(146%)}.spinner-bar:nth-child(6){animation-delay:-.7s;transform:rotate(150deg) translate(146%)}.spinner-bar:nth-child(7){animation-delay:-.6s;transform:rotate(180deg) translate(146%)}.spinner-bar:nth-child(8){animation-delay:-.5s;transform:rotate(210deg) translate(146%)}.spinner-bar:nth-child(9){animation-delay:-.4s;transform:rotate(240deg) translate(146%)}.spinner-bar:nth-child(10){animation-delay:-.3s;transform:rotate(270deg) translate(146%)}.spinner-bar:nth-child(11){animation-delay:-.2s;transform:rotate(300deg) translate(146%)}.spinner-bar:nth-child(12){animation-delay:-.1s;transform:rotate(330deg) translate(146%)}.check-icon{position:absolute;top:-1px;opacity:0;transform-origin:center center;--stroke-color: var(--background-color);--fill-color: var(--foreground-color)}.disappear{animation:.3s disappear ease-in;animation-fill-mode:forwards}.appear{animation:appear cubic-bezier(0.645,0.045,0.355,1) .3s;animation-fill-mode:forwards}@keyframes disappear{30%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(0);filter:blur(2px)}}@keyframes appear{30%{opacity:0;transform:scale(0.6) rotate(0deg);filter:blur(2px)}100%{opacity:1;transform:scale(1);filter:blur(0px)}}@keyframes fade-in{from{opacity:0}to{opacity:1}}@keyframes spinner-spin{0%{opacity:1}100%{opacity:.15}}.error-icon{width:16px;height:16px;flex-shrink:0;margin-top:3px}.password-input-wrapper{position:relative;display:flex;align-items:center;justify-content:center;gap:10px}.password-input-wrapper input{flex:1}.password-input-wrapper button{flex-shrink:1}.page-wrapper{display:flex;flex-direction:column;min-height:100vh;min-height:-webkit-fill-available;align-items:center;justify-content:center}.content-wrapper{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}.word-end-wrapper{display:inline-block;position:relative}.authenticated{position:absolute;left:0}[data-status=authenticated] .authenticating,[data-status=authenticating] .authenticated{user-select:none;pointer-events:none}.authenticating>span,.authenticated>span{transition:.2s cubic-bezier(0.645,0.045,0.355,1);transition-property:opacity,filter,transform;display:inline-block;will-change:transform,filter,opacity}.authenticating>span{transition-duration:.2s}.authenticated>span{transition-duration:.25s}[data-status=authenticated] .authenticating>span{transform:translateY(10px);filter:blur(2px);opacity:0}[data-status=authenticating] .authenticated>span{transform:translateY(-6px);filter:blur(2px);opacity:0}[data-status=authenticated] .authenticated>span:nth-child(1){transition-delay:.04s}[data-status=authenticated] .authenticated>span:nth-child(2){transition-delay:.078s}h1[data-status=authenticated]{transform:translateX(2.5px);transition-property:transform,opacity;transition-duration:.22s;transition-timing-function:ease-in-out;transition-delay:.03s}@media(prefers-reduced-motion:reduce){.appear,.disappear{animation-duration:.001ms!important}*{transition:none!important}}@media(prefers-color-scheme:dark){body{--foreground-color: #fff;--background-color: #030303;--border-color: #333;--text-color: #ddd;--disabled-background: #2c2c2c;--disabled-border: #0a0a0a;--error-color: #e00;--secondary-text: #888888;--link-color: inherit;--button-hover-color: #aaa}}</style><body class=" sso-enabled"><div class=page-wrapper><div class=content-wrapper><div id=card class="card auto-vercel-auth-redirect"><div class=container><noscript><meta http-equiv=refresh content="1; URL=https://vercel.com/sso-api?url=https%3A%2F%2Fcutlist-axoaliahe-alicecharlottesmith-7723s-projects.vercel.app%2F&nonce=26a880f12f01949367e175b8d5b0338b16bee7c0459ec7129952477bc866d050"></noscript><div class=auto-redirect><div class=spinner-wrapper><div id=spinner class=spinner><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div><div class=spinner-bar></div></div><div id=check class=check-icon><svg width="20" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M24 12C24 18.6274 18.6274 24 12 24 5.37258 24 0 18.6274.0 12 0 5.37258 5.37258.0 12 0 18.6274.0 24 5.37258 24 12zM17.2955 9.7955 18.091 9 16.5 7.40901 15.7045 8.2045 9.75 14.159 8.2955 12.7045 7.5 11.909 5.90901 13.5 6.7045 14.2955 8.9545 16.5455C9.39384 16.9848 10.1062 16.9848 10.5455 16.5455l6.75-6.75z" fill="var(--foreground-color)" /></svg></div></div><h1 id=auth-status data-status=authenticating>Authenticat<span class=word-end-wrapper>
-<span class=authenticating><span>ing</span></span><span class=authenticated><span>e</span><span>d</span></span></span></h1></div></div><div id=bottom-section><div class="sso"><p id=auto-redirect-backup class=auto-redirect-backup>If you aren't automatically redirected, <a href="https://vercel.com/sso-api?url=https%3A%2F%2Fcutlist-axoaliahe-alicecharlottesmith-7723s-projects.vercel.app%2F&nonce=26a880f12f01949367e175b8d5b0338b16bee7c0459ec7129952477bc866d050">click here</a></p></div></div></div></div><div class=footer><a href="https://vercel.com/security?utm_source=protection" target=_blank rel=noopener>Vercel Authentication</a></div></div><script>(function(){var form=document.querySelector('form.password');if(form){var button=form.querySelector('button.submit');function onSubmit(e){form.classList.add("submitting");button.disabled=true;}
-form.addEventListener('submit',onSubmit);}
-function showCheckIconWhenVercelJwtIsSet(){fetch('/.well-known/vercel-user-meta').then((response)=>{if(response.status===200){document.getElementById('spinner').classList.add('disappear')
-document.getElementById('check').classList.add('appear')
-document.getElementById('auth-status').setAttribute('data-status','authenticated')}else{showCheckIconWhenVercelJwtIsSet()}})}
-document.addEventListener("DOMContentLoaded",function(){window.location.href="https://vercel.com/sso-api?url=https%3A%2F%2Fcutlist-axoaliahe-alicecharlottesmith-7723s-projects.vercel.app%2F&nonce=26a880f12f01949367e175b8d5b0338b16bee7c0459ec7129952477bc866d050";showCheckIconWhenVercelJwtIsSet()
-document.getElementById('auto-redirect-backup').style.visibility='hidden';});})();</script>
+/* Sidebar sections */
+.logo{font-family:var(--serif);font-size:1.6rem;color:var(--amber);padding:12px 0 4px;text-align:center}
+.logo small{font-family:var(--font);font-size:.6rem;color:var(--text3);display:block;letter-spacing:3px;text-transform:uppercase}
+.section{margin-bottom:14px}
+.section-title{font-size:.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+label{font-size:.75rem;color:var(--text2);display:block;margin-bottom:3px}
+.row{display:flex;gap:6px;margin-bottom:6px}
+.row>*{flex:1}
+.full-w{width:100%;margin-bottom:6px}
+select.full-w,input.full-w{width:100%}
+
+/* Template grid */
+.tpl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:6px}
+.tpl-btn{padding:6px 2px;font-size:.6rem;text-align:center;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s;line-height:1.2;color:var(--text2)}
+.tpl-btn:hover,.tpl-btn.active{border-color:var(--amber);color:var(--amber);background:var(--amber-glow)}
+.tpl-btn .ico{font-size:1.1rem;display:block;margin-bottom:2px}
+
+/* Generate button */
+.gen-btn{width:100%;padding:10px;background:var(--amber);color:var(--bg);border:none;border-radius:var(--radius);font-weight:600;font-size:.9rem;letter-spacing:.5px;cursor:pointer;margin-top:8px}
+.gen-btn:hover{background:#e9a00b}
+
+/* Tabs */
+.tabs{display:flex;gap:0;flex-wrap:wrap}
+.tab{padding:8px 14px;font-size:.75rem;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.unit-toggle{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3)}
+.unit-toggle button{padding:3px 8px;font-size:.7rem}
+.unit-toggle button.active{background:var(--amber);color:var(--bg);border-color:var(--amber)}
+
+/* Tab panels */
+.panel{display:none;height:100%}
+.panel.active{display:block}
+
+/* Preview */
+#previewSvg{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)}
+
+/* 3D */
+#canvas3d{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);cursor:grab}
+#canvas3d:active{cursor:grabbing}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{text-align:left;padding:8px 10px;background:var(--bg3);color:var(--amber);font-weight:500;border-bottom:1px solid var(--border);position:sticky;top:0}
+td{padding:7px 10px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg3)}
+
+/* Sheet layout */
+.sheet-container{display:flex;flex-wrap:wrap;gap:16px}
+.sheet-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.sheet-card h4{font-size:.75rem;color:var(--amber);margin-bottom:8px}
+
+/* Pricing */
+.price-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.8rem}
+.price-row label{flex:1;margin:0}
+.price-row input{width:80px;text-align:right}
+.price-total{font-size:1.1rem;color:var(--amber);padding:12px 0;font-weight:600;border-top:2px solid var(--amber)}
+
+/* Export */
+.export-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.export-btn{padding:16px;text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:.15s}
+.export-btn:hover{border-color:var(--amber);background:var(--amber-glow)}
+.export-btn .ico{font-size:1.6rem;display:block;margin-bottom:4px}
+.export-btn span{font-size:.75rem;color:var(--text2)}
+
+/* Fittings */
+.fitting-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px}
+.fitting-card h4{font-size:.8rem;color:var(--amber);margin-bottom:4px}
+.fitting-card p{font-size:.75rem;color:var(--text2)}
+
+/* Overrides */
+.override-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:6px}
+.override-item .name{font-size:.75rem;color:var(--amber);margin-bottom:4px}
+.override-item .row{margin-bottom:0}
+
+/* Save/Load */
+.project-bar{display:flex;gap:4px;margin-bottom:10px}
+.project-bar button{padding:4px 8px;font-size:.7rem}
+
+/* Info text */
+.info{font-size:.75rem;color:var(--text3);padding:8px;background:var(--bg2);border-radius:var(--radius);margin-bottom:8px;line-height:1.5}
+
+/* Mobile */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-100%;top:0;bottom:0;width:85vw;max-width:340px;transition:left .3s ease;z-index:100}
+  .sidebar.open{left:0}
+  .sidebar-close{display:block}
+  .overlay.open{display:block}
+  .hamburger{display:block}
+  .tabs{overflow-x:auto;flex-wrap:nowrap}
+  .tab{padding:8px 10px;font-size:.7rem}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" onclick="closeSidebar()">&times;</button>
+    <div class="sidebar-scroll">
+      <div class="logo">CutList Pro<small>Cut List Generator</small></div>
+
+      <div class="section">
+        <div class="section-title">Project</div>
+        <input type="text" id="projectName" class="full-w" value="Untitled Project" placeholder="Project name">
+        <div class="project-bar">
+          <button onclick="saveProject()">Save</button>
+          <button onclick="loadProject()">Load</button>
+          <button onclick="newProject()">New</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Material</div>
+        <select id="material" class="full-w" onchange="onMaterialChange()">
+          <option value="plywood" data-thick="18">Plywood (18mm)</option>
+          <option value="mdf" data-thick="18">MDF (18mm)</option>
+          <option value="melamine" data-thick="18">Melamine (18mm)</option>
+          <option value="osb" data-thick="11">OSB (11mm)</option>
+          <option value="c16" data-thick="47">C16 Timber (47mm)</option>
+          <option value="steel" data-thick="3">Steel (3mm)</option>
+        </select>
+        <div class="row" style="margin-top:6px">
+          <div><label>Sheet W</label><input type="number" id="sheetW" class="full-w" value="2440"></div>
+          <div><label>Sheet H</label><input type="number" id="sheetH" class="full-w" value="1220"></div>
+        </div>
+        <div class="row">
+          <div><label>Thickness</label><input type="number" id="thickness" class="full-w" value="18"></div>
+          <div><label>Kerf</label><input type="number" id="kerf" class="full-w" value="3"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Template</div>
+        <div class="tpl-grid" id="tplGrid"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Dimensions</div>
+        <div class="row">
+          <div><label>Width</label><input type="number" id="dimW" class="full-w" value="800"></div>
+          <div><label>Height</label><input type="number" id="dimH" class="full-w" value="720"></div>
+        </div>
+        <div class="row">
+          <div><label>Depth</label><input type="number" id="dimD" class="full-w" value="400"></div>
+          <div><label>Shelves</label><input type="number" id="dimShelves" class="full-w" value="3" min="0" max="20"></div>
+        </div>
+        <div class="row">
+          <div><label>Spacing</label><input type="number" id="dimSpacing" class="full-w" value="400"></div>
+          <div><label>Pitch &deg;</label><input type="number" id="dimPitch" class="full-w" value="35"></div>
+        </div>
+      </div>
+
+      <div class="section" id="overridesSection" style="display:none">
+        <div class="section-title">Component Overrides</div>
+        <div id="overrides"></div>
+      </div>
+
+      <button class="gen-btn" onclick="generate()">Generate Cut List</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger" onclick="openSidebar()"><span></span><span></span><span></span></button>
+      <div class="tabs" id="tabs"></div>
+      <div class="unit-toggle">
+        <button id="btnMM" class="active" onclick="setUnit('mm')">mm</button>
+        <button id="btnIN" onclick="setUnit('in')">in</button>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const S = {
+  unit: 'mm',
+  tab: 'preview',
+  template: 'shelving',
+  parts: [],
+  sheets: [],
+  fittings: [],
+  drag: {x:0,y:0,rx:-25,ry:35,dragging:false}
+};
+
+const TABS = [
+  {id:'preview',label:'Preview'},
+  {id:'view3d',label:'3D View'},
+  {id:'cutlist',label:'Cut List'},
+  {id:'sheets',label:'Sheet Layout'},
+  {id:'fittings',label:'Fittings'},
+  {id:'pricing',label:'Pricing'},
+  {id:'export',label:'Export'}
+];
+
+const TEMPLATES = [
+  {id:'shelving',name:'Open Shelving',ico:'\u{1F4DA}'},
+  {id:'wardrobe',name:'Wardrobe',ico:'\u{1F6AA}'},
+  {id:'kitchenbase',name:'Kitchen Base',ico:'\u{1F37D}'},
+  {id:'kitchenwall',name:'Kitchen Wall',ico:'\u{1F3E0}'},
+  {id:'studwall',name:'Stud Wall',ico:'\u{1F9F1}'},
+  {id:'flatroof',name:'Flat Roof',ico:'\u{2302}'},
+  {id:'floorjoists',name:'Floor Joists',ico:'\u{1F3D7}'},
+  {id:'partition',name:'Partition Wall',ico:'\u{25A8}'},
+  {id:'pitchedroof',name:'Pitched Roof',ico:'\u{26B1}'}
+];
+
+const MATERIAL_PRICES = {plywood:45,mdf:28,melamine:38,osb:18,c16:8,steel:95};
+const FITTING_DB = {
+  shelving:[{name:'Shelf Pins',per:'shelf',qty:4,unit_cost:.15},{name:'Wall Brackets',per:'unit',qty:4,unit_cost:1.80},{name:'Wood Screws 4x40',per:'unit',qty:24,unit_cost:.05}],
+  wardrobe:[{name:'Concealed Hinges',per:'door',qty:3,unit_cost:2.50},{name:'Hanging Rail',per:'unit',qty:1,unit_cost:4.50},{name:'Rail Sockets',per:'unit',qty:2,unit_cost:.80},{name:'Shelf Pins',per:'shelf',qty:4,unit_cost:.15},{name:'Cam Locks',per:'unit',qty:8,unit_cost:.35},{name:'Wood Screws 4x40',per:'unit',qty:40,unit_cost:.05}],
+  kitchenbase:[{name:'Soft-Close Hinges',per:'door',qty:2,unit_cost:3.20},{name:'Drawer Slides 400mm',per:'drawer',qty:1,unit_cost:8.50},{name:'Plinth Clips',per:'unit',qty:4,unit_cost:.60},{name:'Adjustable Legs',per:'unit',qty:4,unit_cost:1.90},{name:'Handle',per:'door',qty:1,unit_cost:2.80},{name:'Wood Screws 4x30',per:'unit',qty:30,unit_cost:.04}],
+  kitchenwall:[{name:'Soft-Close Hinges',per:'door',qty:2,unit_cost:3.20},{name:'Wall Hanging Brackets',per:'unit',qty:2,unit_cost:3.50},{name:'Shelf Pins',per:'shelf',qty:4,unit_cost:.15},{name:'Handle',per:'door',qty:1,unit_cost:2.80}],
+  studwall:[{name:'Framing Nails 90mm',per:'stud',qty:4,unit_cost:.08},{name:'Noggin Nails 75mm',per:'noggin',qty:4,unit_cost:.06},{name:'Frame Ties',per:'unit',qty:4,unit_cost:.45}],
+  flatroof:[{name:'Joist Hangers',per:'joist',qty:2,unit_cost:2.20},{name:'Roofing Nails 65mm',per:'board',qty:20,unit_cost:.04},{name:'DPC Membrane m\u00B2',per:'unit',qty:1,unit_cost:3.50}],
+  floorjoists:[{name:'Joist Hangers',per:'joist',qty:2,unit_cost:2.20},{name:'Herringbone Struts',per:'row',qty:1,unit_cost:1.80},{name:'Floor Nails 50mm',per:'board',qty:12,unit_cost:.04}],
+  partition:[{name:'Framing Nails 90mm',per:'stud',qty:4,unit_cost:.08},{name:'Plasterboard Screws 32mm',per:'board',qty:28,unit_cost:.03},{name:'Corner Tape m',per:'unit',qty:1,unit_cost:.20}],
+  pitchedroof:[{name:'Rafter Brackets',per:'rafter',qty:2,unit_cost:2.80},{name:'Ridge Board Hangers',per:'unit',qty:2,unit_cost:3.50},{name:'Roofing Nails 65mm',per:'board',qty:20,unit_cost:.04},{name:'Felt m\u00B2',per:'unit',qty:1,unit_cost:2.10}]
+};
+
+// ── Helpers ──
+function mm2in(v){return +(v/25.4).toFixed(2)}
+function in2mm(v){return +(v*25.4).toFixed(1)}
+function fmt(v){return S.unit==='in'?mm2in(v)+'"':v+'mm'}
+function fmtNum(v){return S.unit==='in'?mm2in(v):v}
+function gv(id){return +document.getElementById(id).value}
+function sv(id,v){document.getElementById(id).value=v}
+
+// ── Init ──
+function init(){
+  buildTabs();
+  buildTemplateGrid();
+  setTab('preview');
+  generate();
+}
+
+function buildTabs(){
+  const c=document.getElementById('tabs');
+  c.innerHTML=TABS.map(t=>`<button class="tab${t.id===S.tab?' active':''}" data-tab="${t.id}" onclick="setTab('${t.id}')">${t.label}</button>`).join('');
+}
+
+function buildTemplateGrid(){
+  const c=document.getElementById('tplGrid');
+  c.innerHTML=TEMPLATES.map(t=>`<button class="tpl-btn${t.id===S.template?' active':''}" onclick="selectTemplate('${t.id}')"><span class="ico">${t.ico}</span>${t.name}</button>`).join('');
+}
+
+function setTab(id){
+  S.tab=id;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===id));
+  renderTab();
+}
+
+function setUnit(u){
+  S.unit=u;
+  document.getElementById('btnMM').classList.toggle('active',u==='mm');
+  document.getElementById('btnIN').classList.toggle('active',u==='in');
+  renderTab();
+}
+
+function selectTemplate(id){
+  S.template=id;
+  document.querySelectorAll('.tpl-btn').forEach((b,i)=>b.classList.toggle('active',TEMPLATES[i].id===id));
+  applyTemplateDefaults(id);
+  generate();
+}
+
+function applyTemplateDefaults(id){
+  const D={
+    shelving:{w:800,h:1200,d:300,shelves:4,spacing:400,pitch:0},
+    wardrobe:{w:1000,h:2100,d:600,shelves:2,spacing:400,pitch:0},
+    kitchenbase:{w:600,h:720,d:560,shelves:1,spacing:400,pitch:0},
+    kitchenwall:{w:600,h:720,d:330,shelves:2,spacing:400,pitch:0},
+    studwall:{w:2400,h:2400,d:100,shelves:0,spacing:400,pitch:0},
+    flatroof:{w:3600,h:200,d:2400,shelves:0,spacing:400,pitch:0},
+    floorjoists:{w:3600,h:200,d:2400,shelves:0,spacing:400,pitch:0},
+    partition:{w:2400,h:2400,d:100,shelves:0,spacing:600,pitch:0},
+    pitchedroof:{w:4000,h:2000,d:3000,shelves:0,spacing:400,pitch:35}
+  };
+  const d=D[id]||D.shelving;
+  sv('dimW',d.w);sv('dimH',d.h);sv('dimD',d.d);sv('dimShelves',d.shelves);sv('dimSpacing',d.spacing);sv('dimPitch',d.pitch);
+}
+
+function onMaterialChange(){
+  const sel=document.getElementById('material');
+  const opt=sel.options[sel.selectedIndex];
+  sv('thickness',opt.dataset.thick);
+}
+
+// ── Sidebar ──
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('overlay').classList.add('open')}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('open')}
+
+// ── Generate ──
+function generate(){
+  const t=S.template,w=gv('dimW'),h=gv('dimH'),d=gv('dimD'),shelves=gv('dimShelves'),thick=gv('thickness'),spacing=gv('dimSpacing'),pitch=gv('dimPitch');
+  const mat=document.getElementById('material').value;
+  let parts=[];
+
+  if(t==='shelving'){
+    parts.push({name:'Left Side',w:d,h:h,qty:1},{name:'Right Side',w:d,h:h,qty:1});
+    parts.push({name:'Top',w:w-2*thick,h:d,qty:1},{name:'Bottom',w:w-2*thick,h:d,qty:1});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d,qty:1});
+    if(w>600) parts.push({name:'Back Panel',w:w,h:h,qty:1,note:'3mm ply'});
+  } else if(t==='wardrobe'){
+    parts.push({name:'Left Side',w:d,h:h,qty:1},{name:'Right Side',w:d,h:h,qty:1});
+    parts.push({name:'Top',w:w-2*thick,h:d,qty:1},{name:'Bottom',w:w-2*thick,h:d,qty:1});
+    parts.push({name:'Door',w:Math.floor((w-2*thick)/2),h:h-2*thick,qty:2});
+    parts.push({name:'Hanging Rail',w:w-2*thick-20,h:30,qty:1,note:'Round bar'});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20,qty:1});
+    parts.push({name:'Back Panel',w:w-4,h:h-4,qty:1,note:'3mm ply'});
+  } else if(t==='kitchenbase'){
+    parts.push({name:'Left Side',w:d,h:h-100,qty:1},{name:'Right Side',w:d,h:h-100,qty:1});
+    parts.push({name:'Bottom',w:w-2*thick,h:d-20,qty:1});
+    parts.push({name:'Door',w:Math.floor((w-4)/1),h:h-100-thick,qty:1});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20,qty:1});
+    parts.push({name:'Back Panel',w:w-4,h:h-104,qty:1,note:'3mm ply'});
+    parts.push({name:'Plinth',w:w,h:100,qty:1});
+    parts.push({name:'Drawer Front',w:w-4,h:180,qty:1});
+    parts.push({name:'Drawer Side',w:d-40,h:150,qty:2});
+    parts.push({name:'Drawer Back',w:w-2*thick-40,h:150,qty:1});
+    parts.push({name:'Drawer Base',w:w-2*thick-36,h:d-44,qty:1,note:'6mm ply'});
+  } else if(t==='kitchenwall'){
+    parts.push({name:'Left Side',w:d,h:h,qty:1},{name:'Right Side',w:d,h:h,qty:1});
+    parts.push({name:'Top',w:w-2*thick,h:d,qty:1},{name:'Bottom',w:w-2*thick,h:d,qty:1});
+    parts.push({name:'Door',w:w-4,h:h-4,qty:1});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20,qty:1});
+    parts.push({name:'Back Panel',w:w-4,h:h-4,qty:1,note:'3mm ply'});
+  } else if(t==='studwall'){
+    const studCount=Math.floor(w/spacing)+1;
+    parts.push({name:'Top Plate',w:w,h:thick,qty:1,note:thick+'x100mm'});
+    parts.push({name:'Bottom Plate',w:w,h:thick,qty:1,note:thick+'x100mm'});
+    parts.push({name:'Stud',w:thick,h:h-2*thick,qty:studCount,note:thick+'x100mm'});
+    const nogginRows=Math.floor((h-2*thick)/1200);
+    if(nogginRows>0) parts.push({name:'Noggin',w:spacing-thick,h:thick,qty:nogginRows*(studCount-1),note:thick+'x100mm'});
+  } else if(t==='flatroof'){
+    const joistCount=Math.floor(d/spacing)+1;
+    parts.push({name:'Joist',w:w,h:h,qty:joistCount,note:thick+'x'+h+'mm C16'});
+    const deckW=gv('sheetW'),deckH=gv('sheetH');
+    const boardsNeeded=Math.ceil((w*d)/(deckW*deckH));
+    parts.push({name:'Deck Board',w:deckW,h:deckH,qty:boardsNeeded,note:'18mm ply'});
+    parts.push({name:'Fascia',w:w,h:h+thick+20,qty:1,note:'25mm timber'});
+  } else if(t==='floorjoists'){
+    const joistCount=Math.floor(d/spacing)+1;
+    parts.push({name:'Joist',w:w,h:h,qty:joistCount,note:thick+'x'+h+'mm C16'});
+    parts.push({name:'Header',w:d,h:h,qty:2,note:thick+'x'+h+'mm C16'});
+    const hbRows=Math.ceil(w/1800)-1;
+    if(hbRows>0) parts.push({name:'Herringbone Strut',w:spacing,h:50,qty:hbRows*2*(joistCount-1),note:'50x50mm'});
+    const boardsNeeded=Math.ceil((w*d)/(gv('sheetW')*gv('sheetH')));
+    parts.push({name:'Floor Board',w:gv('sheetW'),h:gv('sheetH'),qty:boardsNeeded,note:'22mm T&G chipboard'});
+  } else if(t==='partition'){
+    const studCount=Math.floor(w/spacing)+1;
+    parts.push({name:'Top Plate',w:w,h:thick,qty:1});
+    parts.push({name:'Bottom Plate',w:w,h:thick,qty:1});
+    parts.push({name:'Stud',w:thick,h:h-2*thick,qty:studCount});
+    const nogginRows=Math.floor((h-2*thick)/1200);
+    if(nogginRows>0) parts.push({name:'Noggin',w:spacing-thick,h:thick,qty:nogginRows*(studCount-1)});
+    const pbW=1200,pbH=2400;
+    const boardCount=Math.ceil(w/pbW)*2;
+    parts.push({name:'Plasterboard',w:pbW,h:pbH,qty:boardCount,note:'12.5mm both sides'});
+  } else if(t==='pitchedroof'){
+    const rafterCount=Math.floor(w/spacing)+1;
+    const rLen=Math.round(d/2/Math.cos(pitch*Math.PI/180));
+    parts.push({name:'Rafter',w:rLen,h:h,qty:rafterCount*2,note:thick+'x'+h+'mm C16'});
+    parts.push({name:'Ridge Board',w:w,h:h+50,qty:1,note:'25x'+Math.round(h+50)+'mm'});
+    const collarTieH2=Math.round(d*0.3);
+    parts.push({name:'Collar Tie',w:collarTieH2,h:thick,qty:Math.ceil(rafterCount/2),note:thick+'x100mm'});
+    parts.push({name:'Wall Plate',w:w,h:thick,qty:2,note:'100x'+thick+'mm treated'});
+    const feltArea=w*(rLen+200)*2;
+    parts.push({name:'Roofing Felt',w:1000,h:Math.ceil(feltArea/1000),qty:1,note:'1m wide roll'});
+  }
+
+  S.parts=parts;
+  S.sheets=optimiseSheets(parts);
+  S.fittings=calcFittings(t,parts);
+  buildOverrides();
+  renderTab();
+}
+
+function buildOverrides(){
+  const sec=document.getElementById('overridesSection');
+  const c=document.getElementById('overrides');
+  if(!S.parts.length){sec.style.display='none';return}
+  sec.style.display='block';
+  const unique=[...new Set(S.parts.map(p=>p.name))];
+  c.innerHTML=unique.slice(0,6).map(n=>{
+    const p=S.parts.find(x=>x.name===n);
+    return `<div class="override-item"><div class="name">${n}</div><div class="row"><div><label>W</label><input type="number" class="full-w" value="${p.w}" onchange="overridePart('${n}','w',this.value)"></div><div><label>H</label><input type="number" class="full-w" value="${p.h}" onchange="overridePart('${n}','h',this.value)"></div><div><label>Qty</label><input type="number" class="full-w" value="${p.qty}" onchange="overridePart('${n}','qty',this.value)"></div></div></div>`;
+  }).join('');
+}
+
+function overridePart(name,field,val){
+  S.parts.forEach(p=>{if(p.name===name)p[field]=+val});
+  S.sheets=optimiseSheets(S.parts);
+  renderTab();
+}
+
+// ── Sheet Optimiser (First-Fit Decreasing) ──
+function optimiseSheets(parts){
+  const sw=gv('sheetW'),sh=gv('sheetH'),kerf=gv('kerf');
+  let rects=[];
+  parts.forEach(p=>{for(let i=0;i<p.qty;i++)rects.push({name:p.name,w:p.w,h:p.h})});
+  rects.sort((a,b)=>Math.max(b.w,b.h)-Math.max(a.w,a.h));
+  let sheets=[];
+  rects.forEach(r=>{
+    let placed=false;
+    for(let s of sheets){
+      if(tryPlace(s,r,sw,sh,kerf)){placed=true;break}
+    }
+    if(!placed){
+      let s={rects:[],spaces:[{x:0,y:0,w:sw,h:sh}]};
+      tryPlace(s,r,sw,sh,kerf);
+      sheets.push(s);
+    }
+  });
+  return sheets;
+}
+
+function tryPlace(sheet,rect,sw,sh,kerf){
+  for(let i=0;i<sheet.spaces.length;i++){
+    let sp=sheet.spaces[i];
+    for(let rot of [false,true]){
+      let rw=rot?rect.h:rect.w, rh=rot?rect.w:rect.h;
+      if(rw<=sp.w && rh<=sp.h){
+        sheet.rects.push({name:rect.name,x:sp.x,y:sp.y,w:rw,h:rh});
+        let newSpaces=[];
+        if(sp.w-rw-kerf>10) newSpaces.push({x:sp.x+rw+kerf,y:sp.y,w:sp.w-rw-kerf,h:rh});
+        if(sp.h-rh-kerf>10) newSpaces.push({x:sp.x,y:sp.y+rh+kerf,w:sp.w,h:sp.h-rh-kerf});
+        sheet.spaces.splice(i,1,...newSpaces);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ── Fittings ──
+function calcFittings(tpl,parts){
+  const db=FITTING_DB[tpl]||[];
+  const shelves=gv('dimShelves');
+  const studCount=Math.floor(gv('dimW')/gv('dimSpacing'))+1;
+  return db.map(f=>{
+    let qty=f.qty;
+    if(f.per==='shelf') qty=f.qty*shelves;
+    else if(f.per==='door') qty=f.qty*(parts.filter(p=>p.name.includes('Door')).reduce((s,p)=>s+p.qty,0)||1);
+    else if(f.per==='drawer') qty=f.qty*(parts.filter(p=>p.name==='Drawer Front').reduce((s,p)=>s+p.qty,0)||0);
+    else if(f.per==='stud') qty=f.qty*studCount;
+    else if(f.per==='noggin') qty=f.qty*Math.max(1,parts.filter(p=>p.name==='Noggin').reduce((s,p)=>s+p.qty,0));
+    else if(f.per==='joist') qty=f.qty*(parts.filter(p=>p.name==='Joist').reduce((s,p)=>s+p.qty,0)||1);
+    else if(f.per==='board') qty=f.qty*(parts.filter(p=>p.name.includes('Board')&&!p.name.includes('Plaster')).reduce((s,p)=>s+p.qty,0)||1);
+    else if(f.per==='rafter') qty=f.qty*(parts.filter(p=>p.name==='Rafter').reduce((s,p)=>s+p.qty,0)||1);
+    else if(f.per==='row') qty=f.qty*Math.max(1,Math.ceil(gv('dimW')/1800)-1);
+    return {...f,total_qty:Math.ceil(qty),total_cost:+(Math.ceil(qty)*f.unit_cost).toFixed(2)};
+  });
+}
+
+// ── Render ──
+function renderTab(){
+  const c=document.getElementById('content');
+  switch(S.tab){
+    case 'preview': c.innerHTML=renderPreview(); break;
+    case 'view3d': c.innerHTML='<canvas id="canvas3d" width="800" height="500"></canvas>';
+    requestAnimationFrame(()=>init3D()); break;
+    case 'cutlist': c.innerHTML=renderCutList(); break;
+    case 'sheets': c.innerHTML=renderSheets(); break;
+    case 'fittings': c.innerHTML=renderFittings(); break;
+    case 'pricing': c.innerHTML=renderPricing(); break;
+    case 'export': c.innerHTML=renderExport(); break;
+  }
+}
+
+// ── Preview (2D SVG) ──
+function renderPreview(){
+  if(!S.parts.length) return '<div class="info">Select a template and press Generate.</div>';
+  const W=700,H=500,pad=60;
+  const ow=gv('dimW'),oh=gv('dimH'),od=gv('dimD');
+  const scale=Math.min((W-2*pad)/ow,(H-2*pad)/oh);
+  let svg=`<svg id="previewSvg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  svg+=`<rect width="${W}" height="${H}" fill="#0f0e0c"/>`;
+
+  const bw=ow*scale,bh=oh*scale;
+  const bx=(W-bw)/2,by=(H-bh)/2;
+  svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="none" stroke="#d4920a" stroke-width="1.5"/>`;
+
+  const thick=gv('thickness')*scale;
+  const t=S.template;
+  if(['shelving','wardrobe','kitchenbase','kitchenwall'].includes(t)){
+    svg+=`<rect x="${bx}" y="${by}" width="${thick}" height="${bh}" fill="#d4920a22" stroke="#d4920a55"/>`;
+    svg+=`<rect x="${bx+bw-thick}" y="${by}" width="${thick}" height="${bh}" fill="#d4920a22" stroke="#d4920a55"/>`;
+    svg+=`<rect x="${bx+thick}" y="${by}" width="${bw-2*thick}" height="${thick}" fill="#a6730822" stroke="#a6730855"/>`;
+    svg+=`<rect x="${bx+thick}" y="${by+bh-thick}" width="${bw-2*thick}" height="${thick}" fill="#a6730822" stroke="#a6730855"/>`;
+    const ns=gv('dimShelves');
+    const innerH=bh-2*thick;
+    for(let i=1;i<=ns;i++){
+      const sy2=by+thick+innerH*i/(ns+1)-thick/2;
+      svg+=`<rect x="${bx+thick}" y="${sy2}" width="${bw-2*thick}" height="${thick}" fill="#4a416622" stroke="#4a416655"/>`;
+    }
+    if(t==='wardrobe'){
+      const dw=(bw-2*thick)/2;
+      svg+=`<line x1="${bx+thick+dw}" y1="${by+thick}" x2="${bx+thick+dw}" y2="${by+bh-thick}" stroke="#d4920a33" stroke-dasharray="4"/>`;
+    }
+    if(t==='kitchenbase'){
+      const plinth=100*scale;
+      svg+=`<rect x="${bx}" y="${by+bh-plinth}" width="${bw}" height="${plinth}" fill="#33201022" stroke="#d4920a33"/>`;
+    }
+  } else {
+    const spacing=gv('dimSpacing')*scale;
+    const count=Math.floor(bw/spacing)+1;
+    for(let i=0;i<count;i++){
+      const x2=bx+Math.min(i*spacing,bw-thick);
+      svg+=`<rect x="${x2}" y="${by+thick}" width="${thick}" height="${bh-2*thick}" fill="#d4920a15" stroke="#d4920a44"/>`;
+    }
+    svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${thick}" fill="#d4920a22" stroke="#d4920a55"/>`;
+    svg+=`<rect x="${bx}" y="${by+bh-thick}" width="${bw}" height="${thick}" fill="#d4920a22" stroke="#d4920a55"/>`;
+    if(t==='pitchedroof'){
+      const apex=by+bh*0.15;
+      svg+=`<line x1="${bx}" y1="${by+bh}" x2="${bx+bw/2}" y2="${apex}" stroke="#d4920a" stroke-width="1" stroke-dasharray="6"/>`;
+      svg+=`<line x1="${bx+bw}" y1="${by+bh}" x2="${bx+bw/2}" y2="${apex}" stroke="#d4920a" stroke-width="1" stroke-dasharray="6"/>`;
+    }
+  }
+
+  svg+=dimLine(bx,by-20,bx+bw,by-20,fmt(ow));
+  svg+=dimLine(bx-20,by,bx-20,by+bh,fmt(oh));
+  svg+=`</svg>`;
+  return svg;
+}
+
+function dimLine(x1,y1,x2,y2,label){
+  const col='#666';
+  let s=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width=".7"/>`;
+  s+=`<line x1="${x1}" y1="${y1-4}" x2="${x1}" y2="${y1+4}" stroke="${col}" stroke-width=".7"/>`;
+  s+=`<line x1="${x2}" y1="${y2-4}" x2="${x2}" y2="${y2+4}" stroke="${col}" stroke-width=".7"/>`;
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  const vert=x1===x2;
+  if(vert){
+    s+=`<text x="${mx-6}" y="${my}" fill="${col}" font-size="10" font-family="IBM Plex Mono" text-anchor="end" transform="rotate(-90,${mx-6},${my})">${label}</text>`;
+  } else {
+    s+=`<text x="${mx}" y="${my-5}" fill="${col}" font-size="10" font-family="IBM Plex Mono" text-anchor="middle">${label}</text>`;
+  }
+  return s;
+}
+
+// ── 3D View ──
+function init3D(){
+  const canvas=document.getElementById('canvas3d');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width=canvas.parentElement.clientWidth-32;
+  const H=canvas.height=Math.min(500,W*0.6);
+
+  canvas.onmousedown=e=>{S.drag.dragging=true;S.drag.x=e.clientX;S.drag.y=e.clientY};
+  canvas.onmousemove=e=>{if(!S.drag.dragging)return;S.drag.ry+=(e.clientX-S.drag.x)*.5;S.drag.rx+=(e.clientY-S.drag.y)*.5;S.drag.x=e.clientX;S.drag.y=e.clientY;draw3D(ctx,W,H)};
+  canvas.onmouseup=()=>S.drag.dragging=false;
+  canvas.onmouseleave=()=>S.drag.dragging=false;
+  canvas.ontouchstart=e=>{const t=e.touches[0];S.drag.dragging=true;S.drag.x=t.clientX;S.drag.y=t.clientY;e.preventDefault()};
+  canvas.ontouchmove=e=>{if(!S.drag.dragging)return;const t=e.touches[0];S.drag.ry+=(t.clientX-S.drag.x)*.5;S.drag.rx+=(t.clientY-S.drag.y)*.5;S.drag.x=t.clientX;S.drag.y=t.clientY;draw3D(ctx,W,H);e.preventDefault()};
+  canvas.ontouchend=()=>S.drag.dragging=false;
+
+  draw3D(ctx,W,H);
+}
+
+function draw3D(ctx,W,H){
+  ctx.fillStyle='#0f0e0c';
+  ctx.fillRect(0,0,W,H);
+
+  const ow=gv('dimW'),oh=gv('dimH'),od=gv('dimD');
+  const maxDim=Math.max(ow,oh,od);
+  const sc=Math.min(W,H)*0.3/maxDim;
+  const cx=W/2,cy=H/2;
+  const ax=S.drag.rx*Math.PI/180,ay=S.drag.ry*Math.PI/180;
+  const cosX=Math.cos(ax),sinX=Math.sin(ax),cosY=Math.cos(ay),sinY=Math.sin(ay);
+
+  function project(x,y,z){
+    x-=ow/2;y-=oh/2;z-=od/2;
+    let x1=x*cosY-z*sinY;
+    let z1=x*sinY+z*cosY;
+    let y1=y*cosX-z1*sinX;
+    return{x:cx+x1*sc,y:cy+y1*sc};
+  }
+
+  function drawBox(x,y,z,w,h,d,col,alpha){
+    const verts=[
+      [x,y,z],[x+w,y,z],[x+w,y+h,z],[x,y+h,z],
+      [x,y,z+d],[x+w,y,z+d],[x+w,y+h,z+d],[x,y+h,z+d]
+    ];
+    const pv=verts.map(v=>project(v[0],v[1],v[2]));
+    const faces=[
+      [0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]
+    ];
+    const normals=[[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[-1,0,0],[1,0,0]];
+    const camZ=[sinY*cosX,sinX,cosY*cosX];
+    let facesWithZ=faces.map((f,i)=>{
+      const cz=pv[f[0]].x+pv[f[1]].x+pv[f[2]].x+pv[f[3]].x;
+      const dot=normals[i][0]*camZ[0]+normals[i][1]*camZ[1]+normals[i][2]*camZ[2];
+      return{f,dot,cz};
+    });
+    facesWithZ.sort((a,b)=>a.cz-b.cz);
+    facesWithZ.forEach(({f,dot})=>{
+      if(dot<0)return;
+      const light=0.3+0.7*dot;
+      ctx.beginPath();
+      ctx.moveTo(pv[f[0]].x,pv[f[0]].y);
+      for(let i=1;i<4;i++)ctx.lineTo(pv[f[i]].x,pv[f[i]].y);
+      ctx.closePath();
+      const r=parseInt(col.slice(1,3),16),g=parseInt(col.slice(3,5),16),b=parseInt(col.slice(5,7),16);
+      ctx.fillStyle=`rgba(${Math.round(r*light)},${Math.round(g*light)},${Math.round(b*light)},${alpha})`;
+      ctx.fill();
+      ctx.strokeStyle=`rgba(${r},${g},${b},0.6)`;
+      ctx.lineWidth=.5;
+      ctx.stroke();
+    });
+  }
+
+  const thick=gv('thickness');
+  const t=S.template;
+
+  if(['shelving','wardrobe','kitchenbase','kitchenwall'].includes(t)){
+    drawBox(0,0,0,thick,oh,od,'#8B7355',0.7);
+    drawBox(ow-thick,0,0,thick,oh,od,'#8B7355',0.7);
+    drawBox(thick,0,0,ow-2*thick,thick,od,'#A0896C',0.6);
+    drawBox(thick,oh-thick,0,ow-2*thick,thick,od,'#A0896C',0.6);
+    const ns=gv('dimShelves');
+    for(let i=1;i<=ns;i++){
+      const sy=thick+(oh-2*thick)*i/(ns+1)-thick/2;
+      drawBox(thick,sy,0,ow-2*thick,thick,od,'#6B5B45',0.5);
+    }
+  } else {
+    const sp=gv('dimSpacing');
+    const cnt=Math.floor(ow/sp)+1;
+    drawBox(0,0,0,ow,thick,thick,'#B89B6A',0.6);
+    drawBox(0,oh-thick,0,ow,thick,thick,'#B89B6A',0.6);
+    for(let i=0;i<cnt;i++){
+      const x=Math.min(i*sp,ow-thick);
+      drawBox(x,thick,0,thick,oh-2*thick,thick,'#9C8558',0.5);
+    }
+  }
+
+  ctx.strokeStyle='#ffffff08';
+  ctx.lineWidth=.5;
+  for(let i=-5;i<=5;i++){
+    const a=project(ow/2+i*maxDim/5,oh,0);
+    const b=project(ow/2+i*maxDim/5,oh,od);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+}
+
+// ── Cut List Table ──
+function renderCutList(){
+  if(!S.parts.length) return '<div class="info">Generate a cut list first.</div>';
+  let html='<table><thead><tr><th>Part</th><th>Width</th><th>Height</th><th>Qty</th><th>Area</th><th>Notes</th></tr></thead><tbody>';
+  let totalArea=0;
+  S.parts.forEach(p=>{
+    const area=p.w*p.h*p.qty;
+    totalArea+=area;
+    html+=`<tr><td>${p.name}</td><td>${fmt(p.w)}</td><td>${fmt(p.h)}</td><td>${p.qty}</td><td>${(area/1e6).toFixed(3)} m\u00B2</td><td style="color:var(--text3)">${p.note||''}</td></tr>`;
+  });
+  html+=`</tbody></table>`;
+  html+=`<div style="margin-top:12px;color:var(--amber);font-size:.85rem">Total parts: ${S.parts.reduce((s,p)=>s+p.qty,0)} | Total area: ${(totalArea/1e6).toFixed(3)} m\u00B2 | Sheets needed: ${S.sheets.length}</div>`;
+  return html;
+}
+
+// ── Sheet Layout ──
+function renderSheets(){
+  if(!S.sheets.length) return '<div class="info">Generate a cut list first.</div>';
+  const sw=gv('sheetW'),sh=gv('sheetH');
+  const maxW=Math.min(500,(window.innerWidth-400));
+  const scale=maxW/sw;
+  const colors=['#d4920a','#48a','#4a4','#c44','#84a','#a84','#4aa','#a4a','#aa4','#488','#848','#884'];
+
+  let html='<div class="sheet-container">';
+  S.sheets.forEach((s,si)=>{
+    const svgW=sw*scale,svgH=sh*scale;
+    let svg=`<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${sw} ${sh}">`;
+    svg+=`<rect width="${sw}" height="${sh}" fill="#1a1917" stroke="#444038"/>`;
+    s.rects.forEach((r,ri)=>{
+      const col=colors[ri%colors.length];
+      svg+=`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${col}22" stroke="${col}" stroke-width="1.5"/>`;
+      const fs=Math.min(14,r.w*scale/6,r.h*scale/4);
+      if(fs>5){
+        svg+=`<text x="${r.x+r.w/2}" y="${r.y+r.h/2-6}" text-anchor="middle" fill="${col}" font-size="${Math.max(8,fs)}" font-family="IBM Plex Mono">${r.name}</text>`;
+        svg+=`<text x="${r.x+r.w/2}" y="${r.y+r.h/2+8}" text-anchor="middle" fill="#888" font-size="${Math.max(6,fs-2)}" font-family="IBM Plex Mono">${r.w}x${r.h}</text>`;
+      }
+    });
+    svg+='</svg>';
+    const waste=((sw*sh-s.rects.reduce((a,r)=>a+r.w*r.h,0))/(sw*sh)*100).toFixed(1);
+    html+=`<div class="sheet-card"><h4>Sheet ${si+1} of ${S.sheets.length}</h4>${svg}<div style="margin-top:6px;font-size:.7rem;color:var(--text3)">${s.rects.length} parts | ${waste}% waste | ${fmt(sw)} \u00D7 ${fmt(sh)}</div></div>`;
+  });
+  html+='</div>';
+  return html;
+}
+
+// ── Fittings ──
+function renderFittings(){
+  if(!S.fittings.length) return '<div class="info">No fittings for this template.</div>';
+  let html='<div class="info">Hardware and fixings required for this build.</div>';
+  S.fittings.forEach(f=>{
+    html+=`<div class="fitting-card"><h4>${f.name}</h4><p>${f.total_qty} pcs @ \u00A3${f.unit_cost.toFixed(2)} each = <span style="color:var(--amber)">\u00A3${f.total_cost.toFixed(2)}</span></p></div>`;
+  });
+  const total=S.fittings.reduce((s,f)=>s+f.total_cost,0);
+  html+=`<div class="price-total">Fittings Total: \u00A3${total.toFixed(2)}</div>`;
+  return html;
+}
+
+// ── Pricing ──
+function renderPricing(){
+  if(!S.parts.length) return '<div class="info">Generate a cut list first.</div>';
+  const mat=document.getElementById('material').value;
+  const pricePerSheet=MATERIAL_PRICES[mat]||40;
+  const sheetCount=S.sheets.length;
+  const materialCost=sheetCount*pricePerSheet;
+  const fittingsCost=S.fittings.reduce((s,f)=>s+f.total_cost,0);
+
+  let html=`<div style="max-width:500px">`;
+  html+=`<div class="section-title" style="margin-bottom:12px">Material Cost</div>`;
+  html+=`<div class="price-row"><label>${mat.charAt(0).toUpperCase()+mat.slice(1)} sheets (${sheetCount}x)</label><input type="number" id="priceSheet" value="${pricePerSheet}" onchange="updatePricing()" step="0.01"> <span style="color:var(--text3)">/sheet</span></div>`;
+  html+=`<div class="price-row"><label>Material subtotal</label><span style="color:var(--amber)">\u00A3${materialCost.toFixed(2)}</span></div>`;
+
+  html+=`<div class="section-title" style="margin:16px 0 12px">Fittings Cost</div>`;
+  S.fittings.forEach(f=>{
+    html+=`<div class="price-row"><label>${f.name} (${f.total_qty}x)</label><span>\u00A3${f.total_cost.toFixed(2)}</span></div>`;
+  });
+  html+=`<div class="price-row"><label>Fittings subtotal</label><span style="color:var(--amber)">\u00A3${fittingsCost.toFixed(2)}</span></div>`;
+
+  html+=`<div class="section-title" style="margin:16px 0 12px">Additional Costs</div>`;
+  html+=`<div class="price-row"><label>Edge banding</label><input type="number" id="priceEdge" value="8.00" onchange="updatePricing()" step="0.01"></div>`;
+  html+=`<div class="price-row"><label>Adhesive / finish</label><input type="number" id="priceFinish" value="12.00" onchange="updatePricing()" step="0.01"></div>`;
+  html+=`<div class="price-row"><label>Delivery</label><input type="number" id="priceDelivery" value="25.00" onchange="updatePricing()" step="0.01"></div>`;
+
+  const extras=8+12+25;
+  const total=materialCost+fittingsCost+extras;
+  html+=`<div class="price-total" id="priceTotal">Project Total: \u00A3${total.toFixed(2)}</div>`;
+  html+=`</div>`;
+  return html;
+}
+
+function updatePricing(){
+  const sheetPrice=+(document.getElementById('priceSheet')?.value||0);
+  const edge=+(document.getElementById('priceEdge')?.value||0);
+  const finish=+(document.getElementById('priceFinish')?.value||0);
+  const delivery=+(document.getElementById('priceDelivery')?.value||0);
+  const materialCost=S.sheets.length*sheetPrice;
+  const fittingsCost=S.fittings.reduce((s,f)=>s+f.total_cost,0);
+  const total=materialCost+fittingsCost+edge+finish+delivery;
+  const el=document.getElementById('priceTotal');
+  if(el) el.textContent='Project Total: \u00A3'+total.toFixed(2);
+}
+
+// ── Export ──
+function renderExport(){
+  return `<div class="export-grid">
+    <div class="export-btn" onclick="exportCSV()"><span class="ico">\u{1F4C4}</span><span>CSV Spreadsheet</span></div>
+    <div class="export-btn" onclick="exportJSON()"><span class="ico">\u{1F4CB}</span><span>JSON Data</span></div>
+    <div class="export-btn" onclick="exportDXF()"><span class="ico">\u{1F4D0}</span><span>DXF Drawing</span></div>
+    <div class="export-btn" onclick="exportPrint()"><span class="ico">\u{1F5A8}</span><span>Print / PDF</span></div>
+  </div>`;
+}
+
+function downloadFile(name,content,type){
+  const blob=new Blob([content],{type});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportCSV(){
+  let csv='Part,Width (mm),Height (mm),Qty,Area (m2),Notes\n';
+  S.parts.forEach(p=>{
+    csv+=`"${p.name}",${p.w},${p.h},${p.qty},${(p.w*p.h*p.qty/1e6).toFixed(3)},"${p.note||''}"\n`;
+  });
+  downloadFile(gv2('projectName')+'.csv',csv,'text/csv');
+}
+
+function exportJSON(){
+  const data={
+    project:gv2('projectName'),
+    template:S.template,
+    material:document.getElementById('material').value,
+    dimensions:{w:gv('dimW'),h:gv('dimH'),d:gv('dimD')},
+    parts:S.parts,
+    sheets:S.sheets.length,
+    fittings:S.fittings
+  };
+  downloadFile(gv2('projectName')+'.json',JSON.stringify(data,null,2),'application/json');
+}
+
+function exportDXF(){
+  let dxf='0\nSECTION\n2\nENTITIES\n';
+  let yOff=0;
+  S.parts.forEach(p=>{
+    for(let i=0;i<p.qty;i++){
+      const x=i*(p.w+20);
+      dxf+=`0\nLINE\n8\n${p.name}\n10\n${x}\n20\n${yOff}\n30\n0\n11\n${x+p.w}\n21\n${yOff}\n31\n0\n`;
+      dxf+=`0\nLINE\n8\n${p.name}\n10\n${x+p.w}\n20\n${yOff}\n30\n0\n11\n${x+p.w}\n21\n${yOff+p.h}\n31\n0\n`;
+      dxf+=`0\nLINE\n8\n${p.name}\n10\n${x+p.w}\n20\n${yOff+p.h}\n30\n0\n11\n${x}\n21\n${yOff+p.h}\n31\n0\n`;
+      dxf+=`0\nLINE\n8\n${p.name}\n10\n${x}\n20\n${yOff+p.h}\n30\n0\n11\n${x}\n21\n${yOff}\n31\n0\n`;
+    }
+    yOff+=p.h+30;
+  });
+  dxf+='0\nENDSEC\n0\nEOF\n';
+  downloadFile(gv2('projectName')+'.dxf',dxf,'application/dxf');
+}
+
+function exportPrint(){
+  const w=window.open('','','width=900,height=700');
+  const mat=document.getElementById('material');
+  const matName=mat.options[mat.selectedIndex].text;
+  let html=`<!DOCTYPE html><html><head><style>
+    body{font-family:'IBM Plex Mono',monospace;font-size:12px;padding:20px;color:#222}
+    h1{font-size:18px;margin-bottom:4px}
+    h2{font-size:14px;color:#666;margin:16px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th,td{padding:5px 8px;border:1px solid #ccc;text-align:left;font-size:11px}
+    th{background:#f5f5f5}
+    .meta{color:#666;font-size:11px}
+    @media print{body{padding:10px}}
+  </style></head><body>`;
+  html+=`<h1>${gv2('projectName')}</h1>`;
+  html+=`<div class="meta">${TEMPLATES.find(t=>t.id===S.template)?.name} | ${matName} | ${fmt(gv('dimW'))} \u00D7 ${fmt(gv('dimH'))} \u00D7 ${fmt(gv('dimD'))}</div>`;
+  html+=`<h2>Cut List</h2><table><tr><th>Part</th><th>Width</th><th>Height</th><th>Qty</th><th>Notes</th></tr>`;
+  S.parts.forEach(p=>{html+=`<tr><td>${p.name}</td><td>${fmt(p.w)}</td><td>${fmt(p.h)}</td><td>${p.qty}</td><td>${p.note||''}</td></tr>`});
+  html+=`</table>`;
+  html+=`<h2>Fittings</h2><table><tr><th>Item</th><th>Qty</th><th>Cost</th></tr>`;
+  S.fittings.forEach(f=>{html+=`<tr><td>${f.name}</td><td>${f.total_qty}</td><td>\u00A3${f.total_cost.toFixed(2)}</td></tr>`});
+  html+=`</table>`;
+  html+=`<div class="meta">Sheets needed: ${S.sheets.length} | Generated by CutList Pro</div>`;
+  html+=`</body></html>`;
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+
+function gv2(id){return document.getElementById(id).value}
+
+// ── Save / Load ──
+function saveProject(){
+  const data={
+    name:gv2('projectName'),template:S.template,
+    material:document.getElementById('material').value,
+    sheetW:gv('sheetW'),sheetH:gv('sheetH'),thickness:gv('thickness'),kerf:gv('kerf'),
+    dimW:gv('dimW'),dimH:gv('dimH'),dimD:gv('dimD'),
+    dimShelves:gv('dimShelves'),dimSpacing:gv('dimSpacing'),dimPitch:gv('dimPitch'),
+    unit:S.unit
+  };
+  const projects=JSON.parse(localStorage.getItem('cutlist_projects')||'{}');
+  projects[data.name]=data;
+  localStorage.setItem('cutlist_projects',JSON.stringify(projects));
+  alert('Project saved: '+data.name);
+}
+
+function loadProject(){
+  const projects=JSON.parse(localStorage.getItem('cutlist_projects')||'{}');
+  const names=Object.keys(projects);
+  if(!names.length){alert('No saved projects.');return}
+  const name=prompt('Load project:\n\n'+names.join('\n')+'\n\nEnter name:');
+  if(!name||!projects[name])return;
+  const d=projects[name];
+  sv('projectName',d.name);
+  document.getElementById('material').value=d.material;
+  sv('sheetW',d.sheetW);sv('sheetH',d.sheetH);sv('thickness',d.thickness);sv('kerf',d.kerf);
+  sv('dimW',d.dimW);sv('dimH',d.dimH);sv('dimD',d.dimD);
+  sv('dimShelves',d.dimShelves);sv('dimSpacing',d.dimSpacing);sv('dimPitch',d.dimPitch);
+  S.template=d.template;
+  if(d.unit)setUnit(d.unit);
+  buildTemplateGrid();
+  generate();
+}
+
+function newProject(){
+  sv('projectName','Untitled Project');
+  selectTemplate('shelving');
+}
+
+// ── Boot ──
+window.addEventListener('DOMContentLoaded',init);
+window.addEventListener('resize',()=>{if(S.tab==='view3d')renderTab()});
+</script>
+</body>
+</html>
