@@ -1231,15 +1231,14 @@ const CM = {
 };
 
 function cmOpen(){
-  const el=document.getElementById('camMeasure');
-  el.classList.add('open');
   closeSidebar();
   CM.phase='capture';
   CM.points=[];
   CM.measurements={};
   CM.targetIdx=0;
   CM.measureTarget='width';
-  cmUpdateUI();
+  // Open camera immediately — no landing screen
+  cmCapture();
 }
 
 function cmClose(){
@@ -1268,6 +1267,8 @@ function cmCapture(){
   input.onchange=e=>{
     const file=e.target.files[0];
     if(!file) return;
+    // Show the overlay now that we have a file
+    document.getElementById('camMeasure').classList.add('open');
     const reader=new FileReader();
     reader.onload=ev=>{
       const img=new Image();
@@ -1282,6 +1283,7 @@ function cmCapture(){
     };
     reader.readAsDataURL(file);
   };
+  // If user cancels the camera, don't show overlay
   input.click();
 }
 
@@ -1432,56 +1434,65 @@ function cmUpdateUI(){
   const dist=document.getElementById('cmDist');
   const actions=document.getElementById('cmActions');
 
-  if(CM.phase==='capture'){
-    title.textContent='Step 1: Take a photo';
-    phase.textContent='Take a photo of your wall';
-    inst.innerHTML='Place a <strong>bank card</strong> flat against the wall for scale reference. Then take a photo holding the phone straight-on.';
-    dist.textContent='';
-    actions.innerHTML=`
-      <button class="primary" onclick="cmCapture()">Take photo</button>
-    `;
-  } else if(CM.phase==='calibrate'){
-    title.textContent='Step 2: Mark the reference';
-    phase.textContent='Tap both ends of your '+( CM.refType==='card'?'bank card':'A4 sheet');
-    const refLabel=CM.refType==='card'?'bank card (85.6mm wide)':'A4 paper (297mm long edge)';
+  if(CM.phase==='calibrate'){
+    title.textContent='Set the scale';
+    const refName=CM.refType==='card'?'bank card':'A4 sheet';
+    const refSize=CM.refType==='card'?'85.6mm':'297mm';
     if(CM.points.length===0){
-      inst.innerHTML=`Tap the <strong>left edge</strong> of your ${refLabel}.<br><br><span style="font-size:.65rem;color:var(--text3)">Using something else? <a href="#" onclick="cmSetRef('${CM.refType==='card'?'a4':'card'}');return false" style="color:var(--amber)">Switch to ${CM.refType==='card'?'A4 paper':'bank card'}</a></span>`;
+      phase.innerHTML=`Can you see a <strong>${refName}</strong> in the photo?`;
+      inst.innerHTML=`We need something of known size to calculate real measurements.<br><br>`
+        +`<strong style="color:var(--amber)">Tap the LEFT edge</strong> of your ${refName} in the photo.`
+        +`<br><br><span style="font-size:.65rem;color:var(--text3)">No ${refName}? <a href="#" onclick="cmSetRef('${CM.refType==='card'?'a4':'card'}');return false" style="color:var(--amber)">Use ${CM.refType==='card'?'A4 paper':'a bank card'} instead</a> | <a href="#" onclick="cmSkipCalibrate();return false" style="color:var(--amber)">Skip &amp; type measurements manually</a></span>`;
+      dist.textContent='';
     } else {
-      inst.innerHTML=`Now tap the <strong>right edge</strong> of your ${refLabel}.`;
+      phase.innerHTML=`Good! Now <strong style="color:var(--amber)">tap the RIGHT edge</strong> of the ${refName}.`;
+      inst.innerHTML=`This tells us the scale: your ${refName} is ${refSize} wide, so we can calculate everything else from that.`;
+      dist.textContent='1 of 2 points placed';
     }
-    dist.textContent=CM.points.length+'/2 points';
-    actions.innerHTML=`<button onclick="cmReset()">Start over</button>`;
+    actions.innerHTML=`<button onclick="cmCapture()">Retake photo</button>`;
   } else if(CM.phase==='measure'){
     const t=CM.measureTarget;
     const tName=t.charAt(0).toUpperCase()+t.slice(1);
-    title.textContent='Step 3: Measure '+tName;
-    phase.textContent='Measuring: '+tName;
+    const tDesc={width:'the left wall to the right wall',height:'the floor to where you want the top',depth:'the back wall to where the front will be'}[t];
+    title.textContent='Measure the '+tName;
 
     if(CM.points.length===0){
-      inst.innerHTML=`Tap <strong>one end</strong> of the ${t} you want to measure.`;
+      phase.innerHTML=`Tap <strong style="color:#4a4">one end</strong> of the ${t}`;
+      inst.innerHTML=`Measure ${tDesc}. Tap the starting point on the photo.`;
     } else if(CM.points.length===1){
-      inst.innerHTML=`Now tap the <strong>other end</strong>.`;
+      phase.innerHTML=`Now tap the <strong style="color:#c44">other end</strong>`;
+      inst.innerHTML=`Tap where the ${t} ends.`;
     } else {
       const v=CM.measurements[t];
-      inst.innerHTML=`<strong>${tName}: ${v}mm</strong> (${mm2in(v)}"). Tap Next to measure another dimension, or Done to use these.`;
+      phase.innerHTML=`${tName}: <strong>${v}mm</strong> <span style="font-size:.8rem;color:var(--text3)">(${mm2in(v)}")</span>`;
+      inst.innerHTML='';
     }
 
-    // Show all measurements so far
+    // Measurement summary bar
     const parts=CM.targets.map(x=>{
       const v=CM.measurements[x];
-      return x.charAt(0).toUpperCase()+x.slice(1)+': '+(v?v+'mm':'--');
+      const isCurrent=x===t;
+      const color=v?'var(--amber)':isCurrent?'var(--text)':'var(--text3)';
+      return `<span style="color:${color}">${x.charAt(0).toUpperCase()+x.slice(1)}: ${v?v+'mm':'--'}</span>`;
     });
-    dist.textContent=parts.join('  |  ');
+    dist.innerHTML=parts.join(' &nbsp;&bull;&nbsp; ');
 
     let btns='';
     if(CM.points.length>=2){
-      btns+=`<button onclick="cmNextMeasure()">Next dimension</button>`;
-      btns+=`<button class="primary" onclick="cmDone()">Done (${Object.keys(CM.measurements).length}/3)</button>`;
-    } else {
-      btns+=`<button onclick="cmReset()">Start over</button>`;
+      const remaining=CM.targets.filter(x=>!CM.measurements[x]||x===CM.targets[CM.targetIdx+1]);
+      if(CM.targetIdx<CM.targets.length-1){
+        btns+=`<button onclick="cmNextMeasure()">Measure ${CM.targets[CM.targetIdx+1]}</button>`;
+      }
+      btns+=`<button class="primary" onclick="cmDone()">Use these measurements</button>`;
     }
+    btns+=`<button onclick="cmCapture()" style="flex:0">Retake</button>`;
     actions.innerHTML=btns;
   }
+}
+
+function cmSkipCalibrate(){
+  cmClose();
+  openSidebar();
 }
 
 // ── AR Measure (WebXR — Android only) ──
