@@ -123,15 +123,63 @@ tr:hover td{background:var(--bg3)}
 /* Info text */
 .info{font-size:.75rem;color:var(--text3);padding:8px;background:var(--bg2);border-radius:var(--radius);margin-bottom:8px;line-height:1.5}
 
+/* Welcome / Onboarding */
+#welcome{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+.welcome-card{max-width:420px;width:100%;text-align:center}
+.welcome-card h1{font-family:var(--serif);font-size:2.2rem;color:var(--amber);margin-bottom:4px}
+.welcome-card .tagline{font-size:.8rem;color:var(--text3);margin-bottom:24px}
+.welcome-card .steps{text-align:left;margin-bottom:24px}
+.welcome-step{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border)}
+.welcome-step .num{width:28px;height:28px;border-radius:50%;background:var(--amber);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0}
+.welcome-step h3{font-size:.85rem;color:var(--text);margin-bottom:2px}
+.welcome-step p{font-size:.7rem;color:var(--text3);line-height:1.4}
+.welcome-start{width:100%;padding:14px;background:var(--amber);color:var(--bg);border:none;border-radius:var(--radius);font-size:1rem;font-weight:600;cursor:pointer;margin-top:8px}
+.welcome-start:hover{background:#e9a00b}
+.welcome-skip{display:block;margin:12px auto 0;background:none;border:none;color:var(--text3);font-size:.75rem;cursor:pointer;text-decoration:underline}
+
+/* Step progress bar */
+.step-bar{display:flex;gap:0;margin-bottom:12px;padding:0 2px}
+.step-pip{flex:1;height:4px;border-radius:2px;background:var(--border);transition:background .3s}
+.step-pip.done{background:var(--amber)}
+.step-pip.active{background:var(--amber);opacity:.6}
+.step-label{font-size:.7rem;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.step-label .step-num{background:var(--amber);color:var(--bg);width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700}
+
+/* Helper tips */
+.tip{font-size:.7rem;color:var(--text3);padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:var(--radius);margin-bottom:8px;line-height:1.5}
+.tip strong{color:var(--text2)}
+
+/* Measure helper (iOS fallback) */
+.measure-helper{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:8px}
+.measure-helper h4{font-size:.75rem;color:var(--amber);margin-bottom:6px}
+.measure-helper p{font-size:.7rem;color:var(--text3);line-height:1.5;margin-bottom:8px}
+.measure-helper .mh-steps{list-style:none;padding:0}
+.measure-helper .mh-steps li{font-size:.7rem;color:var(--text2);padding:4px 0 4px 20px;position:relative}
+.measure-helper .mh-steps li::before{content:attr(data-n);position:absolute;left:0;color:var(--amber);font-weight:600}
+
 /* Mobile */
 @media(max-width:768px){
-  .sidebar{position:fixed;left:-100%;top:0;bottom:0;width:85vw;max-width:340px;transition:left .3s ease;z-index:100}
+  .sidebar{position:fixed;left:-100%;top:0;bottom:0;width:90vw;max-width:360px;transition:left .3s ease;z-index:100}
   .sidebar.open{left:0}
-  .sidebar-close{display:block}
+  .sidebar-close{display:block;font-size:1.8rem;top:8px;right:8px}
   .overlay.open{display:block}
   .hamburger{display:block}
-  .tabs{overflow-x:auto;flex-wrap:nowrap}
-  .tab{padding:8px 10px;font-size:.7rem}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .tab{padding:10px 12px;font-size:.75rem}
+  .tpl-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .tpl-btn{padding:10px 4px;font-size:.65rem}
+  .tpl-btn .ico{font-size:1.3rem}
+  .gen-btn{padding:14px;font-size:1rem}
+  .content{padding:12px}
+  table{font-size:.7rem}
+  th,td{padding:6px 8px}
+  .topbar{padding:8px 12px;gap:4px}
+  .hamburger span{width:24px;height:2.5px;margin:5px 0}
+  input,select{font-size:.9rem;padding:10px 12px}
+  label{font-size:.8rem;margin-bottom:4px}
+  .section-title{font-size:.75rem}
+  .row{gap:8px;margin-bottom:8px}
+  .welcome-card h1{font-size:1.8rem}
 }
 
 /* AR Measure */
@@ -161,17 +209,48 @@ tr:hover td{background:var(--bg3)}
 </head>
 <body>
 
+<!-- Welcome Screen -->
+<div id="welcome">
+  <div class="welcome-card">
+    <h1>CutList Pro</h1>
+    <div class="tagline">Your DIY cut list assistant. Measure, design, cut.</div>
+    <div class="steps">
+      <div class="welcome-step">
+        <div class="num">1</div>
+        <div><h3>Pick what you're building</h3><p>Choose from shelves, wardrobes, kitchen cabinets, stud walls, and more. We'll set up sensible defaults.</p></div>
+      </div>
+      <div class="welcome-step">
+        <div class="num">2</div>
+        <div><h3>Enter your measurements</h3><p>Type in width, height and depth in mm or inches. On Android you can use your camera to measure with AR.</p></div>
+      </div>
+      <div class="welcome-step">
+        <div class="num">3</div>
+        <div><h3>Get your cut list</h3><p>We calculate every panel, show how they fit on sheets to minimise waste, list all the screws and fittings, and price it up.</p></div>
+      </div>
+      <div class="welcome-step">
+        <div class="num">4</div>
+        <div><h3>Export and build</h3><p>Download as CSV, JSON, or DXF. Print a workshop sheet. Send it straight to a cutting service.</p></div>
+      </div>
+    </div>
+    <button class="welcome-start" onclick="dismissWelcome()">Let's go</button>
+    <button class="welcome-skip" onclick="dismissWelcome(true)">Don't show this again</button>
+  </div>
+</div>
+
 <div class="app">
   <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
 
   <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" onclick="closeSidebar()">&times;</button>
     <div class="sidebar-scroll">
-      <div class="logo">CutList Pro<small>Cut List Generator</small></div>
+      <div class="logo">CutList Pro<small>DIY Cut List Generator</small></div>
+
+      <!-- Step progress -->
+      <div class="step-bar"><div class="step-pip done" id="pip1"></div><div class="step-pip" id="pip2"></div><div class="step-pip" id="pip3"></div><div class="step-pip" id="pip4"></div></div>
 
       <div class="section">
         <div class="section-title">Project</div>
-        <input type="text" id="projectName" class="full-w" value="Untitled Project" placeholder="Project name">
+        <input type="text" id="projectName" class="full-w" value="My First Build" placeholder="e.g. Living Room Shelves">
         <div class="project-bar">
           <button onclick="saveProject()">Save</button>
           <button onclick="loadProject()">Load</button>
@@ -180,60 +259,70 @@ tr:hover td{background:var(--bg3)}
       </div>
 
       <div class="section">
-        <div class="section-title">Material</div>
-        <select id="material" class="full-w" onchange="onMaterialChange()">
-          <option value="plywood" data-thick="18">Plywood (18mm)</option>
-          <option value="mdf" data-thick="18">MDF (18mm)</option>
-          <option value="melamine" data-thick="18">Melamine (18mm)</option>
-          <option value="osb" data-thick="11">OSB (11mm)</option>
-          <option value="c16" data-thick="47">C16 Timber (47mm)</option>
-          <option value="steel" data-thick="3">Steel (3mm)</option>
-        </select>
-        <div class="row" style="margin-top:6px">
-          <div><label>Sheet W</label><input type="number" id="sheetW" class="full-w" value="2440"></div>
-          <div><label>Sheet H</label><input type="number" id="sheetH" class="full-w" value="1220"></div>
-        </div>
-        <div class="row">
-          <div><label>Thickness</label><input type="number" id="thickness" class="full-w" value="18"></div>
-          <div><label>Kerf</label><input type="number" id="kerf" class="full-w" value="3"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Template</div>
+        <div class="step-label"><span class="step-num">1</span> What are you building?</div>
         <div class="tpl-grid" id="tplGrid"></div>
       </div>
 
       <div class="section">
-        <div class="section-title">Dimensions</div>
+        <div class="step-label"><span class="step-num">2</span> What material?</div>
+        <div class="tip">Most DIY furniture uses <strong>18mm plywood</strong> or <strong>MDF</strong>. Melamine is great for wardrobes (pre-finished). For stud walls, choose <strong>C16 timber</strong>.</div>
+        <select id="material" class="full-w" onchange="onMaterialChange()">
+          <option value="plywood" data-thick="18">Plywood (18mm) - versatile, strong</option>
+          <option value="mdf" data-thick="18">MDF (18mm) - smooth, paintable</option>
+          <option value="melamine" data-thick="18">Melamine (18mm) - pre-finished</option>
+          <option value="osb" data-thick="11">OSB (11mm) - budget, structural</option>
+          <option value="c16" data-thick="47">C16 Timber (47mm) - framing</option>
+          <option value="steel" data-thick="3">Steel (3mm) - industrial</option>
+        </select>
+        <details style="margin-top:6px">
+          <summary style="font-size:.7rem;color:var(--text3);cursor:pointer">Advanced: Sheet size & kerf</summary>
+          <div class="row" style="margin-top:6px">
+            <div><label>Sheet width (mm)</label><input type="number" id="sheetW" class="full-w" value="2440"></div>
+            <div><label>Sheet height (mm)</label><input type="number" id="sheetH" class="full-w" value="1220"></div>
+          </div>
+          <div class="row">
+            <div><label>Thickness (mm)</label><input type="number" id="thickness" class="full-w" value="18"></div>
+            <div><label>Saw kerf (mm)</label><input type="number" id="kerf" class="full-w" value="3"></div>
+          </div>
+          <div class="tip">Standard UK sheets are 2440 x 1220mm (8x4 ft). Kerf is the width of the saw blade cut — usually 3mm.</div>
+        </details>
+      </div>
+
+      <div class="section">
+        <div class="step-label"><span class="step-num">3</span> Your measurements</div>
+        <div class="tip" id="dimTip">Grab a tape measure and note the <strong>width</strong>, <strong>height</strong> and <strong>depth</strong> of the space in millimetres.</div>
         <div class="row">
-          <div><label>Width</label><input type="number" id="dimW" class="full-w" value="800"></div>
-          <div><label>Height</label><input type="number" id="dimH" class="full-w" value="720"></div>
+          <div><label>Width (mm)</label><input type="number" id="dimW" class="full-w" value="800" placeholder="e.g. 800"></div>
+          <div><label>Height (mm)</label><input type="number" id="dimH" class="full-w" value="720" placeholder="e.g. 720"></div>
         </div>
         <div class="row">
-          <div><label>Depth</label><input type="number" id="dimD" class="full-w" value="400"></div>
+          <div><label>Depth (mm)</label><input type="number" id="dimD" class="full-w" value="400" placeholder="e.g. 400"></div>
           <div><label>Shelves</label><input type="number" id="dimShelves" class="full-w" value="3" min="0" max="20"></div>
         </div>
-        <div class="row">
-          <div><label>Spacing</label><input type="number" id="dimSpacing" class="full-w" value="400"></div>
-          <div><label>Pitch &deg;</label><input type="number" id="dimPitch" class="full-w" value="35"></div>
-        </div>
-        <button class="ar-btn" id="arBtn" style="display:none" onclick="startAR()"><span class="ar-ico">&#x1F4F1;</span> AR Measure</button>
-        <div id="arNoSupport" class="ar-nosupport" style="display:none"></div>
+        <details id="advancedDims">
+          <summary style="font-size:.7rem;color:var(--text3);cursor:pointer">Framing: spacing & pitch</summary>
+          <div class="row" style="margin-top:6px">
+            <div><label>Stud spacing (mm)</label><input type="number" id="dimSpacing" class="full-w" value="400"></div>
+            <div><label>Roof pitch (&deg;)</label><input type="number" id="dimPitch" class="full-w" value="35"></div>
+          </div>
+        </details>
+        <button class="ar-btn" id="arBtn" style="display:none" onclick="startAR()"><span class="ar-ico">&#x1F4F1;</span> Measure with your camera (AR)</button>
+        <div id="arNoSupport" style="display:none"></div>
       </div>
 
       <div class="section" id="overridesSection" style="display:none">
-        <div class="section-title">Component Overrides</div>
+        <div class="section-title">Fine-tune parts</div>
+        <div class="tip">Adjust individual panel sizes if your space isn't perfectly square, or change quantities.</div>
         <div id="overrides"></div>
       </div>
 
-      <button class="gen-btn" onclick="generate()">Generate Cut List</button>
+      <button class="gen-btn" onclick="generate();closeSidebar()"><span class="step-num" style="margin-right:6px">4</span> Generate my cut list</button>
     </div>
   </aside>
 
   <div class="main">
     <div class="topbar">
-      <button class="hamburger" onclick="openSidebar()"><span></span><span></span><span></span></button>
+      <button class="hamburger" onclick="openSidebar()" title="Open settings"><span></span><span></span><span></span></button>
       <div class="tabs" id="tabs"></div>
       <div class="unit-toggle">
         <button id="btnMM" class="active" onclick="setUnit('mm')">mm</button>
@@ -272,10 +361,10 @@ const S = {
 const TABS = [
   {id:'preview',label:'Preview'},
   {id:'view3d',label:'3D View'},
-  {id:'cutlist',label:'Cut List'},
-  {id:'sheets',label:'Sheet Layout'},
-  {id:'fittings',label:'Fittings'},
-  {id:'pricing',label:'Pricing'},
+  {id:'cutlist',label:'Parts'},
+  {id:'sheets',label:'Sheets'},
+  {id:'fittings',label:'Screws & Fittings'},
+  {id:'pricing',label:'Cost'},
   {id:'export',label:'Export'}
 ];
 
@@ -452,6 +541,7 @@ function generate(){
   S.fittings=calcFittings(t,parts);
   buildOverrides();
   renderTab();
+  if(typeof updateSteps==='function') updateSteps();
 }
 
 function buildOverrides(){
@@ -548,7 +638,9 @@ function renderTab(){
 
 // ── Preview (2D SVG) ──
 function renderPreview(){
-  if(!S.parts.length) return '<div class="info">Select a template and press Generate.</div>';
+  if(!S.parts.length) return '<div class="info">Pick a template in the sidebar and tap <strong>Generate my cut list</strong> to get started.</div>';
+  const tplName=TEMPLATES.find(x=>x.id===S.template)?.name||'';
+  let header=`<div style="margin-bottom:12px"><div style="font-size:.85rem;color:var(--amber);font-weight:600">${tplName} Preview</div><div style="font-size:.7rem;color:var(--text3)">${S.parts.reduce((s,p)=>s+p.qty,0)} parts from ${S.sheets.length} sheet${S.sheets.length!==1?'s':''} | Swipe tabs above for cut list, pricing & more</div></div>`;
   const W=700,H=550,pad=60;
   const ow=gv('dimW'),oh=gv('dimH'),od=gv('dimD');
   const scale=Math.min((W-2*pad)/ow,(H-2*pad)/oh);
@@ -612,7 +704,7 @@ function renderPreview(){
   svg+=dimLine(bx,by-20,bx+bw,by-20,fmt(ow));
   svg+=dimLine(bx-20,by,bx-20,by+bh,fmt(oh));
   svg+=`</svg>`;
-  return svg;
+  return header+svg;
 }
 
 function dimLine(x1,y1,x2,y2,label){
@@ -983,22 +1075,26 @@ const AR = {
 function checkARSupport(){
   const btn=document.getElementById('arBtn');
   const noSup=document.getElementById('arNoSupport');
-  if(!navigator.xr){
+  const showMeasureHelper=()=>{
     noSup.style.display='block';
-    noSup.textContent='AR not available — WebXR not supported in this browser. Use Chrome on Android or Safari 18+ on iOS.';
-    return;
-  }
+    noSup.innerHTML=`<div class="measure-helper">
+      <h4>How to measure your space</h4>
+      <p>AR measuring isn't available on this device, but measuring by hand is easy and more accurate!</p>
+      <ol class="mh-steps">
+        <li data-n="1.">Get a tape measure (or use the Measure app on your iPhone)</li>
+        <li data-n="2.">Measure the <strong>width</strong> of the space — wall to wall</li>
+        <li data-n="3.">Measure the <strong>height</strong> — floor to ceiling (or desired height)</li>
+        <li data-n="4.">Measure the <strong>depth</strong> — how far it sticks out from the wall</li>
+        <li data-n="5.">Type the numbers above in <strong>millimetres</strong></li>
+      </ol>
+      <p style="margin-top:8px;font-size:.65rem;color:var(--text3)">Quick conversion: 1 inch = 25.4mm. A standard kitchen is usually 600mm deep, 900mm worktop height.</p>
+    </div>`;
+  };
+  if(!navigator.xr){showMeasureHelper();return}
   navigator.xr.isSessionSupported('immersive-ar').then(ok=>{
-    if(ok){
-      btn.style.display='block';
-    } else {
-      noSup.style.display='block';
-      noSup.textContent='AR not available on this device. Use a phone with ARCore (Android) or ARKit (iOS 18+).';
-    }
-  }).catch(()=>{
-    noSup.style.display='block';
-    noSup.textContent='AR check failed. Try on a mobile device with AR support.';
-  });
+    if(ok) btn.style.display='block';
+    else showMeasureHelper();
+  }).catch(showMeasureHelper);
 }
 
 async function startAR(){
@@ -1274,6 +1370,34 @@ function updateARHud(){
   document.getElementById('arDoneBtn').textContent=Object.keys(AR.measurements).length>0?'Done ('+Object.keys(AR.measurements).length+'/3)':'Done';
 }
 
+// ── Welcome ──
+function dismissWelcome(dontShowAgain){
+  document.getElementById('welcome').style.display='none';
+  if(dontShowAgain) localStorage.setItem('cutlist_welcomed','1');
+  openSidebar(); // On mobile, open sidebar so they can start
+}
+
+function checkWelcome(){
+  if(localStorage.getItem('cutlist_welcomed')==='1'){
+    document.getElementById('welcome').style.display='none';
+  }
+}
+
+// ── Step Progress ──
+function updateSteps(){
+  const pips=document.querySelectorAll('.step-pip');
+  // Step 1: template selected (always done after init)
+  pips[0].classList.add('done');
+  // Step 2: material (always done)
+  pips[1].classList.toggle('done',true);
+  // Step 3: dimensions entered (non-default)
+  const dimsEntered=gv('dimW')!==800||gv('dimH')!==720||gv('dimD')!==400;
+  pips[2].classList.toggle('done',dimsEntered);
+  pips[2].classList.toggle('active',!dimsEntered);
+  // Step 4: generated
+  pips[3].classList.toggle('done',S.parts.length>0);
+}
+
 // ── Boot ──
 function init(){
   buildTabs();
@@ -1281,6 +1405,12 @@ function init(){
   setTab('preview');
   generate();
   checkARSupport();
+  checkWelcome();
+  updateSteps();
+  // On mobile, show a helpful first-run hint on the main content
+  if(window.innerWidth<=768 && !localStorage.getItem('cutlist_welcomed')){
+    // Welcome screen handles it
+  }
 }
 window.addEventListener('DOMContentLoaded',init);
 window.addEventListener('resize',()=>{if(S.tab==='view3d')renderTab()});
