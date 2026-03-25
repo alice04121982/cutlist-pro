@@ -133,6 +133,30 @@ tr:hover td{background:var(--bg3)}
   .tabs{overflow-x:auto;flex-wrap:nowrap}
   .tab{padding:8px 10px;font-size:.7rem}
 }
+
+/* AR Measure */
+.ar-btn{width:100%;padding:8px;background:var(--bg3);border:1px dashed var(--amber);border-radius:var(--radius);color:var(--amber);font-size:.8rem;text-align:center;margin-top:8px;cursor:pointer}
+.ar-btn:hover{background:var(--amber-glow)}
+.ar-btn .ar-ico{margin-right:6px}
+#arOverlay{position:fixed;inset:0;z-index:200;background:#000}
+#arOverlay canvas{width:100%;height:100%}
+#arHud{position:fixed;bottom:0;left:0;right:0;z-index:201;background:rgba(15,14,12,.92);padding:16px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-top:1px solid var(--border)}
+#arHud .ar-label{font-size:.85rem;color:var(--amber);font-weight:600;flex:1 1 100%}
+#arHud .ar-dist{font-size:1.4rem;color:var(--text);font-weight:700;font-family:var(--font);flex:1 1 100%;margin:-4px 0 6px}
+#arHud .ar-inst{font-size:.7rem;color:var(--text3);flex:1 1 100%;margin-bottom:4px}
+#arHud button{padding:8px 16px;font-size:.75rem;border-radius:var(--radius)}
+#arHud .ar-done{background:var(--amber);color:var(--bg);border-color:var(--amber)}
+#arHud .ar-cancel{background:none;color:var(--text3);border-color:var(--border)}
+.ar-dot{position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid #fff;transform:translate(-50%,-50%);pointer-events:none;z-index:202}
+.ar-dot.start{background:#4a4}
+.ar-dot.end{background:#c44}
+.ar-line{position:absolute;height:2px;background:var(--amber);transform-origin:left center;pointer-events:none;z-index:202}
+.ar-measure-label{position:absolute;background:rgba(15,14,12,.85);color:var(--amber);padding:4px 10px;border-radius:4px;font-size:.8rem;font-weight:600;transform:translate(-50%,-50%);pointer-events:none;z-index:202;white-space:nowrap}
+.ar-reticle{position:absolute;width:40px;height:40px;border:2px solid var(--amber);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:202;opacity:.7}
+.ar-reticle::before,.ar-reticle::after{content:'';position:absolute;background:var(--amber)}
+.ar-reticle::before{width:1px;height:12px;left:50%;top:50%;transform:translate(-50%,-50%)}
+.ar-reticle::after{width:12px;height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
+.ar-nosupport{padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:.75rem;color:var(--text3);margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -194,6 +218,8 @@ tr:hover td{background:var(--bg3)}
           <div><label>Spacing</label><input type="number" id="dimSpacing" class="full-w" value="400"></div>
           <div><label>Pitch &deg;</label><input type="number" id="dimPitch" class="full-w" value="35"></div>
         </div>
+        <button class="ar-btn" id="arBtn" style="display:none" onclick="startAR()"><span class="ar-ico">&#x1F4F1;</span> AR Measure</button>
+        <div id="arNoSupport" class="ar-nosupport" style="display:none"></div>
       </div>
 
       <div class="section" id="overridesSection" style="display:none">
@@ -215,6 +241,19 @@ tr:hover td{background:var(--bg3)}
       </div>
     </div>
     <div class="content" id="content"></div>
+  </div>
+
+  <!-- AR Overlay -->
+  <div id="arOverlay" style="display:none">
+    <div id="arHud">
+      <div class="ar-label">Measuring: <span id="arTarget">Width</span></div>
+      <div class="ar-dist" id="arDistance">--</div>
+      <div class="ar-inst" id="arInstructions">Tap a surface to place the start point</div>
+      <button onclick="arUndo()">Undo</button>
+      <button onclick="arNext()" id="arNextBtn">Next</button>
+      <button class="ar-done" onclick="arDone()" id="arDoneBtn">Done</button>
+      <button class="ar-cancel" onclick="arCancel()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -272,14 +311,6 @@ function fmt(v){return S.unit==='in'?mm2in(v)+'"':v+'mm'}
 function fmtNum(v){return S.unit==='in'?mm2in(v):v}
 function gv(id){return +document.getElementById(id).value}
 function sv(id,v){document.getElementById(id).value=v}
-
-// ── Init ──
-function init(){
-  buildTabs();
-  buildTemplateGrid();
-  setTab('preview');
-  generate();
-}
 
 function buildTabs(){
   const c=document.getElementById('tabs');
@@ -931,7 +962,326 @@ function newProject(){
   selectTemplate('shelving');
 }
 
+// ── AR Measure ──
+const AR = {
+  session: null,
+  refSpace: null,
+  viewerSpace: null,
+  hitTestSource: null,
+  gl: null,
+  points: [],          // [{x,y,z}] — world-space positions
+  screenPoints: [],    // [{x,y}] — projected screen positions
+  measureTarget: 'width', // 'width' | 'height' | 'depth'
+  targets: ['width','height','depth'],
+  targetIdx: 0,
+  measurements: {},    // {width:mm, height:mm, depth:mm}
+  lastHitPose: null,
+  reticleEl: null,
+  overlayEls: []       // transient DOM elements (dots, lines, labels)
+};
+
+function checkARSupport(){
+  const btn=document.getElementById('arBtn');
+  const noSup=document.getElementById('arNoSupport');
+  if(!navigator.xr){
+    noSup.style.display='block';
+    noSup.textContent='AR not available — WebXR not supported in this browser. Use Chrome on Android or Safari 18+ on iOS.';
+    return;
+  }
+  navigator.xr.isSessionSupported('immersive-ar').then(ok=>{
+    if(ok){
+      btn.style.display='block';
+    } else {
+      noSup.style.display='block';
+      noSup.textContent='AR not available on this device. Use a phone with ARCore (Android) or ARKit (iOS 18+).';
+    }
+  }).catch(()=>{
+    noSup.style.display='block';
+    noSup.textContent='AR check failed. Try on a mobile device with AR support.';
+  });
+}
+
+async function startAR(){
+  try {
+    const overlay=document.getElementById('arOverlay');
+    overlay.style.display='block';
+    closeSidebar();
+
+    AR.targetIdx=0;
+    AR.measureTarget=AR.targets[0];
+    AR.measurements={};
+    AR.points=[];
+    AR.screenPoints=[];
+    clearAROverlayEls();
+    updateARHud();
+
+    const session=await navigator.xr.requestSession('immersive-ar',{
+      requiredFeatures:['hit-test'],
+      optionalFeatures:['dom-overlay'],
+      domOverlay:{root:overlay}
+    });
+    AR.session=session;
+
+    // Set up WebGL context for XR
+    const canvas=document.createElement('canvas');
+    const gl=canvas.getContext('webgl',{xrCompatible:true});
+    AR.gl=gl;
+    await session.updateRenderState({baseLayer:new XRWebGLLayer(session,gl)});
+
+    AR.refSpace=await session.requestReferenceSpace('local');
+    AR.viewerSpace=await session.requestReferenceSpace('viewer');
+    AR.hitTestSource=await session.requestHitTestSource({space:AR.viewerSpace});
+
+    // Add reticle
+    AR.reticleEl=document.createElement('div');
+    AR.reticleEl.className='ar-reticle';
+    overlay.appendChild(AR.reticleEl);
+
+    session.addEventListener('select',onARSelect);
+    session.addEventListener('end',onARSessionEnd);
+    session.requestAnimationFrame(onARFrame);
+  } catch(e){
+    console.error('AR start failed:',e);
+    document.getElementById('arOverlay').style.display='none';
+    alert('Could not start AR: '+e.message);
+  }
+}
+
+function onARFrame(time,frame){
+  const session=AR.session;
+  if(!session)return;
+  session.requestAnimationFrame(onARFrame);
+
+  const pose=frame.getViewerPose(AR.refSpace);
+  if(!pose)return;
+
+  // Clear GL (required to keep session alive)
+  const gl=AR.gl;
+  const layer=session.renderState.baseLayer;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,layer.framebuffer);
+  gl.clearColor(0,0,0,0);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  // Hit test — move reticle to nearest surface
+  const hitResults=frame.getHitTestResults(AR.hitTestSource);
+  if(hitResults.length>0){
+    const hit=hitResults[0];
+    const hitPose=hit.getPose(AR.refSpace);
+    AR.lastHitPose=hitPose;
+    // Project to screen for reticle
+    const view=pose.views[0];
+    const vp=layer.getViewport(view);
+    const screenPos=projectToScreen(hitPose.transform.position,view,vp);
+    if(screenPos && AR.reticleEl){
+      AR.reticleEl.style.left=screenPos.x+'px';
+      AR.reticleEl.style.top=screenPos.y+'px';
+      AR.reticleEl.style.display='block';
+    }
+  } else {
+    if(AR.reticleEl) AR.reticleEl.style.display='none';
+    AR.lastHitPose=null;
+  }
+
+  // Update placed point screen positions (they move as camera moves)
+  if(AR.points.length>0){
+    const view=pose.views[0];
+    const vp=layer.getViewport(view);
+    AR.points.forEach((pt,i)=>{
+      const sp=projectToScreen(pt,view,vp);
+      if(sp && AR.overlayEls[i]){
+        AR.overlayEls[i].style.left=sp.x+'px';
+        AR.overlayEls[i].style.top=sp.y+'px';
+      }
+    });
+    // Update line and label between two points
+    if(AR.points.length===2){
+      const sp0=projectToScreen(AR.points[0],pose.views[0],layer.getViewport(pose.views[0]));
+      const sp1=projectToScreen(AR.points[1],pose.views[0],layer.getViewport(pose.views[0]));
+      if(sp0&&sp1) updateARLine(sp0,sp1);
+    }
+  }
+}
+
+function projectToScreen(worldPos,view,viewport){
+  const p=view.projectionMatrix;
+  const v=view.transform.inverse.matrix;
+  // Multiply view * point
+  const wx=worldPos.x,wy=worldPos.y,wz=worldPos.z;
+  const vx=v[0]*wx+v[4]*wy+v[8]*wz+v[12];
+  const vy=v[1]*wx+v[5]*wy+v[9]*wz+v[13];
+  const vz=v[2]*wx+v[6]*wy+v[10]*wz+v[14];
+  const vw=v[3]*wx+v[7]*wy+v[11]*wz+v[15];
+  // Multiply projection * viewpoint
+  const cx=p[0]*vx+p[4]*vy+p[8]*vz+p[12]*vw;
+  const cy=p[1]*vx+p[5]*vy+p[9]*vz+p[13]*vw;
+  const cw=p[3]*vx+p[7]*vy+p[11]*vz+p[15]*vw;
+  if(cw<=0)return null;
+  const ndcX=cx/cw;
+  const ndcY=cy/cw;
+  const sx=window.innerWidth*(ndcX+1)/2;
+  const sy=window.innerHeight*(1-ndcY)/2;
+  return{x:sx,y:sy};
+}
+
+function onARSelect(){
+  if(!AR.lastHitPose)return;
+  const pos=AR.lastHitPose.transform.position;
+  const pt={x:pos.x,y:pos.y,z:pos.z};
+
+  if(AR.points.length>=2){
+    // Already have 2 points — start fresh for re-measure
+    clearAROverlayEls();
+    AR.points=[];
+  }
+
+  AR.points.push(pt);
+
+  // Add dot to overlay
+  const overlay=document.getElementById('arOverlay');
+  const dot=document.createElement('div');
+  dot.className='ar-dot '+(AR.points.length===1?'start':'end');
+  overlay.appendChild(dot);
+  AR.overlayEls.push(dot);
+
+  if(AR.points.length===2){
+    // Calculate distance
+    const a=AR.points[0],b=AR.points[1];
+    const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+    const distM=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const distMM=Math.round(distM*1000);
+
+    AR.measurements[AR.measureTarget]=distMM;
+
+    // Show distance
+    const distEl=document.getElementById('arDistance');
+    distEl.textContent=distMM+'mm ('+mm2in(distMM)+'")';
+
+    // Add line element
+    const line=document.createElement('div');
+    line.className='ar-line';
+    line.id='arLineMeasure';
+    overlay.appendChild(line);
+
+    // Add label element
+    const label=document.createElement('div');
+    label.className='ar-measure-label';
+    label.id='arLabelMeasure';
+    label.textContent=AR.measureTarget.charAt(0).toUpperCase()+AR.measureTarget.slice(1)+': '+distMM+'mm';
+    overlay.appendChild(label);
+
+    document.getElementById('arInstructions').textContent='Tap Next to measure '+getNextTargetName()+', or Done to finish';
+  } else {
+    document.getElementById('arInstructions').textContent='Tap a surface to place the end point';
+    document.getElementById('arDistance').textContent='--';
+  }
+}
+
+function updateARLine(sp0,sp1){
+  const line=document.getElementById('arLineMeasure');
+  const label=document.getElementById('arLabelMeasure');
+  if(!line||!label)return;
+  const dx=sp1.x-sp0.x,dy=sp1.y-sp0.y;
+  const len=Math.sqrt(dx*dx+dy*dy);
+  const angle=Math.atan2(dy,dx)*180/Math.PI;
+  line.style.left=sp0.x+'px';
+  line.style.top=sp0.y+'px';
+  line.style.width=len+'px';
+  line.style.transform='rotate('+angle+'deg)';
+  label.style.left=(sp0.x+sp1.x)/2+'px';
+  label.style.top=(sp0.y+sp1.y)/2-20+'px';
+}
+
+function getNextTargetName(){
+  const next=AR.targetIdx+1;
+  return next<AR.targets.length?AR.targets[next]:'(all done)';
+}
+
+function arNext(){
+  if(AR.points.length<2){alert('Place 2 points first');return}
+  AR.targetIdx++;
+  if(AR.targetIdx>=AR.targets.length) AR.targetIdx=0;
+  AR.measureTarget=AR.targets[AR.targetIdx];
+  AR.points=[];
+  clearAROverlayEls();
+  updateARHud();
+  document.getElementById('arDistance').textContent='--';
+  document.getElementById('arInstructions').textContent='Tap a surface to place the start point';
+}
+
+function arUndo(){
+  if(AR.points.length>0){
+    AR.points.pop();
+    const el=AR.overlayEls.pop();
+    if(el)el.remove();
+    // Also remove line and label if going back from 2 to 1
+    const line=document.getElementById('arLineMeasure');
+    const label=document.getElementById('arLabelMeasure');
+    if(line)line.remove();
+    if(label)label.remove();
+    document.getElementById('arDistance').textContent='--';
+    document.getElementById('arInstructions').textContent=AR.points.length===0?'Tap a surface to place the start point':'Tap a surface to place the end point';
+  }
+}
+
+function arDone(){
+  // Apply measurements to dimension inputs
+  if(AR.measurements.width) sv('dimW',AR.measurements.width);
+  if(AR.measurements.height) sv('dimH',AR.measurements.height);
+  if(AR.measurements.depth) sv('dimD',AR.measurements.depth);
+
+  endARSession();
+  generate(); // Auto-regenerate with new dims
+}
+
+function arCancel(){
+  endARSession();
+}
+
+function endARSession(){
+  if(AR.session){
+    AR.session.end().catch(()=>{});
+  }
+}
+
+function onARSessionEnd(){
+  AR.session=null;
+  AR.hitTestSource=null;
+  AR.refSpace=null;
+  AR.viewerSpace=null;
+  AR.gl=null;
+  AR.lastHitPose=null;
+  clearAROverlayEls();
+  if(AR.reticleEl){AR.reticleEl.remove();AR.reticleEl=null}
+  document.getElementById('arOverlay').style.display='none';
+}
+
+function clearAROverlayEls(){
+  AR.overlayEls.forEach(el=>el.remove());
+  AR.overlayEls=[];
+  const line=document.getElementById('arLineMeasure');
+  const label=document.getElementById('arLabelMeasure');
+  if(line)line.remove();
+  if(label)label.remove();
+}
+
+function updateARHud(){
+  document.getElementById('arTarget').textContent=AR.measureTarget.charAt(0).toUpperCase()+AR.measureTarget.slice(1);
+  // Show which measurements are done
+  const parts=AR.targets.map(t=>{
+    const v=AR.measurements[t];
+    return t.charAt(0).toUpperCase()+t.slice(1)+(v?': '+v+'mm':': --');
+  });
+  document.getElementById('arDoneBtn').textContent=Object.keys(AR.measurements).length>0?'Done ('+Object.keys(AR.measurements).length+'/3)':'Done';
+}
+
 // ── Boot ──
+function init(){
+  buildTabs();
+  buildTemplateGrid();
+  setTab('preview');
+  generate();
+  checkARSupport();
+}
 window.addEventListener('DOMContentLoaded',init);
 window.addEventListener('resize',()=>{if(S.tab==='view3d')renderTab()});
 </script>
