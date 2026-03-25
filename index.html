@@ -313,6 +313,10 @@ tr:hover td{background:var(--bg3)}
           <div><label>Depth (mm)</label><input type="number" id="dimD" class="full-w" value="400" placeholder="e.g. 400"></div>
           <div><label>Shelves</label><input type="number" id="dimShelves" class="full-w" value="3" min="0" max="20"></div>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;margin:8px 0;cursor:pointer;font-size:.75rem;color:var(--text2)">
+          <input type="checkbox" id="scribeToggle" checked style="width:auto;margin:0"> Add 2mm scribing tolerance
+        </label>
+        <div class="tip" style="margin-bottom:6px">Scribing removes 2mm from panels that sit against walls, so you can scribe them to fit uneven surfaces.</div>
         <details id="advancedDims">
           <summary style="font-size:.7rem;color:var(--text3);cursor:pointer">Framing: spacing & pitch</summary>
           <div class="row" style="margin-top:6px">
@@ -493,39 +497,67 @@ function openSidebar(){document.getElementById('sidebar').classList.add('open');
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('open')}
 
 // ── Generate ──
+function calcHingePositions(doorH){
+  // Standard 35mm concealed hinge positions (Blum/Hettich pattern)
+  // Top hinge: 80-100mm from top edge, bottom hinge: 80-100mm from bottom
+  // Centre hinge if door > 1200mm
+  const positions=[{y:90,label:'Top hinge'},{y:doorH-90,label:'Bottom hinge'}];
+  if(doorH>1200) positions.push({y:Math.round(doorH/2),label:'Centre hinge'});
+  // Each hinge: 35mm diameter bore, 13mm deep, centre 22.5mm from door edge
+  return positions.map(p=>({...p,bore:35,depth:13,inset:22.5}));
+}
+
 function generate(){
   const t=S.template,w=gv('dimW'),h=gv('dimH'),d=gv('dimD'),shelves=gv('dimShelves'),thick=gv('thickness'),spacing=gv('dimSpacing'),pitch=gv('dimPitch');
   const mat=document.getElementById('material').value;
+  const scribe=document.getElementById('scribeToggle')?.checked?2:0; // 2mm scribing tolerance
   let parts=[];
 
   if(t==='shelving'){
-    parts.push({name:'Left Side',w:d,h:h,qty:1},{name:'Right Side',w:d,h:h,qty:1});
-    parts.push({name:'Top',w:w-2*thick,h:d,qty:1},{name:'Bottom',w:w-2*thick,h:d,qty:1});
-    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d,qty:1});
+    // Sides scribe against back wall and side walls
+    parts.push({name:'Left Side',w:d-scribe,h:h,qty:1,scribed:!!scribe,wallEdge:'back+left'});
+    parts.push({name:'Right Side',w:d-scribe,h:h,qty:1,scribed:!!scribe,wallEdge:'back+right'});
+    parts.push({name:'Top',w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
+    parts.push({name:'Bottom',w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
     if(w>600) parts.push({name:'Back Panel',w:w,h:h,qty:1,note:'3mm ply'});
   } else if(t==='wardrobe'){
-    parts.push({name:'Left Side',w:d,h:h,qty:1},{name:'Right Side',w:d,h:h,qty:1});
-    parts.push({name:'Top',w:w-2*thick,h:d,qty:1},{name:'Bottom',w:w-2*thick,h:d,qty:1});
-    parts.push({name:'Door',w:Math.floor((w-2*thick)/2),h:h-2*thick,qty:2});
+    const doorW=Math.floor((w-2*thick)/2);
+    const doorH=h-2*thick;
+    const hinges=calcHingePositions(doorH);
+    parts.push({name:'Left Side',w:d-scribe,h:h,qty:1,scribed:!!scribe,wallEdge:'back+left'});
+    parts.push({name:'Right Side',w:d-scribe,h:h,qty:1,scribed:!!scribe,wallEdge:'back+right'});
+    parts.push({name:'Top',w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
+    parts.push({name:'Bottom',w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
+    parts.push({name:'Door',w:doorW,h:doorH,qty:2,hinges,note:hinges.length+' hinges, 35mm bore'});
     parts.push({name:'Hanging Rail',w:w-2*thick-20,h:30,qty:1,note:'Round bar'});
-    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20,qty:1});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
     parts.push({name:'Back Panel',w:w-4,h:h-4,qty:1,note:'3mm ply'});
   } else if(t==='kitchenbase'){
-    parts.push({name:'Left Side',w:d,h:h-100,qty:1},{name:'Right Side',w:d,h:h-100,qty:1});
+    const doorW=w-4;
+    const doorH=h-100-thick;
+    const hinges=calcHingePositions(doorH);
+    parts.push({name:'Left Side',w:d,h:h-100,qty:1,scribed:!!scribe,wallEdge:'back'});
+    parts.push({name:'Right Side',w:d,h:h-100,qty:1,scribed:!!scribe,wallEdge:'back'});
     parts.push({name:'Bottom',w:w-2*thick,h:d-20,qty:1});
-    parts.push({name:'Door',w:Math.floor((w-4)/1),h:h-100-thick,qty:1});
+    parts.push({name:'Door',w:doorW,h:doorH,qty:1,hinges,note:hinges.length+' hinges, 35mm bore'});
     for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20,qty:1});
     parts.push({name:'Back Panel',w:w-4,h:h-104,qty:1,note:'3mm ply'});
-    parts.push({name:'Plinth',w:w,h:100,qty:1});
+    parts.push({name:'Plinth',w:w-scribe*2,h:100,qty:1,scribed:!!scribe,wallEdge:'left+right'});
     parts.push({name:'Drawer Front',w:w-4,h:180,qty:1});
     parts.push({name:'Drawer Side',w:d-40,h:150,qty:2});
     parts.push({name:'Drawer Back',w:w-2*thick-40,h:150,qty:1});
     parts.push({name:'Drawer Base',w:w-2*thick-36,h:d-44,qty:1,note:'6mm ply'});
   } else if(t==='kitchenwall'){
-    parts.push({name:'Left Side',w:d,h:h,qty:1},{name:'Right Side',w:d,h:h,qty:1});
-    parts.push({name:'Top',w:w-2*thick,h:d,qty:1},{name:'Bottom',w:w-2*thick,h:d,qty:1});
-    parts.push({name:'Door',w:w-4,h:h-4,qty:1});
-    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20,qty:1});
+    const doorW=w-4;
+    const doorH=h-4;
+    const hinges=calcHingePositions(doorH);
+    parts.push({name:'Left Side',w:d-scribe,h:h,qty:1,scribed:!!scribe,wallEdge:'back+left'});
+    parts.push({name:'Right Side',w:d-scribe,h:h,qty:1,scribed:!!scribe,wallEdge:'back+right'});
+    parts.push({name:'Top',w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
+    parts.push({name:'Bottom',w:w-2*thick,h:d-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
+    parts.push({name:'Door',w:doorW,h:doorH,qty:1,hinges,note:hinges.length+' hinges, 35mm bore'});
+    for(let i=0;i<shelves;i++) parts.push({name:'Shelf '+(i+1),w:w-2*thick,h:d-20-scribe,qty:1,scribed:!!scribe,wallEdge:'back'});
     parts.push({name:'Back Panel',w:w-4,h:h-4,qty:1,note:'3mm ply'});
   } else if(t==='studwall'){
     const studCount=Math.floor(w/spacing)+1;
@@ -864,14 +896,39 @@ function draw3D(ctx,W,H){
 // ── Cut List Table ──
 function renderCutList(){
   if(!S.parts.length) return '<div class="info">Generate a cut list first.</div>';
-  let html='<table><thead><tr><th>Part</th><th>Width</th><th>Height</th><th>Qty</th><th>Area</th><th>Notes</th></tr></thead><tbody>';
+  const hasScribe=S.parts.some(p=>p.scribed);
+  let html='';
+  if(hasScribe) html+='<div class="tip" style="margin-bottom:10px"><strong>Scribing applied:</strong> 2mm removed from wall-adjacent edges. Mark these edges and scribe to fit with a block plane or jigsaw.</div>';
+  html+='<table><thead><tr><th>Part</th><th>Width</th><th>Height</th><th>Qty</th><th>Area</th><th>Notes</th></tr></thead><tbody>';
   let totalArea=0;
   S.parts.forEach(p=>{
     const area=p.w*p.h*p.qty;
     totalArea+=area;
-    html+=`<tr><td>${p.name}</td><td>${fmt(p.w)}</td><td>${fmt(p.h)}</td><td>${p.qty}</td><td>${(area/1e6).toFixed(3)} m\u00B2</td><td style="color:var(--text3)">${p.note||''}</td></tr>`;
+    let notes=p.note||'';
+    if(p.scribed) notes+=(notes?' | ':'')+'<span style="color:var(--amber)">Scribed (-2mm)</span>';
+    if(p.hinges){
+      const hText=p.hinges.map(h=>h.label+' @ '+h.y+'mm').join(', ');
+      notes+=(notes?' | ':'')+'<span style="color:var(--blue)">Hinges: '+hText+'</span>';
+    }
+    html+=`<tr><td>${p.name}</td><td>${fmt(p.w)}</td><td>${fmt(p.h)}</td><td>${p.qty}</td><td>${(area/1e6).toFixed(3)} m\u00B2</td><td style="color:var(--text3);font-size:.7rem">${notes}</td></tr>`;
   });
   html+=`</tbody></table>`;
+  // Hinge detail panel
+  const doorParts=S.parts.filter(p=>p.hinges);
+  if(doorParts.length){
+    html+='<div style="margin-top:16px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">';
+    html+='<div style="font-size:.8rem;color:var(--amber);font-weight:600;margin-bottom:8px">Hinge Drilling Guide</div>';
+    doorParts.forEach(dp=>{
+      html+=`<div style="font-size:.75rem;color:var(--text2);margin-bottom:6px"><strong>${dp.name}</strong> (${dp.w} x ${dp.h}mm):</div>`;
+      html+='<table style="margin-bottom:10px"><tr><th>Position</th><th>From top edge</th><th>From hinge edge</th><th>Bore</th><th>Depth</th></tr>';
+      dp.hinges.forEach(h=>{
+        html+=`<tr><td>${h.label}</td><td>${h.y}mm</td><td>${h.inset}mm</td><td>\u00D8${h.bore}mm</td><td>${h.depth}mm</td></tr>`;
+      });
+      html+='</table>';
+    });
+    html+='<div style="font-size:.65rem;color:var(--text3)">Use a 35mm Forstner bit. Drill on the inside face. Hinge cup sits 22.5mm from the door edge (standard overlay).</div>';
+    html+='</div>';
+  }
   html+=`<div style="margin-top:12px;color:var(--amber);font-size:.85rem">Total parts: ${S.parts.reduce((s,p)=>s+p.qty,0)} | Total area: ${(totalArea/1e6).toFixed(3)} m\u00B2 | Sheets needed: ${S.sheets.length}</div>`;
   return html;
 }
@@ -965,10 +1022,22 @@ function updatePricing(){
 // ── Export ──
 function renderExport(){
   return `<div class="export-grid">
+    <div class="export-btn" onclick="exportCNC()" style="border-color:var(--amber)"><span class="ico">\u{1F3ED}</span><span style="color:var(--amber);font-weight:600">Export for CNC</span></div>
     <div class="export-btn" onclick="exportCSV()"><span class="ico">\u{1F4C4}</span><span>CSV Spreadsheet</span></div>
     <div class="export-btn" onclick="exportJSON()"><span class="ico">\u{1F4CB}</span><span>JSON Data</span></div>
     <div class="export-btn" onclick="exportDXF()"><span class="ico">\u{1F4D0}</span><span>DXF Drawing</span></div>
     <div class="export-btn" onclick="exportPrint()"><span class="ico">\u{1F5A8}</span><span>Print / PDF</span></div>
+  </div>
+  <div style="margin-top:16px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
+    <div style="font-size:.8rem;color:var(--amber);font-weight:600;margin-bottom:6px">UK Cutting Services</div>
+    <div style="font-size:.7rem;color:var(--text3);line-height:1.6">
+      Export your CNC CSV and upload it to one of these services:<br>
+      <a href="https://www.cutwrights.com" target="_blank" rel="noopener" style="color:var(--amber)">Cutwrights</a> — MDF, melamine, plywood. Online quotes.<br>
+      <a href="https://cutlist.co.uk" target="_blank" rel="noopener" style="color:var(--amber)">Cutlist.co.uk</a> — Trade panel cutting & edging.<br>
+      <a href="https://www.cuttosize.co.uk" target="_blank" rel="noopener" style="color:var(--amber)">Cut To Size</a> — Panels, edging, shaker doors.<br>
+      <a href="https://cnccreations.co.uk" target="_blank" rel="noopener" style="color:var(--amber)">CNC Creations</a> — MDF, plywood, melamine. 3-7 day delivery.<br>
+      <a href="https://www.timbersource.co.uk" target="_blank" rel="noopener" style="color:var(--amber)">Timbersource</a> — Hardwood & softwood cutting.<br>
+    </div>
   </div>`;
 }
 
@@ -1017,6 +1086,61 @@ function exportDXF(){
   });
   dxf+='0\nENDSEC\n0\nEOF\n';
   downloadFile(gv2('projectName')+'.dxf',dxf,'application/dxf');
+}
+
+function exportCNC(){
+  // CNC-ready CSV: industry-standard format for cutting services
+  // Columns match what Cutwrights, CNC Creations, Timbersource expect
+  const mat=document.getElementById('material');
+  const matName=mat.options[mat.selectedIndex].text.split(' - ')[0].trim();
+  const thick=gv('thickness');
+  const project=gv2('projectName');
+
+  let csv='';
+  // Header comments
+  csv+='# CNC Cut List Export - CutList Pro\n';
+  csv+='# Project: '+project+'\n';
+  csv+='# Material: '+matName+' ('+thick+'mm)\n';
+  csv+='# Date: '+new Date().toISOString().split('T')[0]+'\n';
+  csv+='# All dimensions in mm. Grain direction: L=Length\n';
+  csv+='#\n';
+  // Column headers — standard CNC service format
+  csv+='Part Name,Length (mm),Width (mm),Qty,Material,Thickness (mm),Grain,Edge L1,Edge L2,Edge W1,Edge W2,Scribed,Notes\n';
+
+  S.parts.forEach(p=>{
+    const len=Math.max(p.w,p.h);
+    const wid=Math.min(p.w,p.h);
+    const grain='L'; // Length-wise grain default
+    // Edge banding: 1=yes, 0=no. Default: front-facing edges only
+    const isDoor=p.name.includes('Door');
+    const isDrawer=p.name.includes('Drawer');
+    const isBack=p.name.includes('Back');
+    const isPlinth=p.name.includes('Plinth');
+    // Front-facing long edges get banding, others don't
+    const edgeL1=(isDoor||isDrawer||isPlinth)?1:0;
+    const edgeL2=(isDoor||isDrawer)?1:0;
+    const edgeW1=(isDoor||isDrawer)?1:0;
+    const edgeW2=(isDoor||isDrawer)?1:0;
+    const scribed=p.scribed?'YES':'NO';
+    let notes=p.note||'';
+    // Add hinge drilling info for CNC
+    if(p.hinges){
+      const hingeNotes=p.hinges.map(h=>'DRILL '+h.bore+'mm@'+h.y+'mmY/'+h.inset+'mmX/'+h.depth+'mmD').join('; ');
+      notes+=(notes?'; ':'')+hingeNotes;
+    }
+    for(let i=0;i<p.qty;i++){
+      const label=p.qty>1?p.name+' #'+(i+1):p.name;
+      csv+=`"${label}",${len},${wid},1,"${matName}",${thick},"${grain}",${edgeL1},${edgeL2},${edgeW1},${edgeW2},"${scribed}","${notes}"\n`;
+    }
+  });
+
+  // Summary
+  csv+='\n# Summary\n';
+  csv+='# Total parts: '+S.parts.reduce((s,p)=>s+p.qty,0)+'\n';
+  csv+='# Sheets needed: '+S.sheets.length+'\n';
+  csv+='# Sheet size: '+gv('sheetW')+'x'+gv('sheetH')+'mm\n';
+
+  downloadFile(project+'-CNC.csv',csv,'text/csv');
 }
 
 function exportPrint(){
