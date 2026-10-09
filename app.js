@@ -668,8 +668,8 @@ function elevationSVG(mode = 'elev', hl = null) {
   const cab = isCabinet(S.template);
   let sh, vw, vh;
   if (cab) { sh = cabinetShapes(); vw = S.w; vh = S.h; } else ({ sh, vw, vh } = frameShapes());
-  if (mode === 'photo') {
-    return `<svg viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="none" class="on-photo" aria-hidden="true">${shapesSVG(sh, null)}</svg>`;
+  if (mode === 'photo' || mode === 'solid') {
+    return `<svg viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="none" class="on-photo${mode === 'solid' ? ' solid' : ''}" aria-hidden="true">${shapesSVG(sh, null)}</svg>`;
   }
   const big = Math.max(vw, vh);
   const fs = big / 32, pad = fs * 3.4;
@@ -962,7 +962,7 @@ function renderStage() {
   const box = $('#stageBox'), foot = $('#stageFoot');
   if (S.stage === 'photo') {
     ensureOverlay();
-    box.innerHTML = `<div class="compare" id="planCompare"><img class="compare-img" alt="Your photo" src="${esc(S.photo.url)}"><div class="compare-layer" data-layer><div class="ov-box" id="planOverlay"></div></div><div class="compare-handle" aria-hidden="true"><span><i class="ph ph-arrows-out-cardinal"></i></span></div></div>`;
+    box.innerHTML = `<div class="compare" id="planCompare"><img class="compare-img" alt="Your photo" src="${esc(S.photo.url)}"><div class="compare-layer" data-layer><div class="ov-box" id="planOverlay"></div></div><div class="compare-handle" aria-hidden="true"><span><i class="ph ph-arrows-left-right"></i></span></div></div>`;
     const root = $('#planCompare'), ovb = $('#planOverlay');
     root.style.aspectRatio = `${S.photo.w} / ${S.photo.h}`;
     ovb.innerHTML = elevationSVG('photo');
@@ -1561,14 +1561,17 @@ function renderHome() {
   if (draft && draft.name) { card.hidden = false; $('#resumeName').textContent = String(draft.name).slice(0, 60); } else card.hidden = true;
   if (heroBuilt) return;
   heroBuilt = true;
-  // Demo: open shelving drawn onto the sample photo
-  const demo = { template: 'shelving', w: 1500, h: 1000, d: 300, shelves: 2, thickness: 18, doors: 0, scribe: true, overrides: {} };
+  // Demo: a three-bay plywood shelf unit drawn onto the sample photo
+  const demo = { template: 'shelving', w: 1500, h: 1000, d: 300, shelves: 1, compartments: 3, thickness: 18, material: 'plywood', doors: 0, joinery: 'screws', scribe: true, overrides: {} };
   const saved = {}; Object.keys(demo).forEach(k => { saved[k] = S[k]; S[k] = demo[k]; });
   compute();
   const box = $('#heroOverlay');
-  box.innerHTML = elevationSVG('photo');
+  box.innerHTML = elevationSVG('solid') + `<span class="ov-dim ov-dim-w">${fmt(S.w)}</span><span class="ov-dim ov-dim-h">${fmt(S.h)}</span>`;
   const root = $('#heroCompare');
   placeOverlay(box, { wf: () => 0.38, aspect: () => 1.5, imgW: 1600, imgH: 1067, pos: () => ({ x: 0.565, yb: 0.6 }) });
+  $('#heroStats').innerHTML = `<li><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>${fmt(S.w)} x ${fmt(S.h)}</strong> measured from the photo</span></li>`
+    + `<li><i class="ph ph-scissors" aria-hidden="true"></i><span><strong>${R.pieceCount} cuts</strong> from ${R.nMain} ${R.nMain === 1 ? 'sheet' : 'sheets'} of plywood</span></li>`
+    + `<li><i class="ph ph-truck" aria-hidden="true"></i><span><strong>About ${gbp0(R.total)}</strong> cut and delivered</span></li>`;
   Object.assign(S, saved);
   compute();
   const range = $('#heroSlider');
