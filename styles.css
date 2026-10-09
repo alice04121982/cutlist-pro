@@ -10,7 +10,7 @@
   --ok:#1F7A4D; --warn:#9A5B00; --warn-wash:rgba(214,140,0,.13);
   --shadow:0 1px 2px rgba(21,24,27,.06),0 8px 24px rgba(21,24,27,.07);
   --el-panel:#D9C7A8; --el-panel-2:#C9B38E; --el-edge:#6E5A3A; --el-back:#ECE3D3; --el-dim:#5F666D; --el-grid:#E3E5E0;
-  --display:'Panchang',ui-sans-serif,system-ui,sans-serif;
+  --display:'General Sans',ui-sans-serif,system-ui,sans-serif;
   --body:'Satoshi',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --r:12px; --pill:999px;
@@ -47,7 +47,7 @@
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:calc(var(--nav-h) + 12px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);-webkit-font-smoothing:antialiased;min-height:100dvh;overflow-x:hidden}
 img,svg,canvas{display:block;max-width:100%}
-h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.02em;line-height:1.05;margin:0}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.05;margin:0}
 p{margin:0}
 a{color:inherit}
 button,input,select{font:inherit;color:inherit}
@@ -92,7 +92,7 @@ button,input,select{font:inherit;color:inherit}
 .brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;cursor:pointer}
 .brand-mark{width:22px;height:22px;border-radius:5px;background:var(--accent);position:relative;flex:none}
 .brand-mark::after{content:"";position:absolute;left:5px;right:5px;top:10px;height:2px;background:var(--on-accent)}
-.brand-name{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+.brand-name{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.02em}
 .nav-links{display:none;gap:28px;margin-left:24px}
 .nav-links a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink-2)}
 .nav-links a:hover{color:var(--ink)}
@@ -152,7 +152,7 @@ body[data-view="plan"] .home-only{display:none!important}
 
 /* ---------- How ---------- */
 .how{padding-top:56px;padding-bottom:56px;border-top:1px solid var(--line)}
-.how h2,.designs h2{font-size:clamp(32px,4.4vw,52px);max-width:16ch}
+.how h2,.designs h2{font-size:clamp(32px,4.4vw,52px);max-width:22ch}
 .rail{list-style:none;margin:36px 0 0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,78%);gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px;scrollbar-width:thin}
 @media(min-width:900px){.rail{grid-auto-flow:row;grid-template-columns:repeat(4,1fr);overflow:visible}}
 .rail-item{scroll-snap-align:start;padding:24px 0 0;border-top:2px solid var(--ink)}
@@ -166,7 +166,7 @@ body[data-view="plan"] .home-only{display:none!important}
 .tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;padding:20px;min-height:170px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);cursor:pointer;overflow:hidden;transition:transform .3s var(--ease),border-color .2s,box-shadow .3s var(--ease)}
 .tile:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--shadow)}
 .tile i{font-size:30px;margin-bottom:auto;color:var(--accent-ink)}
-.tile-title{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.01em;line-height:1.1}
+.tile-title{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.01em;line-height:1.1}
 .tile-text{font-size:14px;color:var(--ink-2)}
 .tile-tint{background:var(--accent-wash);border-color:transparent}
 .tile-ink{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -230,7 +230,7 @@ body[data-view="plan"] .home-only{display:none!important}
 .plan.wide .stage-col,.plan.wide .ctl-col{display:none}
 
 .stage-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-.stage-title{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.01em}
+.stage-title{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.01em}
 .stage-meta{font-family:var(--mono);font-size:13px;color:var(--ink-3)}
 .stage-box{border-radius:var(--r);background:var(--surface);border:1px solid var(--line);overflow:hidden;position:relative}
 .stage-box .compare{border-radius:0}
@@ -248,7 +248,7 @@ body[data-view="plan"] .home-only{display:none!important}
 /* Controls */
 .ctl-col{display:grid;gap:22px}
 .group{display:grid;gap:12px}
-.group-title{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.01em}
+.group-title{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em}
 .group-sub{font-size:14px;color:var(--ink-2);margin-top:-6px}
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .field{display:grid;gap:6px;min-width:0}
@@ -459,7 +459,7 @@ dialog.sheet::backdrop{background:rgba(10,12,14,.55)}
 .measure .icon-btn{border-color:#3A4046;color:#ECEDEA}
 .measure .btn-ghost{color:#ECEDEA;border-color:#3A4046}
 .measure-top{display:flex;align-items:center;gap:12px;padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top))}
-.measure-title{flex:1;font-family:var(--display);font-weight:800;font-size:18px}
+.measure-title{flex:1;font-family:var(--display);font-weight:700;font-size:18px}
 .measure-canvas{flex:1;position:relative;overflow:hidden;touch-action:none}
 .measure-canvas canvas{position:absolute;top:0;left:0;cursor:crosshair}
 .measure-bottom{padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:#181B1E;border-top:1px solid #2C3135;display:grid;gap:8px}
@@ -535,23 +535,3 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
 #scaleNote{flex-basis:100%;font-size:13px;color:var(--ink-3)}
 .brand-name{white-space:nowrap}
 @media(max-width:520px){.bs-long{display:none}.nav-in{gap:10px}}
-
-/* Panchang is a wide face: smaller sizes, open tracking, everything else unchanged */
-h1,h2,h3{letter-spacing:-.005em;line-height:1.08}
-.brand-name{font-size:16px;letter-spacing:0}
-.hero h1{font-size:clamp(30px,3.3vw,44px);letter-spacing:-.01em;line-height:1.04}
-.how h2,.designs h2{font-size:clamp(24px,3vw,38px);max-width:20ch}
-.trade h2{font-size:clamp(22px,2.7vw,32px)}
-.privacy h2{font-size:clamp(18px,2vw,24px)}
-.rail-item h3{font-size:20px}
-.tile-title{font-size:16px;letter-spacing:0}
-.tile-hero .tile-title{font-size:clamp(20px,2.2vw,28px)}
-.stage-title{font-size:17px}
-.group-title{font-size:15px;letter-spacing:.01em}
-.page-head h2{font-size:clamp(24px,3vw,34px)}
-.sect-head h3{font-size:17px}
-.build-card h3{font-size:clamp(20px,2.3vw,26px)}
-.card h3{font-size:15px}
-.sheet-in h2{font-size:21px}
-.measure-title{font-size:15px}
-.empty h3{font-size:18px}
