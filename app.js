@@ -277,7 +277,7 @@ function generateParts() {
     sheet({ name: 'Bottom', w: w - 2 * th, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
     for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - s - 2, qty: bays, role: 'shelf', edge: 1 });
     if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
-    if (w > 600) thin({ name: 'Back Panel', w, h, role: 'back', note: '3mm, pinned on' });
+    thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on. Stops the unit racking sideways' });
     overlayDoors(w, h - 4);
   } else if (t === 'wardrobe') {
     const inner = w - 2 * th;
@@ -1328,32 +1328,43 @@ function isoSVG(items, opt = {}) {
   const cen = pts => pts.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [0, 0, 0]).map(c => c / pts.length);
   const light = [0.35, 0.6, -0.72];
   const faces = [];
-  moved.forEach(it => {
-    const rv = it.mv.map(rot), c = cen(rv);
+  const addFaces = (it, verts, cls, mvd) => {
+    const rv = verts.map(rot), c = cen(rv);
     it.f.forEach(f => {
       const fc = cen(f.map(i => rv[i]));
       const nrm = [fc[0] - c[0], fc[1] - c[1], fc[2] - c[2]], len = Math.hypot(...nrm) || 1;
       const nn = nrm.map(x => x / len);
       if (nn[2] > 0.02) return;
       const k = 0.78 + 0.26 * Math.max(0, nn[0] * light[0] + nn[1] * light[1] + nn[2] * light[2]);
-      faces.push({ z: fc[2], pts: f.map(i => scr(it.mv[i])), fill: shadeHex(it.fill, k) });
+      faces.push({ z: fc[2], pts: f.map(i => scr(verts[i])), fill: shadeHex(it.fill, k), cls, mv: mvd });
     });
+  };
+  // Animated steps: each moving part is drawn twice. The "fly" copy slides from the exploded spot
+  // into place (sorted for depth where it starts), then swaps for the "land" copy (sorted where it ends).
+  const travel = it => { const a = scr(cen(it.mv)), b = scr(cen(it.v)); return [(b[0] - a[0]).toFixed(1), (b[1] - a[1]).toFixed(1)]; };
+  moved.forEach(it => {
+    if (opt.animate && it.offset) { addFaces(it, it.mv, 'm-fly', travel(it)); addFaces(it, it.v, 'm-land'); }
+    else addFaces(it, it.mv);
   });
   faces.sort((a, b) => b.z - a.z);
+  const anim = f => f.cls ? ` class="${f.cls}"${f.mv ? ` data-dx="${f.mv[0]}" data-dy="${f.mv[1]}"` : ''}` : '';
   let s = `<svg viewBox="0 0 ${VW} ${VH}" class="m-iso" role="img" aria-label="${esc(opt.alt || 'Assembly drawing')}"><defs><marker id="mArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${MP.ink}"/></marker></defs>`;
-  faces.forEach(f => { s += `<polygon points="${f.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${f.fill}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`; });
+  faces.forEach(f => { s += `<polygon${anim(f)} points="${f.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${f.fill}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`; });
   // Movement arrows for exploded parts, then letter callouts
   const seen = new Set();
   moved.forEach(it => {
     if (!it.offset) return;
     const a = scr(cen(it.mv)), b = scr(cen(it.v));
-    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 24) s += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${MP.ink}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#mArr)"/>`;
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 24) s += `<line${opt.animate ? ' class="m-arrow"' : ''} x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${MP.ink}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#mArr)"/>`;
   });
   moved.forEach(it => {
     if (!it.label || seen.has(it.label + (it.offset ? 'o' : ''))) return;
     seen.add(it.label + (it.offset ? 'o' : ''));
     const p = scr(cen(it.mv)), lx = p[0] + 26, ly = p[1] - 26;
+    const g = opt.animate && it.offset ? travel(it) : null;
+    if (g) s += `<g class="m-fly-lab" data-dx="${g[0]}" data-dy="${g[1]}">`;
     s += `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${lx}" y2="${ly}" stroke="${MP.ink}" stroke-width="1"/><circle cx="${lx}" cy="${ly}" r="13" fill="${MP.paper}" stroke="${MP.ink}" stroke-width="1.4"/><text x="${lx}" y="${ly + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="${MP.ink}" font-family="General Sans, sans-serif">${esc(it.label)}</text>`;
+    if (g) s += '</g>';
   });
   return s + '</svg>';
 }
@@ -1440,7 +1451,7 @@ function hwCallouts(hwList, find) {
   }).join('');
 }
 
-function renderManual() {
+function renderManual(print = false) {
   if (!isCabinet(S.template)) return `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The picture manual is for furniture designs. Building work uses the step-by-step guide.</span></div>`;
   const solids = partSolids();
   const { groups, letterOf } = manualParts();
@@ -1472,7 +1483,7 @@ function renderManual() {
       else if (st.add.includes(s.part)) items.push({ ...s, fill: MP.add, offset: st.ex && st.ex[s.part], label: letterOf(s.part) });
     });
     if (i === 0) items.forEach(it => { if (it.part === 'Left Side') it.label = letterOf('Left Side'); });
-    const art = isoSVG(items, { alt: 'Step ' + (i + 1) });
+    const art = isoSVG(items, { alt: 'Step ' + (i + 1), animate: !print && items.some(it => it.offset) });
     pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
       <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}
       ${st.check ? `<div class="m-check"><svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="10" y="10" width="100" height="60" fill="none" stroke="${MP.ink}" stroke-width="2"/><line x1="10" y1="10" x2="110" y2="70" stroke="${MP.add}" stroke-width="2"/><line x1="110" y1="10" x2="10" y2="70" stroke="${MP.add}" stroke-width="2"/></svg><span>A = B</span></div>` : ''}
@@ -1481,7 +1492,8 @@ function renderManual() {
     built = built.concat(st.add);
   });
   pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight. Re-check the doors after a week as the hinges settle.</p></div>`));
-  return `<div class="manual">${pages.join('')}</div>`;
+  const play = print ? '' : `<div class="m-play"><button type="button" class="chip" data-action="manual-anim" aria-pressed="${S.manualAnim !== false}"><i class="ph ph-${S.manualAnim !== false ? 'pause' : 'play'}" aria-hidden="true"></i>${S.manualAnim !== false ? 'Pause animations' : 'Play animations'}</button></div>`;
+  return `<div class="manual${!print && S.manualAnim !== false ? ' anim' : ''}">${play}${pages.join('')}</div>`;
 }
 
 // ── Order ──
@@ -1549,6 +1561,7 @@ function renderOrderPage() {
 
 function afterPage() {
   // Size timber bar segments without inline style attributes
+  $$('[data-dx]', $('#pageCol')).forEach(el => { el.style.setProperty('--dx', el.dataset.dx + 'px'); el.style.setProperty('--dy', el.dataset.dy + 'px'); });
   $$('[style-w]', $('#pageCol')).forEach(el => { el.style.flex = '0 0 ' + (Number(el.getAttribute('style-w')) * 100) + '%'; el.removeAttribute('style-w'); });
   $$('[style-mt]', $('#pageCol')).forEach(el => { el.style.marginTop = '16px'; el.removeAttribute('style-mt'); });
 }
@@ -2111,8 +2124,9 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
+  'manual-anim': () => { S.manualAnim = S.manualAnim === false; render(); },
   'build-mode': el => { S.buildMode = el.dataset.value === 'steps' ? 'steps' : 'manual'; render(); },
-  'print-manual': () => { $('#printSheet').innerHTML = `<h1>${esc(S.name)}</h1>` + renderManual(); document.body.classList.add('print-manual'); window.print(); document.body.classList.remove('print-manual'); },
+  'print-manual': () => { $('#printSheet').innerHTML = `<h1>${esc(S.name)}</h1>` + renderManual(true); document.body.classList.add('print-manual'); window.print(); document.body.classList.remove('print-manual'); },
   'build-go': el => { S.buildIdx = Number(el.dataset.step); render(); },
   'build-prev': () => { S.buildIdx = Math.max(0, S.buildIdx - 1); render(); },
   'build-done': () => { const d = new Set(S.done); d.add(S.buildIdx); S.done = [...d]; const n = buildSteps().length; if (S.buildIdx < n - 1) S.buildIdx++; else toast('All steps done. Nice work.'); saveDraft(); render(); },

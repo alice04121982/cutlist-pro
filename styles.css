@@ -593,6 +593,19 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
 .m-done{display:grid;place-items:center;text-align:center;gap:10px;padding:40px 0}
 .m-done i{font-size:56px;color:#1F7A4D}
 @media(min-width:768px){.m-page{padding:36px 40px}}
+/* Step animations: parts slide from the exploded spot into place, then hold. Off for reduced motion and print. */
+.m-play{display:flex;justify-content:flex-end}
+.m-land{opacity:0}
+@media (prefers-reduced-motion:no-preference){
+  .manual.anim .m-fly{animation:m-fly 4.5s var(--ease) infinite}
+  .manual.anim .m-fly-lab{animation:m-lab 4.5s var(--ease) infinite}
+  .manual.anim .m-land{animation:m-land 4.5s linear infinite}
+  .manual.anim .m-arrow{animation:m-arrow 4.5s linear infinite}
+}
+@keyframes m-fly{0%,18%{transform:translate(0,0);opacity:1}55%{transform:translate(var(--dx),var(--dy));opacity:1}56%,90%{transform:translate(var(--dx),var(--dy));opacity:0}91%{transform:translate(0,0);opacity:0}100%{transform:translate(0,0);opacity:1}}
+@keyframes m-lab{0%,18%{transform:translate(0,0);opacity:1}55%,88%{transform:translate(var(--dx),var(--dy));opacity:1}91%{transform:translate(var(--dx),var(--dy));opacity:0}92%{transform:translate(0,0);opacity:0}100%{transform:translate(0,0);opacity:1}}
+@keyframes m-land{0%,55%{opacity:0}56%,88%{opacity:1}92%,100%{opacity:0}}
+@keyframes m-arrow{0%,18%{opacity:1}30%,90%{opacity:0}100%{opacity:1}}
 
 @media print{
   body.print-manual #printSheet>h1{display:none}
