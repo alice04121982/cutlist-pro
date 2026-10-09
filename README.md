@@ -30,7 +30,7 @@ UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider), 
 - Projects are stored in `localStorage` on the device only and validated on load.
 - Strict Content Security Policy (no inline scripts or handlers), Subresource Integrity on the icon stylesheet, escaped output everywhere, spreadsheet formula injection guarded in CSV exports.
 
-When hosting, also send these headers (they cannot be set from a meta tag):
+Hosting headers are set in `vercel.json` (frame-ancestors and HSTS cannot be set from a meta tag). On another host, send:
 
 ```
 Content-Security-Policy: frame-ancestors 'none'
