@@ -16,7 +16,7 @@ Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cup
 
 ## Design system
 
-- Type: Cabinet Grotesk (display) and Satoshi (body) from Fontshare, JetBrains Mono for measurements.
+- Type: Panchang (display) and Satoshi (body) from Fontshare, JetBrains Mono for measurements.
 - Colour: cool neutrals with one accent, hi-vis orange `#FF5B1F`. Dark text on the accent for contrast.
 - Shape: surfaces 12px radius, every button and chip a full pill.
 - Light and dark themes follow the system, with a manual toggle.

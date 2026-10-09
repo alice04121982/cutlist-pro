@@ -10,7 +10,7 @@
   --ok:#1F7A4D; --warn:#9A5B00; --warn-wash:rgba(214,140,0,.13);
   --shadow:0 1px 2px rgba(21,24,27,.06),0 8px 24px rgba(21,24,27,.07);
   --el-panel:#D9C7A8; --el-panel-2:#C9B38E; --el-edge:#6E5A3A; --el-back:#ECE3D3; --el-dim:#5F666D; --el-grid:#E3E5E0;
-  --display:'Cabinet Grotesk',ui-sans-serif,system-ui,sans-serif;
+  --display:'Panchang',ui-sans-serif,system-ui,sans-serif;
   --body:'Satoshi',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --r:12px; --pill:999px;
@@ -535,3 +535,23 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
 #scaleNote{flex-basis:100%;font-size:13px;color:var(--ink-3)}
 .brand-name{white-space:nowrap}
 @media(max-width:520px){.bs-long{display:none}.nav-in{gap:10px}}
+
+/* Panchang is a wide face: smaller sizes, open tracking, everything else unchanged */
+h1,h2,h3{letter-spacing:-.005em;line-height:1.08}
+.brand-name{font-size:16px;letter-spacing:0}
+.hero h1{font-size:clamp(30px,3.3vw,44px);letter-spacing:-.01em;line-height:1.04}
+.how h2,.designs h2{font-size:clamp(24px,3vw,38px);max-width:20ch}
+.trade h2{font-size:clamp(22px,2.7vw,32px)}
+.privacy h2{font-size:clamp(18px,2vw,24px)}
+.rail-item h3{font-size:20px}
+.tile-title{font-size:16px;letter-spacing:0}
+.tile-hero .tile-title{font-size:clamp(20px,2.2vw,28px)}
+.stage-title{font-size:17px}
+.group-title{font-size:15px;letter-spacing:.01em}
+.page-head h2{font-size:clamp(24px,3vw,34px)}
+.sect-head h3{font-size:17px}
+.build-card h3{font-size:clamp(20px,2.3vw,26px)}
+.card h3{font-size:15px}
+.sheet-in h2{font-size:21px}
+.measure-title{font-size:15px}
+.empty h3{font-size:18px}
