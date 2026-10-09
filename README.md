@@ -9,7 +9,7 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`. No build step. Ope
 1. **Space**: pick what you are making, add a photo, measure on the photo (bank card or A4 for scale) or with AR on Android.
 2. **Design**: material, doors, shelves, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
 3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
-4. **Build**: generated step-by-step guide with the parts for each step highlighted.
+4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
 5. **Order**: itemised estimate, delivery options, CNC cut file for UK cutting services.
 
 Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.

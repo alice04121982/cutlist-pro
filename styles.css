@@ -536,3 +536,59 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
 .brand-name{white-space:nowrap}
 @media(max-width:520px){.bs-long{display:none}.nav-in{gap:10px}}
 .field .seg{justify-self:start}
+
+/* ---------- Assembly manual: fixed paper palette in every theme and in print ---------- */
+.manual{display:grid;gap:16px;max-width:860px;margin:0 auto}
+.m-page{position:relative;background:#FBFBFA;color:#15181B;border:1px solid #D6D9D3;border-radius:var(--r);padding:28px 24px;display:grid;gap:14px;align-content:start;min-height:420px}
+.m-page .m-iso{width:100%;height:auto;max-height:520px}
+.m-cover-head h3{font-size:clamp(24px,3.2vw,34px);color:#15181B}
+.m-dims{font-family:var(--mono);font-size:14px;color:#5F666D;margin-top:4px}
+.m-meta{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:space-between;border-top:1px solid #D6D9D3;padding-top:14px}
+.m-people{display:flex;align-items:center;gap:8px;font-weight:700}
+.m-people i{font-size:30px}
+.m-tools{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:#454B51;max-width:560px}
+.m-tools span{display:inline-flex;align-items:center;gap:6px}
+.m-tools i{font-size:18px;color:#15181B}
+.m-h{font-family:var(--display);font-weight:700;font-size:22px;margin:0;color:#15181B}
+.m-sub{font-size:14px;color:#5F666D;margin-top:-6px}
+.m-parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.m-part{display:grid;justify-items:start;gap:4px;padding:14px;border:1px solid #E1E3DE;border-radius:10px;background:#fff;position:relative}
+.m-part svg{max-width:100%;height:auto;margin:6px 0}
+.m-letter{width:28px;height:28px;border-radius:50%;border:1.5px solid #15181B;display:grid;place-items:center;font-weight:700;font-family:var(--display)}
+.m-pq{font-family:var(--mono);font-weight:600;font-size:18px}
+.m-pn{font-weight:700;font-size:14px}
+.m-ps{font-family:var(--mono);font-size:12px;color:#5F666D}
+.m-hw{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.m-hwi{display:grid;gap:8px;justify-items:start;align-content:start;padding:14px;border:1px solid #E1E3DE;border-radius:10px;background:#fff}
+.m-hw-art{display:block;max-width:100%}
+.m-hwq b{font-family:var(--mono);font-size:18px}
+.m-hwq span,.m-call span{font-family:var(--mono);font-size:13px;color:#fff;background:#15181B;border-radius:4px;padding:1px 6px;margin-left:4px}
+.m-hwn{font-size:13px;color:#454B51}
+.m-hwn em{font-style:normal;font-family:var(--mono);font-size:11px;border:1px solid #15181B;border-radius:3px;padding:0 4px;color:#15181B}
+.m-step-head{display:flex;align-items:center;gap:14px}
+.m-n{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:#15181B}
+.m-2p{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1.5px solid #15181B;border-radius:var(--pill);font-weight:700;font-size:13px}
+.m-2p i{font-size:18px}
+.m-calls{display:flex;flex-wrap:wrap;gap:10px}
+.m-calls:empty{display:none}
+.m-call{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid #15181B;border-radius:10px;background:#fff}
+.m-call>div{display:flex;align-items:center;gap:2px}
+.m-call b{font-family:var(--mono);font-size:16px}
+.m-check{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-weight:600}
+.m-warn{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:#9A5B00}
+.m-warn i{font-size:22px}
+.m-note{font-size:15px;color:#454B51;max-width:60ch}
+.m-done{display:grid;place-items:center;text-align:center;gap:10px;padding:40px 0}
+.m-done i{font-size:56px;color:#1F7A4D}
+@media(min-width:768px){.m-page{padding:36px 40px}}
+
+@media print{
+  body.print-manual #printSheet>h1{display:none}
+  #printSheet .manual{display:block;max-width:none}
+  #printSheet .m-page{border:0;border-radius:0;padding:0;min-height:0;break-after:page;page-break-after:always}
+  #printSheet .m-page:last-child{break-after:auto;page-break-after:auto}
+  #printSheet .m-page .m-iso{max-height:195mm}
+  #printSheet .m-part,#printSheet .m-hwi,#printSheet .m-call{break-inside:avoid}
+  #printSheet .m-hwq span,#printSheet .m-call span{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printSheet svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

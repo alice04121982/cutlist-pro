@@ -157,7 +157,7 @@ function freshState(template = 'eaves') {
 }
 
 const S = Object.assign(freshState(), {
-  view: 'home', step: 0, stage: 'drawing', buildIdx: 0, editParts: false,
+  view: 'home', step: 0, stage: 'drawing', buildIdx: 0, buildMode: 'manual', editParts: false,
   photo: null, // { url, img, w, h } kept in memory only, never persisted
   fracPerMM: null, ov: null, cmp: 0, measured: false, drag3d: { rx: -18, ry: 32 }
 });
@@ -1198,8 +1198,11 @@ function renderBuildPage() {
   const st = steps[S.buildIdx];
   const tools = [...new Set(steps.flatMap(s => s.tools))];
   const done = new Set(S.done);
+  const manualOK = isCabinet(S.template), mode = manualOK ? S.buildMode : 'steps';
+  const head = `<div class="page-head"><div><h2>How to build it</h2><p>${mode === 'manual' ? 'A picture manual, like flat-pack furniture. Print it or save it as a PDF.' : steps.length + ' steps. Tick each one off as you go.'}</p></div><div class="files">${manualOK ? `<div class="seg" role="group" aria-label="Guide type"><button type="button" data-action="build-mode" data-value="manual" aria-pressed="${mode === 'manual'}">Manual</button><button type="button" data-action="build-mode" data-value="steps" aria-pressed="${mode === 'steps'}">Step by step</button></div>` : ''}<button type="button" class="btn btn-ghost btn-sm" data-action="${mode === 'manual' ? 'print-manual' : 'print'}"><i class="ph ph-printer" aria-hidden="true"></i>${mode === 'manual' ? 'Print or save PDF' : 'Print the guide'}</button></div></div>`;
+  if (mode === 'manual') return `<div class="page">${head}${renderManual()}</div>`;
   return `<div class="page">
-    <div class="page-head"><div><h2>How to build it</h2><p>${steps.length} steps. Tick each one off as you go.</p></div><div class="files"><button type="button" class="btn btn-ghost btn-sm" data-action="print"><i class="ph ph-printer" aria-hidden="true"></i>Print the guide</button></div></div>
+    ${head}
     <div class="sect"><div class="sect-head"><h3>Tools you will need</h3></div><div class="tools">${tools.map(t => `<div class="tool"><i class="ph ph-${TOOL_ICONS[t] || 'wrench'}" aria-hidden="true"></i>${esc(t)}</div>`).join('')}</div></div>
     <div class="sect build">
       <div class="build-fig">${elevationSVG('fig', new Set(st.parts))}</div>
@@ -1220,6 +1223,227 @@ function renderBuildPage() {
       </div>
     </div>
   </div>`;
+}
+
+// ───────────────────────── Assembly manual (IKEA style) ─────────────────────────
+// Fixed "paper" palette so the manual looks the same on screen, in dark mode and in print.
+const MP = { ink: '#15181B', done: '#E4E2DC', wood: '#E9D9BC', add: '#FF8A5C', line: '#15181B', paper: '#FBFBFA' };
+
+// 3D solids for each named part, in mm. x right, y up, z from the front (0) to the back (D).
+function partSolids() {
+  const t = S.template, th = S.thickness, W = S.w, H = S.h, D = S.d;
+  const out = [];
+  const box = (part, x, y, z, w, h, d) => {
+    const v = [[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z], [x, y, z + d], [x + w, y, z + d], [x + w, y + h, z + d], [x, y + h, z + d]];
+    out.push({ part, v, f: [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [0, 3, 7, 4], [1, 2, 6, 5]] });
+  };
+  const prismX = (part, x0, x1, prof) => {
+    const n = prof.length, v = [];
+    prof.forEach(([y, z]) => v.push([x0, y, z]));
+    prof.forEach(([y, z]) => v.push([x1, y, z]));
+    const f = [prof.map((_, i) => i), prof.map((_, i) => n + i)];
+    for (let i = 0; i < n; i++) f.push([i, (i + 1) % n, n + (i + 1) % n, n + i]);
+    out.push({ part, v, f });
+  };
+  const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base;
+  if (t === 'eaves') {
+    const L = S.low, prof = [[0, 0], [H, 0], [L, D], [0, D]];
+    prismX('Left Side', 0, th, prof); prismX('Right Side', W - th, W, prof);
+    prismX('Sloped Top', th, W - th, [[H, 0], [L, D], [L - th, D], [H - th, 0]]);
+  } else {
+    box('Left Side', 0, base, 0, th, Hc, D); box('Right Side', W - th, base, 0, th, Hc, D);
+    if (t === 'kitchenbase') { box('Top Rail', th, H - th, 0, W - 2 * th, th, 100); box('Top Rail', th, H - th, D - 100, W - 2 * th, th, 100); }
+    else box('Top', th, H - th, 0, W - 2 * th, th, D);
+  }
+  box('Bottom', th, base, 0, W - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0));
+  R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
+    const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
+    box(p.name, th, base + yc - th / 2, 0, W - 2 * th, th, Math.min(D, p.h));
+  });
+  const back = R.parts.find(p => p.name === 'Back Panel');
+  if (back) box('Back Panel', 0, base, D, W, t === 'eaves' ? S.low : Hc, 3);
+  if (base) box('Plinth', 0, 0, 30, W, base, th);
+  if (t === 'wardrobe') box('Hanging Rail', th + 10, H - th - 90, D / 2 - 12, W - 2 * th - 20, 25, 25);
+  // Doors and drawer fronts come from the front elevation, laid on the front face
+  cabinetShapes().filter(s => s.part === 'Door' || s.part === 'Drawer Front').forEach(s => box(s.part, s.x, H - s.y - s.h, -th, s.w, s.h, th));
+  return out;
+}
+
+function shadeHex(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(clamp(v * k, 0, 255)));
+  return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+// items: [{ part, v, f, fill, offset:[dx,dy,dz], label }]
+function isoSVG(items, opt = {}) {
+  const VW = opt.w || 640, VH = opt.h || 460, pad = 34;
+  const ax = (opt.rx ?? -24) * Math.PI / 180, ay = (opt.ry ?? 36) * Math.PI / 180;
+  const cX = Math.cos(ax), sX = Math.sin(ax), cY = Math.cos(ay), sY = Math.sin(ay);
+  const rot = ([x, y, z]) => { const x1 = x * cY - z * sY, z1 = x * sY + z * cY; return [x1, y * cX - z1 * sX, y * sX + z1 * cX]; };
+  const moved = items.map(it => ({ ...it, mv: it.v.map(p => it.offset ? [p[0] + it.offset[0], p[1] + it.offset[1], p[2] + it.offset[2]] : p) }));
+  const allP = moved.flatMap(it => it.mv.map(rot));
+  if (!allP.length) return '';
+  const minX = Math.min(...allP.map(p => p[0])), maxX = Math.max(...allP.map(p => p[0]));
+  const minY = Math.min(...allP.map(p => -p[1])), maxY = Math.max(...allP.map(p => -p[1]));
+  const sc = Math.min((VW - pad * 2) / (maxX - minX || 1), (VH - pad * 2) / (maxY - minY || 1));
+  const ox = (VW - (maxX - minX) * sc) / 2 - minX * sc, oy = (VH - (maxY - minY) * sc) / 2 - minY * sc;
+  const scr = p => { const r = rot(p); return [ox + r[0] * sc, oy - r[1] * sc, r[2]]; };
+  const cen = pts => pts.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [0, 0, 0]).map(c => c / pts.length);
+  const light = [0.35, 0.6, -0.72];
+  const faces = [];
+  moved.forEach(it => {
+    const rv = it.mv.map(rot), c = cen(rv);
+    it.f.forEach(f => {
+      const fc = cen(f.map(i => rv[i]));
+      const nrm = [fc[0] - c[0], fc[1] - c[1], fc[2] - c[2]], len = Math.hypot(...nrm) || 1;
+      const nn = nrm.map(x => x / len);
+      if (nn[2] > 0.02) return;
+      const k = 0.78 + 0.26 * Math.max(0, nn[0] * light[0] + nn[1] * light[1] + nn[2] * light[2]);
+      faces.push({ z: fc[2], pts: f.map(i => scr(it.mv[i])), fill: shadeHex(it.fill, k) });
+    });
+  });
+  faces.sort((a, b) => b.z - a.z);
+  let s = `<svg viewBox="0 0 ${VW} ${VH}" class="m-iso" role="img" aria-label="${esc(opt.alt || 'Assembly drawing')}"><defs><marker id="mArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${MP.ink}"/></marker></defs>`;
+  faces.forEach(f => { s += `<polygon points="${f.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${f.fill}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`; });
+  // Movement arrows for exploded parts, then letter callouts
+  const seen = new Set();
+  moved.forEach(it => {
+    if (!it.offset) return;
+    const a = scr(cen(it.mv)), b = scr(cen(it.v));
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 24) s += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${MP.ink}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#mArr)"/>`;
+  });
+  moved.forEach(it => {
+    if (!it.label || seen.has(it.label + (it.offset ? 'o' : ''))) return;
+    seen.add(it.label + (it.offset ? 'o' : ''));
+    const p = scr(cen(it.mv)), lx = p[0] + 26, ly = p[1] - 26;
+    s += `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${lx}" y2="${ly}" stroke="${MP.ink}" stroke-width="1"/><circle cx="${lx}" cy="${ly}" r="13" fill="${MP.paper}" stroke="${MP.ink}" stroke-width="1.4"/><text x="${lx}" y="${ly + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="${MP.ink}" font-family="General Sans, sans-serif">${esc(it.label)}</text>`;
+  });
+  return s + '</svg>';
+}
+
+// Letter each distinct part. Identical sizes share a letter, like a flat-pack manual.
+function manualParts() {
+  const groups = [];
+  R.parts.filter(p => ['sheet', 'ply3', 'ply6', 'linear'].includes(p.stock)).forEach(p => {
+    const key = p.name.replace(/ \d+$/, '') + '|' + p.w + '|' + p.h;
+    let g = groups.find(x => x.key === key);
+    if (!g) groups.push(g = { key, names: [], p, qty: 0 });
+    g.names.push(p.name); g.qty += p.qty;
+  });
+  const map = {};
+  groups.forEach((g, i) => { g.letter = String.fromCharCode(65 + i); g.names.forEach(n => { map[n] = g.letter; }); });
+  return { groups, letterOf: n => map[n] };
+}
+
+function manualHardware() {
+  const list = R.fittings.filter(f => !/jig/i.test(f.name)).map((f, i) => ({ ...f, id: 101 + i }));
+  return { list, find: key => list.find(f => f.name.toLowerCase().includes(key.toLowerCase())) };
+}
+
+// Simple technical line drawings. Screws, pins and dowels are drawn at actual size (mm units).
+function hwArt(name) {
+  const n = name.toLowerCase(), ink = MP.ink;
+  const mm = (w, h, body) => `<svg width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}" class="m-hw-art" aria-hidden="true">${body}</svg>`;
+  const screw = (L, d) => {
+    let th = '';
+    for (let x = 6; x < L - 3; x += 1.8) th += `<line x1="${x}" y1="${5 - d / 2}" x2="${x + 1.1}" y2="${5 + d / 2}" stroke="${ink}" stroke-width=".3"/>`;
+    return mm(L + 2, 10, `<path d="M1,1.5 L4,1.5 L5.5,${5 - d / 2} L${L - 3},${5 - d / 2} L${L + 1},5 L${L - 3},${5 + d / 2} L5.5,${5 + d / 2} L4,8.5 L1,8.5 Z" fill="#fff" stroke="${ink}" stroke-width=".45"/>${th}`);
+  };
+  if (/pocket/.test(n)) return { art: screw(32, 4), actual: true };
+  if (/screw/.test(n)) return { art: screw(/32/.test(n) ? 32 : /30/.test(n) ? 30 : 40, 4), actual: true };
+  if (/panel pin|nail/.test(n)) return { art: mm(27, 6, `<rect x="1" y="1.6" width="1" height="2.8" fill="${ink}"/><path d="M2,2.6 L24,2.6 L26,3 L24,3.4 L2,3.4 Z" fill="#fff" stroke="${ink}" stroke-width=".35"/>`), actual: true };
+  if (/dowel/.test(n)) return { art: mm(32, 10, `<rect x="1" y="1" width="30" height="8" rx="2" fill="#F1E6D2" stroke="${ink}" stroke-width=".45"/>${[6, 11, 16, 21, 26].map(x => `<line x1="${x}" y1="1" x2="${x - 2}" y2="9" stroke="${ink}" stroke-width=".3"/>`).join('')}`), actual: true };
+  if (/shelf pin/.test(n)) return { art: mm(16, 8, `<rect x="1" y="2.5" width="8" height="3" fill="#fff" stroke="${ink}" stroke-width=".4"/><rect x="9" y="1" width="1.4" height="6" fill="${ink}"/><rect x="10.4" y="2" width="4.6" height="4" rx=".6" fill="#fff" stroke="${ink}" stroke-width=".4"/>`), actual: true };
+  if (/cam/.test(n)) return { art: mm(40, 16, `<circle cx="8" cy="8" r="7.5" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/><path d="M4,8 h8 M8,6.5 v3" stroke="${ink}" stroke-width=".7"/><path d="M18,6.6 h18 l2,1.4 l-2,1.4 h-18 z" fill="#fff" stroke="${ink}" stroke-width=".4"/><circle cx="18" cy="8" r="2.4" fill="#fff" stroke="${ink}" stroke-width=".45"/>`), actual: true };
+  const px = (w, h, body) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" class="m-hw-art" aria-hidden="true">${body}</svg>`;
+  if (/hinge/.test(n)) return { art: px(96, 44, `<circle cx="20" cy="22" r="17" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><circle cx="20" cy="22" r="11" fill="#fff" stroke="${ink}" stroke-width="1"/><path d="M34,15 h44 a6,6 0 0 1 6,6 v2 a6,6 0 0 1 -6,6 h-44 z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><circle cx="62" cy="22" r="2.5" fill="${ink}"/><circle cx="76" cy="22" r="2.5" fill="${ink}"/>`) };
+  if (/bracket/.test(n)) return { art: px(56, 56, `<path d="M8,6 h12 v30 h30 v12 h-42 z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4" stroke-linejoin="round"/><circle cx="14" cy="18" r="2.6" fill="#fff" stroke="${ink}"/><circle cx="36" cy="42" r="2.6" fill="#fff" stroke="${ink}"/>`) };
+  if (/leg/.test(n)) return { art: px(40, 70, `<rect x="6" y="4" width="28" height="8" rx="2" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><rect x="13" y="12" width="14" height="44" fill="#fff" stroke="${ink}" stroke-width="1.4"/><rect x="9" y="56" width="22" height="9" rx="3" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/>`) };
+  if (/runner/.test(n)) return { art: px(110, 36, `<rect x="4" y="6" width="100" height="10" rx="2" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><rect x="4" y="20" width="100" height="10" rx="2" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/>`) };
+  if (/handle|knob/.test(n)) return { art: px(56, 40, /knob/.test(n) ? `<circle cx="28" cy="20" r="14" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><circle cx="28" cy="20" r="6" fill="#fff" stroke="${ink}"/>` : `<path d="M6,26 v-10 a4,4 0 0 1 4,-4 h36 a4,4 0 0 1 4,4 v10" fill="none" stroke="${ink}" stroke-width="5" stroke-linecap="round"/>`) };
+  if (/glue/.test(n)) return { art: px(36, 66, `<path d="M15,4 h6 l2,10 h-10 z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><rect x="6" y="14" width="24" height="48" rx="5" fill="#fff" stroke="${ink}" stroke-width="1.4"/><rect x="10" y="30" width="16" height="14" fill="#E9EAEC"/>`) };
+  if (/socket|clip/.test(n)) return { art: px(44, 44, `<rect x="6" y="6" width="32" height="32" rx="6" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><circle cx="22" cy="22" r="7" fill="#fff" stroke="${ink}" stroke-width="1.2"/>`) };
+  return { art: px(44, 44, `<rect x="6" y="6" width="32" height="32" rx="4" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/>`) };
+}
+
+function manualSteps() {
+  const t = S.template, W = S.w, H = S.h, D = S.d;
+  const has = n => R.parts.some(p => p.name === n);
+  const names = role => R.parts.filter(p => p.role === role).map(p => p.name);
+  const f = Math.max(2, Math.ceil(D / 150));
+  const join = k => S.joinery === 'cam' ? [['cam lock', f * k], ['dowels', f * k]] : S.joinery === 'pocket' ? [['pocket-hole screws', f * k]] : [['wood screws', f * k]];
+  const topName = t === 'eaves' ? 'Sloped Top' : t === 'kitchenbase' ? 'Top Rail' : 'Top';
+  const steps = [];
+  steps.push({ add: ['Bottom'], ex: { Bottom: [W * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Fix the bottom to the left side, flush at the front.' });
+  steps.push({ add: [topName], ex: { [topName]: [W * 0.35, H * 0.3, 0] }, hw: join(1), note: t === 'eaves' ? 'The angled top follows the slope of the side.' : 'Fix the top to the left side, flush at the front.' });
+  steps.push({ add: ['Right Side'], ex: { 'Right Side': [W * 0.45, 0, 0] }, hw: join(2), note: 'Fit the right side to the top and bottom.', twoPeople: H > 1500 });
+  if (has('Back Panel')) steps.push({ add: ['Back Panel'], ex: { 'Back Panel': [0, 0, D * 1.1] }, hw: [['panel pins', 40]], note: 'Measure corner to corner both ways. When they match, the box is square. Pin the back on every 150mm.', check: true });
+  if (has('Plinth')) steps.push({ add: ['Plinth'], ex: { Plinth: [0, -H * 0.1, -D * 0.7] }, hw: [['legs', 4], ['plinth clips', 4]], note: 'Screw on the legs. Level the unit, then clip the plinth onto the front legs.' });
+  const shelves = names('shelf');
+  if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, 0, -D * 1.05]])), hw: [['shelf pins', 4 * shelves.length]], note: 'Push the shelf pins into the holes, then rest each shelf on four pins.' });
+  if (has('Hanging Rail')) steps.push({ add: ['Hanging Rail'], ex: { 'Hanging Rail': [0, 0, -D * 0.9] }, hw: [['rail end sockets', 2]], note: 'Screw the sockets to the sides, then drop the rail in.' });
+  if (has('Drawer Front')) steps.push({ add: ['Drawer Front'], ex: { 'Drawer Front': [0, 0, -D * 0.8] }, hw: [['runners', 1]], note: 'Build the drawer box from its sides, back and base. Fit the runners, then slide it in.' });
+  const wallHw = t === 'eaves' ? [['angle brackets', 6]] : t === 'wardrobe' ? [['anti-tip', 2]] : t === 'kitchenwall' ? [['wall hanging', 2]] : t === 'shelving' ? [['wall fixing', 4]] : [];
+  steps.push({ add: [], wall: true, hw: wallHw, note: t === 'eaves' ? 'Check for pipes and cables, then fix it to the floor and the knee wall. Leave an air gap behind for ventilation.' : 'Check for pipes and cables, then fix it to the wall.', twoPeople: H > 1200 || W > 1500 });
+  if (has('Door')) {
+    const nd = R.parts.find(p => p.name === 'Door').qty;
+    steps.push({ add: ['Door'], ex: { Door: [0, 0, -D * 0.7] }, hw: [['hinges', R.parts.find(p => p.name === 'Door').hinges.length * nd], ['knob', nd], ['handles', nd]], note: 'Clip each hinge onto its plate. Turn the adjusting screws until the gaps are even.', twoPeople: H > 1500 });
+  }
+  return steps;
+}
+
+function hwCallouts(hwList, find) {
+  return hwList.map(([key, qty]) => {
+    const f = find(key);
+    if (!f) return '';
+    const a = hwArt(f.name);
+    return `<div class="m-call">${a.art}<div><b>${qty ? qty + 'x' : ''}</b><span>${f.id}</span></div></div>`;
+  }).join('');
+}
+
+function renderManual() {
+  if (!isCabinet(S.template)) return `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The picture manual is for furniture designs. Building work uses the step-by-step guide.</span></div>`;
+  const solids = partSolids();
+  const { groups, letterOf } = manualParts();
+  const hw = manualHardware();
+  const steps = manualSteps();
+  const tools = [...new Set(buildSteps().flatMap(s => s.tools))];
+  const pages = [];
+  const page = (inner, cls = '') => `<section class="m-page ${cls}">${inner}</section>`;
+  // Cover
+  const cover = isoSVG(solids.map(s => ({ ...s, fill: s.part === 'Back Panel' ? MP.done : MP.wood })), { alt: designName(), h: 500 });
+  pages.push(page(`<div class="m-cover-head"><h3>${esc(designName())}</h3><div class="m-dims">${fmt(S.w)} x ${fmt(S.h)} x ${fmt(S.d)}</div></div>${cover}
+    <div class="m-meta"><div class="m-people"><i class="ph ph-${S.h > 1200 || S.w > 1500 ? 'users' : 'user'}" aria-hidden="true"></i>${S.h > 1200 || S.w > 1500 ? '2 people' : '1 person'}</div>
+    <div class="m-tools">${tools.map(t => `<span><i class="ph ph-${TOOL_ICONS[t] || 'wrench'}" aria-hidden="true"></i>${esc(t)}</span>`).join('')}</div></div>`, 'm-cover'));
+  // Parts
+  const maxDim = Math.max(...groups.map(g => Math.max(g.p.w, g.p.h)));
+  pages.push(page(`<h4 class="m-h">Parts</h4><div class="m-parts">${groups.map(g => {
+    const sc = 120 / maxDim, w = Math.max(8, g.p.w * sc), h = Math.max(6, g.p.h * sc);
+    const shape = g.p.shape ? `<polygon points="0,${h} ${w},${h} ${w},${h - g.p.shape.back * sc} 0,0" fill="${MP.wood}" stroke="${MP.ink}" stroke-width="1.2" transform="translate(2 2)"/>` : `<rect x="2" y="2" width="${w}" height="${h}" fill="${g.p.stock === 'linear' ? '#E9EAEC' : MP.wood}" stroke="${MP.ink}" stroke-width="1.2"/>`;
+    return `<div class="m-part"><span class="m-letter">${g.letter}</span><svg viewBox="0 0 ${w + 4} ${h + 4}" width="${w + 4}" height="${h + 4}" aria-hidden="true">${shape}</svg><div class="m-pq">${g.qty}x</div><div class="m-pn">${esc(g.p.name.replace(/ \d+$/, ''))}</div><div class="m-ps">${Math.round(g.p.w)} x ${Math.round(g.p.h)}</div></div>`;
+  }).join('')}</div>`));
+  // Hardware
+  pages.push(page(`<h4 class="m-h">Hardware</h4><p class="m-sub">Screws, pins and dowels are printed at actual size. Lay yours on top to check.</p><div class="m-hw">${hw.list.map(f => { const a = hwArt(f.name); return `<div class="m-hwi">${a.art}<div class="m-hwq"><b>${f.total_qty}x</b> <span>${f.id}</span></div><div class="m-hwn">${esc(f.name)}${a.actual ? ' <em>1:1</em>' : ''}</div></div>`; }).join('')}</div>`));
+  // Assembly
+  let built = ['Left Side'];
+  steps.forEach((st, i) => {
+    const items = [];
+    solids.forEach(s => {
+      if (built.includes(s.part)) items.push({ ...s, fill: MP.done, label: st.wall ? letterOf(s.part) : null });
+      else if (st.add.includes(s.part)) items.push({ ...s, fill: MP.add, offset: st.ex && st.ex[s.part], label: letterOf(s.part) });
+    });
+    if (i === 0) items.forEach(it => { if (it.part === 'Left Side') it.label = letterOf('Left Side'); });
+    const art = isoSVG(items, { alt: 'Step ' + (i + 1) });
+    pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
+      <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}
+      ${st.check ? `<div class="m-check"><svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="10" y="10" width="100" height="60" fill="none" stroke="${MP.ink}" stroke-width="2"/><line x1="10" y1="10" x2="110" y2="70" stroke="${MP.add}" stroke-width="2"/><line x1="110" y1="10" x2="10" y2="70" stroke="${MP.add}" stroke-width="2"/></svg><span>A = B</span></div>` : ''}
+      ${st.wall ? `<div class="m-warn"><i class="ph ph-warning" aria-hidden="true"></i>Check for pipes and cables before you drill.</div>` : ''}
+      <p class="m-note">${esc(st.note)}</p>`));
+    built = built.concat(st.add);
+  });
+  pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight. Re-check the doors after a week as the hinges settle.</p></div>`));
+  return `<div class="manual">${pages.join('')}</div>`;
 }
 
 // ── Order ──
@@ -1719,6 +1943,8 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
+  'build-mode': el => { S.buildMode = el.dataset.value === 'steps' ? 'steps' : 'manual'; render(); },
+  'print-manual': () => { $('#printSheet').innerHTML = `<h1>${esc(S.name)}</h1>` + renderManual(); document.body.classList.add('print-manual'); window.print(); document.body.classList.remove('print-manual'); },
   'build-go': el => { S.buildIdx = Number(el.dataset.step); render(); },
   'build-prev': () => { S.buildIdx = Math.max(0, S.buildIdx - 1); render(); },
   'build-done': () => { const d = new Set(S.done); d.add(S.buildIdx); S.done = [...d]; const n = buildSteps().length; if (S.buildIdx < n - 1) S.buildIdx++; else toast('All steps done. Nice work.'); saveDraft(); render(); },
