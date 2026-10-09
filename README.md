@@ -1,1 +1,58 @@
-# cutlist-pro
+# CutList Pro
+
+Photograph the space, pick a design, and get exact cuts, build steps and a supplier-ready order.
+
+Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverless function, `api/assistant.js`, for the design assistant. No build step.
+
+## The flow
+
+1. **Space**: pick what you are making, add a photo, measure on the photo (bank card or A4 for scale) or with AR on Android.
+2. **Design**: material, doors, compartments (upright dividers), shelves per compartment, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
+3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
+4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
+5. **Order**: itemised estimate, delivery options, CNC cut file for UK cutting services.
+
+Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
+
+## Design assistant ("Change it")
+
+Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (`claude-opus-5-5`, low effort, structured JSON output, server-side refusal fallback) for a list of setting changes. The browser validates every change again before applying it.
+
+To switch it on in Vercel:
+
+1. Add an environment variable `ANTHROPIC_API_KEY` (Project Settings, Environment Variables) and redeploy.
+2. Set a monthly spend limit for that key in the Anthropic Console. The function also rate-limits each visitor, accepts same-origin requests only and caps message length.
+
+Without a key, or if the AI is unreachable, a built-in phrase parser handles the common requests (compartments, shelves, doors, sizes, board, joining) so the button still works.
+
+## Design system
+
+- Type: General Sans (display) and Satoshi (body) from Fontshare, JetBrains Mono for measurements.
+- Colour: cool neutrals with one accent, hi-vis orange `#FF5B1F`. Dark text on the accent for contrast.
+- Shape: surfaces 12px radius, every button and chip a full pill.
+- Light and dark themes follow the system, with a manual toggle.
+- Icons: Phosphor (regular).
+
+UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider), Cal AI and Quizlet capture tips, IKEA camera framing, IKEA and LARQ step-by-step setup, Stripe split configurator with live preview, Instacart and Amazon checkout summaries.
+
+## Privacy and security
+
+- Photos are processed in the browser and never uploaded or stored. The assistant only receives the typed request and the design sizes.
+- Projects are stored in `localStorage` on the device only and validated on load.
+- Strict Content Security Policy (no inline scripts or handlers), Subresource Integrity on the icon stylesheet, escaped output everywhere, spreadsheet formula injection guarded in CSV exports.
+
+Hosting headers are set in `vercel.json` (frame-ancestors and HSTS cannot be set from a meta tag). On another host, send:
+
+```
+Content-Security-Policy: frame-ancestors 'none'
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(self), geolocation=(), microphone=(), xr-spatial-tracking=(self)
+```
+
+## Credits
+
+Hero photo by Алан Албегов, design tile photo by Andrea Davis, both on Unsplash.
+
+Prices are estimates. Always check measurements before you order.
