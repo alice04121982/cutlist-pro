@@ -535,3 +535,4 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
 #scaleNote{flex-basis:100%;font-size:13px;color:var(--ink-3)}
 .brand-name{white-space:nowrap}
 @media(max-width:520px){.bs-long{display:none}.nav-in{gap:10px}}
+.field .seg{justify-self:start}

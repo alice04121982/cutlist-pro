@@ -67,6 +67,13 @@ const TEMPLATES = [
   { id: 'pitchedroof', name: 'Pitched roof', icon: 'house-line', kind: 'frame' }
 ];
 const tplOf = id => TEMPLATES.find(t => t.id === id) || TEMPLATES[0];
+// Name for the current design, e.g. under-eaves without doors reads as shelving
+function designName() {
+  if (S.template === 'eaves' && doorCount() === 0) return 'Under-eaves shelving';
+  if (S.template === 'wardrobe' && doorCount() === 0) return 'Open wardrobe';
+  if (S.template === 'shelving' && doorCount() > 0) return 'Shelving unit with doors';
+  return tplOf(S.template).name;
+}
 const isCabinet = id => tplOf(id).kind === 'cabinet';
 const STRUCTURAL = new Set(['floorjoists', 'flatroof', 'pitchedroof']);
 
@@ -654,7 +661,7 @@ function elevationSVG(mode = 'elev', hl = null) {
     if (mode === 'elev') side += dimLine(ox + D + fs * 1.4, H - L, ox + D + fs * 1.4, H, fmt(L), fs) + dimLine(ox, H + fs * 3.6, ox + D, H + fs * 3.6, fmt(D), fs);
   }
   const x0 = -pad, y0 = -pad, W = vw + extraW + pad * 2, Hh = vh + pad * 2 + (S.template === 'eaves' ? fs * 3 : 0);
-  let svg = `<svg class="elev" viewBox="${x0} ${y0} ${W} ${Hh}" role="img" aria-label="${esc(tplOf(S.template).name)} drawing">`;
+  let svg = `<svg class="elev" viewBox="${x0} ${y0} ${W} ${Hh}" role="img" aria-label="${esc(designName())} drawing">`;
   svg += `<rect class="bg" x="${x0}" y="${y0}" width="${W}" height="${Hh}"/>`;
   svg += shapesSVG(sh, hl) + side;
   if (mode === 'elev') {
@@ -912,11 +919,10 @@ function renderBar() {
 function renderStage() {
   const col = $('#stageCol');
   if (S.stage === 'photo' && !S.photo) S.stage = 'drawing';
-  const t = tplOf(S.template);
   const meta = isCabinet(S.template) ? `${fmt(S.w)} x ${fmt(S.h)} x ${fmt(S.d)}` : `${fmt(S.w)} x ${fmt(S.template === 'studwall' || S.template === 'partition' ? S.h : S.d)}`;
   col.innerHTML = `
     <div class="stage-head">
-      <div><div class="stage-title">${esc(t.name)}</div><div class="stage-meta">${esc(meta)}</div></div>
+      <div><div class="stage-title">${esc(designName())}</div><div class="stage-meta">${esc(meta)}</div></div>
       <div class="seg" role="group" aria-label="Preview">
         <button type="button" data-action="stage" data-value="photo" aria-pressed="${S.stage === 'photo'}"${S.photo ? '' : ' disabled title="Add a photo first"'}>On photo</button>
         <button type="button" data-action="stage" data-value="drawing" aria-pressed="${S.stage === 'drawing'}">Drawing</button>
@@ -971,6 +977,7 @@ function renderControls() {
       <div class="group">
         <h2 class="group-title">What are you making?</h2>
         <div class="tpl-grid">${cab.map(tpl).join('')}<div class="tpl-sep">Building work</div>${fr.map(tpl).join('')}</div>
+        ${isCabinet(S.template) ? `<div class="field full"><span class="lbl" id="styleLbl">Style</span><div class="seg" role="group" aria-labelledby="styleLbl"><button type="button" data-action="style" data-value="doors" aria-pressed="${doorCount() > 0}">With doors</button><button type="button" data-action="style" data-value="open" aria-pressed="${doorCount() === 0}">Open shelves</button></div></div>` : ''}
       </div>
       <div class="group">
         <h2 class="group-title">Your space</h2>
@@ -1125,7 +1132,7 @@ function renderCutPage() {
   const scribe = R.parts.some(p => p.scribed) ? `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span><strong>Scribe edges</strong> are 2mm oversize where they meet a wall. Trim them to fit on site.</span></div>` : '';
   const anyEdited = Object.keys(S.overrides).length;
   return `<div class="page">
-    <div class="page-head"><div><h2>Your cut list</h2><p>${esc(tplOf(S.template).name)}, ${esc(isCabinet(S.template) ? `${fmt(S.w)} wide, ${fmt(S.h)} high, ${fmt(S.d)} deep` : `${fmt(S.w)} by ${fmt(S.template === 'studwall' || S.template === 'partition' ? S.h : S.d)}`)}.</p></div>
+    <div class="page-head"><div><h2>Your cut list</h2><p>${esc(designName())}, ${esc(isCabinet(S.template) ? `${fmt(S.w)} wide, ${fmt(S.h)} high, ${fmt(S.d)} deep` : `${fmt(S.w)} by ${fmt(S.template === 'studwall' || S.template === 'partition' ? S.h : S.d)}`)}.</p></div>
       <div class="files"><button type="button" class="btn btn-ghost btn-sm" data-action="toggle-edit"><i class="ph ph-pencil-simple" aria-hidden="true"></i>${S.editParts ? 'Done editing' : 'Edit sizes'}</button>${anyEdited ? '<button type="button" class="btn btn-ghost btn-sm" data-action="reset-overrides"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>Undo edits</button>' : ''}<button type="button" class="btn btn-ghost btn-sm" data-action="print"><i class="ph ph-printer" aria-hidden="true"></i>Print</button></div></div>
     <div class="stats">
       <div class="stat"><div class="k">Pieces</div><div class="v">${R.pieceCount}</div></div>
@@ -1414,7 +1421,7 @@ function exportDXF() {
 
 function printSheet() {
   const steps = buildSteps();
-  let h = `<h1>${esc(S.name)}</h1><div class="meta">${esc(tplOf(S.template).name)}, ${esc(isCabinet(S.template) ? MATERIALS[S.material].name + ' ' + S.thickness + 'mm' : 'C16 timber')}, ${fmt(S.w)} x ${fmt(S.h)} x ${fmt(S.d)}. Estimate ${gbp0(R.total)}.</div>`;
+  let h = `<h1>${esc(S.name)}</h1><div class="meta">${esc(designName())}, ${esc(isCabinet(S.template) ? MATERIALS[S.material].name + ' ' + S.thickness + 'mm' : 'C16 timber')}, ${fmt(S.w)} x ${fmt(S.h)} x ${fmt(S.d)}. Estimate ${gbp0(R.total)}.</div>`;
   h += '<h2>Cut list</h2><table><tr><th>Part</th><th>Length</th><th>Width</th><th>Qty</th><th>Notes</th></tr>';
   R.parts.forEach(p => { h += `<tr><td>${esc(p.name)}</td><td>${fmt(p.w)}</td><td>${fmt(p.h)}</td><td>${p.qty}</td><td>${esc([p.note, p.scribed ? 'Scribe edge' : ''].filter(Boolean).join('. '))}</td></tr>`; });
   h += '</table><h2>Hardware</h2><table><tr><th>Item</th><th>Qty</th><th>Cost</th></tr>';
@@ -1683,6 +1690,13 @@ const ACTIONS = {
   },
   stage: el => { if (el.dataset.value === 'photo' && !S.photo) return; S.stage = el.dataset.value; renderStage(); },
   unit: el => { S.unit = el.dataset.value === 'in' ? 'in' : 'mm'; saveDraft(); render(); },
+  style: el => {
+    // 'auto' gives the template's usual door count; shelving defaults to none, so force 2 there
+    if (el.dataset.value === 'open') S.doors = 0;
+    else S.doors = S.template === 'shelving' ? 2 : 'auto';
+    if (el.dataset.value === 'open' && S.template === 'eaves' && S.shelves < 2) S.shelves = 2;
+    saveDraft(); render();
+  },
   joinery: el => { S.joinery = JOINERY[el.dataset.value] ? el.dataset.value : 'screws'; saveDraft(); render(); },
   theme: () => {
     const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
