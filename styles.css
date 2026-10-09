@@ -592,3 +592,18 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
   #printSheet .m-hwq span,#printSheet .m-call span{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #printSheet svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* ---------- Design assistant ---------- */
+@media(max-width:640px){.ask-btn span{display:none}.ask-btn{padding:0 14px}}
+dialog.ask{width:min(620px,100%)}
+.ask-log{display:grid;gap:10px;max-height:46dvh;overflow:auto;padding:2px}
+.ask-log:empty{display:none}
+.msg{max-width:88%;padding:10px 14px;border-radius:14px;font-size:15px;line-height:1.45}
+.msg.user{justify-self:end;background:var(--ink);color:var(--bg);border-bottom-right-radius:4px}
+.msg.bot{justify-self:start;background:var(--surface-2);border-bottom-left-radius:4px}
+.msg.bot .tags{margin-top:8px}
+.msg.wait{color:var(--ink-3)}
+.ask-sugg .chip{min-height:34px;font-size:13px}
+.ask-form{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.ask-form textarea.input{min-height:52px;padding:12px 14px;resize:vertical;font:inherit;line-height:1.4}
+.ask-form .btn{min-height:52px;width:52px;padding:0}

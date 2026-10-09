@@ -192,6 +192,7 @@
   <div class="plan-bar" id="planBar">
     <button type="button" class="btn btn-ghost" data-action="prev"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></button>
     <div class="plan-bar-sum" id="barSum" aria-live="polite"></div>
+    <button type="button" class="btn btn-ghost ask-btn" data-action="open-ask"><i class="ph ph-sparkle" aria-hidden="true"></i><span>Change it</span></button>
     <button type="button" class="btn btn-primary" data-action="next" id="nextBtn"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></button>
   </div>
 </div>
@@ -217,6 +218,24 @@
       <button type="button" class="btn btn-ghost btn-lg" data-action="pick-photo"><i class="ph ph-image" aria-hidden="true"></i>Choose from library</button>
       <button type="button" class="link-btn" data-action="close-dialog">Not now</button>
     </div>
+  </div>
+</dialog>
+
+<!-- Design assistant -->
+<dialog id="dlgAsk" class="sheet ask" aria-labelledby="askTitle">
+  <div class="sheet-in">
+    <div class="sheet-head">
+      <h2 id="askTitle">Tell us what to change</h2>
+      <button type="button" class="icon-btn" data-action="close-dialog" aria-label="Close"><i class="ph ph-x" aria-hidden="true"></i></button>
+    </div>
+    <div class="ask-log" id="askLog" aria-live="polite"></div>
+    <div class="chips ask-sugg" id="askSugg"></div>
+    <form class="ask-form" id="askForm" autocomplete="off">
+      <label class="sr-only" for="askInput">Describe the change</label>
+      <textarea id="askInput" class="input" rows="2" maxlength="600" placeholder="e.g. Make it five compartments with two shelves each, no doors"></textarea>
+      <button type="submit" class="btn btn-primary" id="askSend" aria-label="Send"><i class="ph ph-paper-plane-right" aria-hidden="true"></i></button>
+    </form>
+    <p class="fine" id="askNote"><i class="ph ph-info" aria-hidden="true"></i> Your words and the design sizes are sent to our AI to work out the change. Photos are never sent.</p>
   </div>
 </dialog>
 

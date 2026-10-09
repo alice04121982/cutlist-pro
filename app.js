@@ -101,7 +101,7 @@ const FIELDS = {
   pitchedroof: [['w', 'Building length', 'Along the ridge'], ['d', 'Span', 'Wall plate to wall plate'], ['h', 'Rafter depth', 'e.g. 100, 125, 150'], ['pitch', 'Roof pitch', 'Degrees'], ['spacing', 'Rafter centres', 'Usually 400']]
 };
 const fieldsFor = id => FIELDS[id] || (isCabinet(id) ? FIELDS.cabinet : FIELDS.studwall);
-const LIMITS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], spacing: [200, 1200], pitch: [5, 70], thickness: [3, 100], kerf: [0, 10], sheetW: [300, 3700], sheetH: [300, 2200] };
+const LIMITS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], spacing: [200, 1200], pitch: [5, 70], thickness: [3, 100], kerf: [0, 10], sheetW: [300, 3700], sheetH: [300, 2200] };
 
 const MATERIALS = {
   plywood: { name: 'Plywood', thick: 18, price: 45, note: 'Strong, takes screws well' },
@@ -150,7 +150,7 @@ function freshState(template = 'eaves') {
     thickness: cab ? 18 : 47,
     sheetW: 2440, sheetH: 1220, kerf: 3,
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
-    doors: 'auto', joinery: 'screws', scribe: true,
+    compartments: 1, doors: 'auto', joinery: 'screws', scribe: true,
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
     unit: 'mm', done: []
   };
@@ -163,7 +163,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -181,6 +181,7 @@ function sanitizeProject(p) {
     w: num(pick('w', 'dimW'), ...LIMITS.w, base.w), h: num(pick('h', 'dimH'), ...LIMITS.h, base.h), d: num(pick('d', 'dimD'), ...LIMITS.d, base.d),
     low: num(p.low, ...LIMITS.low, base.low), shelves: Math.round(num(pick('shelves', 'dimShelves'), ...LIMITS.shelves, base.shelves)),
     spacing: num(pick('spacing', 'dimSpacing'), ...LIMITS.spacing, base.spacing), pitch: num(pick('pitch', 'dimPitch'), 0, 70, base.pitch),
+    compartments: Math.round(num(p.compartments, 1, 8, 1)),
     doors: p.doors === 'auto' || p.doors === undefined ? 'auto' : Math.round(num(p.doors, 0, 8, 0)),
     joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false,
     priceSheet: p.priceSheet == null ? null : num(p.priceSheet, 0, 1000, null),
@@ -217,9 +218,19 @@ function saveDraft() {
 }
 
 // ───────────────────────── Generation ─────────────────────────
+// Upright dividers split a unit into bays. Kitchen base units keep one bay (drawer above).
+const BAY_TEMPLATES = new Set(['eaves', 'shelving', 'wardrobe', 'kitchenwall']);
+function bayInfo() {
+  const bays = BAY_TEMPLATES.has(S.template) ? clamp(Math.round(S.compartments || 1), 1, 8) : 1;
+  const inner = S.w - 2 * S.thickness;
+  return { bays, bayW: Math.floor((inner - (bays - 1) * S.thickness) / bays), inner };
+}
+const bayX = (b, bayW) => S.thickness + b * (bayW + S.thickness);
+
 function doorCount() {
   if (S.doors !== 'auto') return S.doors;
-  const W = S.w;
+  const W = S.w, { bays } = bayInfo();
+  if (bays > 1 && S.template !== 'shelving') return bays;
   switch (S.template) {
     case 'shelving': return 0;
     case 'wardrobe': return W > 1300 ? 3 : 2;
@@ -247,6 +258,7 @@ function generateParts() {
   const t = S.template, w = S.w, h = S.h, d = S.d, n = S.shelves, th = S.thickness, sp = S.spacing;
   const s = S.scribe ? 2 : 0, sc = !!s;
   const nd = doorCount();
+  const { bays, bayW } = bayInfo();
   const P = [];
   const sheet = (o) => P.push({ stock: 'sheet', qty: 1, ...o });
   const thin = (o, k = 'ply3') => P.push({ stock: k, qty: 1, ...o });
@@ -263,7 +275,8 @@ function generateParts() {
     sheet({ name: 'Right Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
     sheet({ name: 'Top', w: w - 2 * th, h: d - s, scribed: sc, role: 'top', edge: 1 });
     sheet({ name: 'Bottom', w: w - 2 * th, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
-    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: w - 2 * th, h: d - s - 2, role: 'shelf', edge: 1 });
+    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - s - 2, qty: bays, role: 'shelf', edge: 1 });
+    if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
     if (w > 600) thin({ name: 'Back Panel', w, h, role: 'back', note: '3mm, pinned on' });
     overlayDoors(w, h - 4);
   } else if (t === 'wardrobe') {
@@ -272,9 +285,10 @@ function generateParts() {
     sheet({ name: 'Right Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
     sheet({ name: 'Top', w: inner, h: d - s, scribed: sc, role: 'top', edge: 1 });
     sheet({ name: 'Bottom', w: inner, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
-    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: inner, h: d - 20 - s, role: 'shelf', edge: 1 });
+    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - 20 - s, qty: bays, role: 'shelf', edge: 1 });
+    if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
     thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on' });
-    lin({ name: 'Hanging Rail', w: inner - 20, h: 30, section: '25mm rail', role: 'rail', note: 'Round chrome rail' });
+    lin({ name: 'Hanging Rail', w: bayW - 20, h: 30, qty: bays, section: '25mm rail', role: 'rail', note: 'Round chrome rail' });
     if (nd) {
       const dw = Math.floor((inner - 2 * (nd + 1)) / nd), dh = h - 2 * th - 4;
       const hinges = calcHingePositions(dh);
@@ -299,7 +313,8 @@ function generateParts() {
     sheet({ name: 'Right Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
     sheet({ name: 'Top', w: w - 2 * th, h: d - s, scribed: sc, role: 'top', edge: 1 });
     sheet({ name: 'Bottom', w: w - 2 * th, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
-    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: w - 2 * th, h: d - 20 - s, role: 'shelf', edge: 1 });
+    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - 20 - s, qty: bays, role: 'shelf', edge: 1 });
+    if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
     thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on' });
     overlayDoors(w, h - 4);
   } else if (t === 'eaves') {
@@ -315,7 +330,12 @@ function generateParts() {
       const yTop = yc + th / 2;
       const maxDepth = g.rise > 0 ? (h - th / cosA - yTop) * S.d / g.rise : g.run;
       const depth = Math.floor(Math.min(g.run - 2, maxDepth) - 5);
-      if (depth >= 100) sheet({ name: 'Shelf ' + (i + 1), w: inner, h: depth, role: 'shelf', edge: 1, yc, note: 'Shallower to clear the slope' });
+      if (depth >= 100) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: depth, qty: bays, role: 'shelf', edge: 1, yc, note: 'Shallower to clear the slope' });
+    }
+    if (bays > 1) {
+      // Dividers sit between the bottom and the underside of the sloped top, so they follow the roof angle too
+      const front = Math.round(h - th - th / cosA), back = Math.max(50, Math.round(S.low - th - th / cosA));
+      sheet({ name: 'Divider', w: g.run, h: front, qty: bays - 1, role: 'divider', shape: { front, back }, note: `Angled top: ${front} at the front, ${back} at the back (${g.angDeg} deg)`, edge: 1 });
     }
     thin({ name: 'Back Panel', w: w - 4, h: Math.max(50, S.low - 4), role: 'back', note: '3mm, pinned on' });
     overlayDoors(w, h - 4);
@@ -460,7 +480,7 @@ function packLinear(parts, kerf) {
 
 const FITTING_DB = {
   shelving: [{ name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Wall fixing brackets', per: 'unit', qty: 4, unit_cost: 1.8 }],
-  wardrobe: [{ name: 'Rail end sockets', per: 'unit', qty: 2, unit_cost: 0.8 }, { name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Anti-tip wall brackets', per: 'unit', qty: 2, unit_cost: 1.8 }],
+  wardrobe: [{ name: 'Rail end sockets', per: 'rail', qty: 2, unit_cost: 0.8 }, { name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Anti-tip wall brackets', per: 'unit', qty: 2, unit_cost: 1.8 }],
   kitchenbase: [{ name: 'Drawer runners 400mm (pair)', per: 'drawer', qty: 1, unit_cost: 8.5 }, { name: 'Plinth clips', per: 'unit', qty: 4, unit_cost: 0.6 }, { name: 'Adjustable legs', per: 'unit', qty: 4, unit_cost: 1.9 }, { name: 'Handles', per: 'handle', qty: 1, unit_cost: 2.8 }],
   kitchenwall: [{ name: 'Wall hanging brackets', per: 'unit', qty: 2, unit_cost: 3.5 }, { name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Handles', per: 'handle', qty: 1, unit_cost: 2.8 }],
   eaves: [{ name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Angle brackets 40mm', per: 'unit', qty: 6, unit_cost: 0.6 }, { name: 'Door knobs', per: 'handle', qty: 1, unit_cost: 2.8 }],
@@ -474,7 +494,7 @@ const FITTING_DB = {
 function calcFittings(parts) {
   const sum = (f) => parts.filter(f).reduce((s, p) => s + p.qty, 0);
   const cnt = {
-    unit: 1, shelf: sum(p => p.role === 'shelf'), drawer: sum(p => p.name === 'Drawer Front'),
+    unit: 1, shelf: sum(p => p.role === 'shelf'), rail: sum(p => p.role === 'rail'), drawer: sum(p => p.name === 'Drawer Front'),
     handle: sum(p => p.role === 'door') + sum(p => p.name === 'Drawer Front'),
     stud: sum(p => p.role === 'stud'), noggin: sum(p => p.role === 'noggin'), joist: sum(p => p.role === 'joist'),
     board: sum(p => p.stock === 'whole' && p.kind !== 'plaster'), plaster: sum(p => p.kind === 'plaster'), rafter: sum(p => p.role === 'rafter'),
@@ -484,7 +504,7 @@ function calcFittings(parts) {
   const hinges = parts.filter(p => p.hinges).reduce((s, p) => s + p.hinges.length * p.qty, 0);
   if (hinges) out.unshift({ name: 'Soft-close 35mm hinges', total_qty: hinges, unit_cost: 2.5, note: 'With mounting plates' });
   if (isCabinet(S.template)) {
-    const joints = 4, perJoint = Math.max(2, Math.ceil(S.d / 150));
+    const joints = 4 + 2 * sum(p => p.role === 'divider'), perJoint = Math.max(2, Math.ceil(S.d / 150));
     const f = joints * perJoint;
     if (S.joinery === 'screws') {
       out.push({ name: 'Wood screws 4x40mm', total_qty: f + 10, unit_cost: 0.05 });
@@ -548,12 +568,14 @@ function cabinetShapes() {
   if (t === 'kitchenbase') sh.push({ x: th, y: 0, w: W - 2 * th, h: th * 1.2, c: 'p2', part: 'Top Rail' });
   else sh.push({ x: th, y: 0, w: W - 2 * th, h: th, c: 'p2', part: t === 'eaves' ? 'Sloped Top' : 'Top' });
   sh.push({ x: th, y: Hc - th, w: W - 2 * th, h: th, c: 'p2', part: 'Bottom' });
+  const { bays, bayW } = bayInfo();
   R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
     const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
-    sh.push({ x: th, y: Hc - yc - th / 2, w: W - 2 * th, h: th, c: 'p2', part: p.name });
+    for (let b = 0; b < bays; b++) sh.push({ x: bayX(b, bayW), y: Hc - yc - th / 2, w: bayW, h: th, c: 'p2', part: p.name });
   });
+  for (let b = 1; b < bays; b++) sh.push({ x: bayX(b, bayW) - th, y: th, w: th, h: Hc - 2 * th, c: 'p', part: 'Divider' });
   if (base) sh.push({ x: 0, y: Hc, w: W, h: base, c: 'p', part: 'Plinth' });
-  if (t === 'wardrobe') sh.push({ line: [th + 20, th + 70, W - th - 20, th + 70], c: 'rl', part: 'Hanging Rail' });
+  if (t === 'wardrobe') for (let b = 0; b < bays; b++) sh.push({ line: [bayX(b, bayW) + 20, th + 70, bayX(b, bayW) + bayW - 20, th + 70], c: 'rl', part: 'Hanging Rail' });
   const drawer = R.parts.find(p => p.name === 'Drawer Front');
   if (drawer) sh.push({ x: 2, y: 2, w: W - 4, h: 180, c: 'dr', part: 'Drawer Front', handle: [W / 2, 60] });
   const door = R.parts.find(p => p.role === 'door');
@@ -699,10 +721,16 @@ function solids() {
       box(th, H - th, 0, W - 2 * th, th, D, 'panel2');
     }
     box(th, base, 0, W - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0), 'panel2');
+    const { bays, bayW } = bayInfo();
     R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
       const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
-      box(th, base + yc - th / 2, 0, W - 2 * th, th, Math.min(D, p.h), 'shelf');
+      for (let b = 0; b < bays; b++) box(bayX(b, bayW), base + yc - th / 2, 0, bayW, th, Math.min(D, p.h), 'shelf');
     });
+    for (let b = 1; b < bays; b++) {
+      const x = bayX(b, bayW) - th;
+      if (t === 'eaves') { const c = Math.cos(eavesGeom().ang) || 1; prismX(x, x + th, [[th, 0], [H - th / c, 0], [S.low - th / c, D], [th, D]], 'panel'); }
+      else box(x, base + th, 0, th, Hc - 2 * th, D, 'panel');
+    }
     if (base) box(0, 0, 20, W, base, th, 'panel');
   } else if (t === 'studwall' || t === 'partition') {
     const sp = S.spacing, cnt = Math.floor(W / sp) + 1;
@@ -1012,7 +1040,8 @@ function renderControls() {
               ${[0, 1, 2, 3, 4].map(n => `<option value="${n}"${S.doors === n ? ' selected' : ''}>${n === 0 ? 'No doors' : n + (n === 1 ? ' door' : ' doors')}</option>`).join('')}
             </select>
           </div>
-          ${numField('shelves', 'Shelves', '', '')}
+          ${BAY_TEMPLATES.has(S.template) ? numField('compartments', 'Compartments', 'Upright dividers split it into bays', '') : ''}
+          ${numField('shelves', bayInfo().bays > 1 ? 'Shelves per compartment' : 'Shelves', '', '')}
         </div>
         ${S.template === 'eaves' && R.parts.filter(p => p.role === 'shelf').length < S.shelves ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Some shelves would sit too close to the slope, so we left them out.</span></div>` : ''}
       </div>
@@ -1165,6 +1194,7 @@ function buildSteps() {
         ? ['Set your pocket-hole jig for 18mm board.', `Drill ${f} pocket holes on the underside of the bottom and the top face of the top.`, 'Clamp each joint flush, glue, then drive 32mm pocket screws.']
         : ['Push glued dowels into the side panels.', 'Fit the cam bolts, then slide the top and bottom on.', 'Turn each cam a quarter turn until tight. Do not over-tighten.'];
     steps.push({ title: 'Build the box', parts: [...names('side'), ...names('top'), ...names('bottom')], tools: S.joinery === 'pocket' ? ['Drill', 'Pocket-hole jig', 'Clamps'] : S.joinery === 'cam' ? ['Screwdriver', 'Rubber mallet'] : ['Drill', '3mm bit', 'Countersink', 'Clamps'], body: join });
+    if (R.parts.some(p => p.role === 'divider')) { const bi = bayInfo(); steps.push({ title: 'Fit the dividers', parts: names('divider'), tools: ['Tape measure', 'Drill', 'Clamps'], body: [`Mark the divider positions on the top and bottom: each compartment is ${bi.bayW}mm wide inside.`, 'Slide each divider in from the front and clamp it on its marks, square to the front edge.', `Fix through the top and bottom with ${f} screws at each end.`] }); }
     if (R.parts.some(p => p.role === 'back')) steps.push({ title: 'Square it and fit the back', parts: ['Back Panel'], tools: ['Tape measure', 'Hammer'], body: ['Measure both diagonals. When they match, the box is square.', 'Pin the back on with 25mm panel pins every 150mm.', 'The back holds it square, so pin it before moving the unit.'] });
     if (t === 'kitchenbase') steps.push({ title: 'Make the drawer', parts: names('drawer'), tools: ['Drill', 'Clamps'], body: ['Glue and screw the sides to the back.', 'Slide the 6mm base in and pin it from below.', 'Fit the runners to the drawer and cabinet, then hang the front with 2mm gaps.'] });
     if (R.parts.some(p => p.role === 'shelf') || t === 'wardrobe') steps.push({ title: t === 'wardrobe' ? 'Fit shelves and rail' : 'Fit the shelves', parts: [...names('shelf'), ...names('rail')], tools: ['Drill', '5mm bit', 'Shelf-pin jig'], body: ['Drill 5mm shelf-pin holes 10mm deep, 37mm in from the front and back.', 'Use a jig or a strip of pegboard so both sides match.', t === 'wardrobe' ? 'Screw the rail sockets 70mm below the top, then drop the rail in.' : 'Push in the pins and drop the shelves on.'] });
@@ -1256,14 +1286,20 @@ function partSolids() {
     else box('Top', th, H - th, 0, W - 2 * th, th, D);
   }
   box('Bottom', th, base, 0, W - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0));
+  const { bays, bayW } = bayInfo();
   R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
     const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
-    box(p.name, th, base + yc - th / 2, 0, W - 2 * th, th, Math.min(D, p.h));
+    for (let b = 0; b < bays; b++) box(p.name, bayX(b, bayW), base + yc - th / 2, 0, bayW, th, Math.min(D, p.h));
   });
+  for (let b = 1; b < bays; b++) {
+    const x = bayX(b, bayW) - th;
+    if (t === 'eaves') { const c = Math.cos(eavesGeom().ang) || 1; prismX('Divider', x, x + th, [[th, 0], [H - th / c, 0], [S.low - th / c, D], [th, D]]); }
+    else box('Divider', x, base + th, 0, th, Hc - 2 * th, D);
+  }
   const back = R.parts.find(p => p.name === 'Back Panel');
   if (back) box('Back Panel', 0, base, D, W, t === 'eaves' ? S.low : Hc, 3);
   if (base) box('Plinth', 0, 0, 30, W, base, th);
-  if (t === 'wardrobe') box('Hanging Rail', th + 10, H - th - 90, D / 2 - 12, W - 2 * th - 20, 25, 25);
+  if (t === 'wardrobe') for (let b = 0; b < bays; b++) box('Hanging Rail', bayX(b, bayW) + 10, H - th - 90, D / 2 - 12, bayW - 20, 25, 25);
   // Doors and drawer fronts come from the front elevation, laid on the front face
   cabinetShapes().filter(s => s.part === 'Door' || s.part === 'Drawer Front').forEach(s => box(s.part, s.x, H - s.y - s.h, -th, s.w, s.h, th));
   return out;
@@ -1378,6 +1414,8 @@ function manualSteps() {
   steps.push({ add: ['Bottom'], ex: { Bottom: [W * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Fix the bottom to the left side, flush at the front.' });
   steps.push({ add: [topName], ex: { [topName]: [W * 0.35, H * 0.3, 0] }, hw: join(1), note: t === 'eaves' ? 'The angled top follows the slope of the side.' : 'Fix the top to the left side, flush at the front.' });
   steps.push({ add: ['Right Side'], ex: { 'Right Side': [W * 0.45, 0, 0] }, hw: join(2), note: 'Fit the right side to the top and bottom.', twoPeople: H > 1500 });
+  const dividers = R.parts.find(p => p.name === 'Divider');
+  if (dividers) steps.push({ add: ['Divider'], ex: { Divider: [0, 0, -D * 1.05] }, hw: join(2 * dividers.qty), note: `Slide the dividers in from the front. Space them ${bayInfo().bayW}mm apart, then fix through the top and bottom.` });
   if (has('Back Panel')) steps.push({ add: ['Back Panel'], ex: { 'Back Panel': [0, 0, D * 1.1] }, hw: [['panel pins', 40]], note: 'Measure corner to corner both ways. When they match, the box is square. Pin the back on every 150mm.', check: true });
   if (has('Plinth')) steps.push({ add: ['Plinth'], ex: { Plinth: [0, -H * 0.1, -D * 0.7] }, hw: [['legs', 4], ['plinth clips', 4]], note: 'Screw on the legs. Level the unit, then clip the plinth onto the front legs.' });
   const shelves = names('shelf');
@@ -1889,6 +1927,131 @@ function updateARHud() {
   $('#arDoneBtn').textContent = n ? `Done (${n}/3)` : 'Done';
 }
 
+// ───────────────────────── Design assistant ─────────────────────────
+// Sends the request and current sizes to /api/assistant (Claude, server side). If that is not
+// set up or not reachable, a built-in phrase parser handles the common requests instead.
+const ASK = { log: [], busy: false };
+const ASK_FIELDS = ['template', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch', 'doors', 'joinery', 'material'];
+const FIELD_LABEL = { template: 'Design', w: 'Width', h: 'Height', d: 'Depth', low: 'Back height', shelves: 'Shelves', compartments: 'Compartments', thickness: 'Thickness', spacing: 'Centres', pitch: 'Pitch', doors: 'Doors', joinery: 'Joining', material: 'Board', scribe: 'Scribe edges' };
+const WORDNUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, single: 1, double: 2, a: 1, an: 1 };
+
+function askSuggestions() {
+  if (!isCabinet(S.template)) return ['Make it 3.6m long', 'Studs at 600 centres', 'Use 38mm timber'];
+  const out = [];
+  if (BAY_TEMPLATES.has(S.template)) out.push(S.compartments > 1 ? 'Make it one big space' : 'Split it into 5 compartments');
+  out.push(doorCount() ? 'No doors, just shelves' : 'Add doors');
+  out.push('Two shelves in each section', 'Make it 1.5m wide');
+  return out;
+}
+
+function renderAsk() {
+  $('#askLog').innerHTML = ASK.log.map(m => `<div class="msg ${m.role === 'user' ? 'user' : 'bot'}${m.wait ? ' wait' : ''}">${esc(m.text)}${m.diff && m.diff.length ? `<div class="tags">${m.diff.map(d => `<span class="tag acc">${esc(d)}</span>`).join('')}</div>` : ''}</div>`).join('');
+  $('#askSugg').innerHTML = ASK.log.length ? '' : askSuggestions().map(t => `<button type="button" class="chip" data-action="ask-suggest" data-text="${esc(t)}">${esc(t)}</button>`).join('');
+  const log = $('#askLog'); log.scrollTop = log.scrollHeight;
+}
+
+function fmtVal(k, v) {
+  if (k === 'template') return tplOf(v).name;
+  if (k === 'doors') return v === 'auto' ? 'suggested' : v === 0 ? 'none' : String(v);
+  if (k === 'material') return MATERIALS[v] ? MATERIALS[v].name : v;
+  if (k === 'joinery') return JOINERY[v] ? JOINERY[v].short : v;
+  if (k === 'scribe') return v ? 'on' : 'off';
+  if (['w', 'h', 'd', 'low', 'thickness', 'spacing'].includes(k)) return fmt(v);
+  if (k === 'pitch') return v + ' deg';
+  return String(v);
+}
+
+// Validate and apply. Never trust the server (or the parser) blindly.
+function applyChanges(ch) {
+  const diff = [];
+  if (!ch || typeof ch !== 'object') return diff;
+  if (ch.template && ch.template !== S.template && TEMPLATES.some(t => t.id === ch.template)) {
+    const keep = { name: S.name, unit: S.unit };
+    startTemplate(ch.template, { keepOverlay: true });
+    Object.assign(S, keep);
+    diff.push(`Design: ${tplOf(ch.template).name}`);
+  }
+  for (const k of ['w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch']) {
+    if (ch[k] === undefined || ch[k] === null) continue;
+    const v = Number(ch[k]); const lim = LIMITS[k];
+    if (!Number.isFinite(v) || !lim) continue;
+    const nv = Math.round(clamp(v, lim[0], lim[1]));
+    if (nv !== S[k]) { diff.push(`${FIELD_LABEL[k]}: ${fmtVal(k, nv)}`); S[k] = nv; }
+  }
+  if (S.template === 'eaves' && S.low >= S.h) { S.low = Math.round(S.h * 0.6); diff.push(`Back height: ${fmtVal('low', S.low)}`); }
+  if (ch.doors !== undefined && ch.doors !== null) {
+    const v = ch.doors === 'auto' ? 'auto' : clamp(Math.round(Number(ch.doors)) || 0, 0, 8);
+    if (v !== S.doors && isCabinet(S.template)) { S.doors = v; diff.push(`Doors: ${fmtVal('doors', v)}`); }
+  }
+  if (ch.joinery && JOINERY[ch.joinery] && ch.joinery !== S.joinery) { S.joinery = ch.joinery; diff.push(`Joining: ${JOINERY[ch.joinery].short}`); }
+  if (ch.material && MATERIALS[ch.material] && ch.material !== 'c16' && isCabinet(S.template) && ch.material !== S.material) {
+    S.material = ch.material; S.thickness = MATERIALS[ch.material].thick; S.priceSheet = null; diff.push(`Board: ${MATERIALS[ch.material].name}`);
+  }
+  if (typeof ch.scribe === 'boolean' && ch.scribe !== S.scribe) { S.scribe = ch.scribe; diff.push(`Scribe edges: ${ch.scribe ? 'on' : 'off'}`); }
+  if (diff.length) { saveDraft(); render(); }
+  return diff;
+}
+
+// Offline fallback: understands the common requests without any AI.
+function parseLocally(text) {
+  const t = ' ' + text.toLowerCase().replace(/[,;]/g, ' ') + ' ';
+  const ch = {};
+  const n = s => (s in WORDNUM ? WORDNUM[s] : Number(s));
+  const NUM = '(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|single|double|a|an)';
+  let m;
+  if ((m = t.match(new RegExp(NUM + '\\s*(?:equal\\s+)?(?:compartments?|sections?|bays?|cubbies|cubby|columns?|boxes|divisions?|cubes?)'))) ) ch.compartments = n(m[1]);
+  else if ((m = t.match(new RegExp(NUM + '\\s*dividers?')))) ch.compartments = n(m[1]) + 1;
+  if (/one big|single space|no dividers|remove (the )?dividers/.test(t)) ch.compartments = 1;
+  if ((m = t.match(new RegExp(NUM + '\\s*shel(?:f|ves)')))) ch.shelves = n(m[1]);
+  if (/no shelves|without shelves/.test(t)) ch.shelves = 0;
+  if (/no doors|without doors|remove (the )?doors|open shelv|just shelves|shelving only|doors off/.test(t)) ch.doors = '0';
+  else if ((m = t.match(new RegExp(NUM + '\\s*doors?')))) ch.doors = String(clamp(n(m[1]), 0, 8));
+  else if (/(add|with|put on|want) (some )?doors/.test(t)) ch.doors = 'auto';
+  const toMM = (v, u) => { v = Number(v); u = (u || '').trim(); if (u === 'm' || u === 'metre' || u === 'metres' || u === 'meter' || u === 'meters') return v * 1000; if (u === 'cm') return v * 10; if (u === 'in' || u === 'inch' || u === 'inches' || u === '"') return v * 25.4; if (!u && v <= 10) return v * 1000; return v; };
+  const UNIT = '\\s*(mm|cm|metres?|meters?|m|inches|inch|in|")?';
+  const dims = [['low', 'back height|knee ?wall(?: height)?|back'], ['w', 'wide|width|long|length'], ['h', 'high|height|tall'], ['d', 'deep|depth']];
+  for (const [k, words] of dims) {
+    if (k === 'low' && S.template !== 'eaves') continue;
+    let r = t.match(new RegExp('(\\d+(?:\\.\\d+)?)' + UNIT + '\\s*(?:' + words + ')\\b'));
+    if (!r) { const q = t.match(new RegExp('\\b(?:' + words + ')\\s*(?:to|of|=|:|is|at)?\\s*(\\d+(?:\\.\\d+)?)' + UNIT)); if (q) r = q; }
+    if (r && !(k === 'h' && /back height/.test(r[0]))) ch[k] = Math.round(toMM(r[1], r[2]));
+  }
+  if (/pocket/.test(t)) ch.joinery = 'pocket'; else if (/cam|flat ?pack|knock ?down/.test(t)) ch.joinery = 'cam'; else if (/\bscrews?\b/.test(t) && /join|fix|use/.test(t)) ch.joinery = 'screws';
+  if (/\bmdf\b/.test(t)) ch.material = 'mdf'; else if (/melamine|chipboard/.test(t)) ch.material = 'melamine'; else if (/\bosb\b/.test(t)) ch.material = 'osb'; else if (/\bply(wood)?\b/.test(t)) ch.material = 'plywood';
+  const T = [['eaves', /eaves|loft|attic|knee ?wall/], ['wardrobe', /wardrobe/], ['kitchenbase', /kitchen base|base unit/], ['kitchenwall', /wall cupboard|wall unit/], ['shelving', /bookcase|shelving unit/]];
+  for (const [id, re] of T) if (re.test(t) && /(make it|change (it )?to|switch to|turn it into|instead)/.test(t)) { ch.template = id; break; }
+  return ch;
+}
+
+async function askSend(text) {
+  text = String(text || '').trim().slice(0, 600);
+  if (!text || ASK.busy) return;
+  ASK.busy = true;
+  const history = ASK.log.filter(m => !m.wait).slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', text: m.text }));
+  ASK.log.push({ role: 'user', text });
+  ASK.log.push({ role: 'bot', text: 'Working on it...', wait: true });
+  renderAsk();
+  $('#askInput').value = '';
+  const design = {}; ASK_FIELDS.forEach(k => { design[k] = S[k]; });
+  let reply, changes, offline = false;
+  try {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 45000);
+    const r = await fetch('/api/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, design, history }), signal: ctl.signal, credentials: 'same-origin' });
+    clearTimeout(to);
+    if (r.ok) { const j = await r.json(); reply = typeof j.reply === 'string' ? j.reply : ''; changes = j.changes; }
+    else if (r.status === 429) reply = 'Lots of requests right now. Give it a minute and try again.';
+    else offline = true;
+  } catch { offline = true; }
+  if (offline) { changes = parseLocally(text); }
+  ASK.log.pop();
+  const diff = applyChanges(changes);
+  if (offline) reply = diff.length ? 'Done.' : "I couldn't work that out. Try something like \"5 compartments\", \"no doors\", \"2 shelves\" or \"1.5m wide\".";
+  else if (!reply) reply = diff.length ? 'Done.' : 'Nothing to change there.';
+  ASK.log.push({ role: 'bot', text: reply, diff });
+  ASK.busy = false;
+  renderAsk();
+}
+
 // ───────────────────────── Events ─────────────────────────
 function startTemplate(id, opts = {}) {
   const keepPhoto = S.photo, unit = S.unit;
@@ -1930,6 +2093,8 @@ const ACTIONS = {
     if (S.view === 'plan') render();
   },
   'open-tips': () => $('#dlgTips').showModal(),
+  'open-ask': () => { renderAsk(); $('#dlgAsk').showModal(); setTimeout(() => $('#askInput').focus(), 50); },
+  'ask-suggest': el => askSend(el.dataset.text),
   'take-photo': () => { $('#dlgTips').close(); $('#photoCapture').click(); },
   'pick-photo': () => { $('#dlgTips').close(); $('#photoPick').click(); },
   'close-dialog': el => el.closest('dialog').close(),
@@ -2025,11 +2190,14 @@ document.addEventListener('change', e => {
   else if (k === 'scribe') S.scribe = el.checked;
   else if (k === 'delivery') S.delivery = DELIVERY.some(d => d.id === el.value) ? el.value : 'standard';
   else if (k === 'postcode') { render(); return; }
+  else if (k === 'compartments' || k === 'shelves') { render(); return; }
   else if (k === 'name') { S.name = el.value.trim().slice(0, 60) || 'Untitled project'; el.value = S.name; saveDraft(); return; }
   else return;
   saveDraft(); render();
 });
 
+$('#askForm').addEventListener('submit', e => { e.preventDefault(); askSend($('#askInput').value); });
+$('#askInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askSend($('#askInput').value); } });
 ['photoCapture', 'photoPick'].forEach(id => $('#' + id).addEventListener('change', e => { takePhoto(e.target.files[0]); e.target.value = ''; }));
 
 // Drag and drop a photo onto the drop zone (desktop)
