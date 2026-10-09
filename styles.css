@@ -632,3 +632,26 @@ dialog.ask{width:min(620px,100%)}
 .ask-form{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
 .ask-form textarea.input{min-height:52px;padding:12px 14px;resize:vertical;font:inherit;line-height:1.4}
 .ask-form .btn{min-height:52px;width:52px;padding:0}
+
+/* ---------- Safety checks ---------- */
+.safety{border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px;background:var(--surface,transparent)}
+.safety.has-fail{border-color:#C8371D}
+.safety-head{display:flex;align-items:center;gap:10px}
+.safety-head i{font-size:24px;color:#1F7A4D}
+.safety.has-fail .safety-head i{color:#C8371D}
+.safety-head h3{font-size:18px;margin:0}
+.sc-load{display:grid;gap:6px}
+.sc-load .lbl{font-size:13px;font-weight:700;color:var(--ink-2)}
+.sc-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.sc{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.sc>i{font-size:20px;flex:none;margin-top:1px}
+.sc strong{display:block}
+.sc span{color:var(--ink-2)}
+.sc-pass>i{color:#1F7A4D}.sc-warn>i{color:#B26A00}.sc-fail>i{color:#C8371D}.sc-action>i,.sc-info>i,.sc-stop>i{color:var(--accent)}
+.sc-fixes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sc-src p{font-size:13px;color:var(--ink-2);margin:8px 0 0}
+.m-safety{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.m-safety li{display:flex;gap:12px;align-items:flex-start;font-size:15px}
+.m-safety i{font-size:26px;color:#15181B;flex:none}
+.m-safety b{display:block;color:#15181B}
+.m-safety span{color:#454B51}

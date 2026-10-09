@@ -14,6 +14,12 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 
 Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 
+## Safety checks
+
+Every furniture design is checked as you edit it: shelf sag over time (beam formula with Eurocode 5 creep), shelf strength, load per shelf pin, back panel against racking, and wall fixing. Failing checks offer a one-tap fix (more compartments, thicker board, plywood). The rules, figures and sources are in [docs/SAFETY.md](docs/SAFETY.md) for professional review. Building work (walls, joists, roofs) is not checked and shows a stop notice.
+
+The picture manual animates each step: parts slide into place, with a pause button, and stays still for reduced motion and in print.
+
 ## Design assistant ("Change it")
 
 Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (`claude-opus-5-5`, low effort, structured JSON output, server-side refusal fallback) for a list of setting changes. The browser validates every change again before applying it.

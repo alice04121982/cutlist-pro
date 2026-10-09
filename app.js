@@ -78,9 +78,9 @@ const isCabinet = id => tplOf(id).kind === 'cabinet';
 const STRUCTURAL = new Set(['floorjoists', 'flatroof', 'pitchedroof']);
 
 const DEFAULTS = {
-  eaves: { w: 1800, h: 1200, d: 600, low: 700, shelves: 1, spacing: 400, pitch: 0 },
-  shelving: { w: 800, h: 1200, d: 300, low: 0, shelves: 4, spacing: 400, pitch: 0 },
-  wardrobe: { w: 1000, h: 2100, d: 600, low: 0, shelves: 2, spacing: 400, pitch: 0 },
+  eaves: { w: 1800, h: 1200, d: 600, low: 700, shelves: 1, bays: 3, spacing: 400, pitch: 0 },
+  shelving: { w: 800, h: 1200, d: 300, low: 0, shelves: 4, bays: 2, spacing: 400, pitch: 0 },
+  wardrobe: { w: 1000, h: 2100, d: 600, low: 0, shelves: 2, bays: 2, spacing: 400, pitch: 0 },
   kitchenbase: { w: 600, h: 720, d: 560, low: 0, shelves: 1, spacing: 400, pitch: 0 },
   kitchenwall: { w: 600, h: 720, d: 330, low: 0, shelves: 2, spacing: 400, pitch: 0 },
   studwall: { w: 2400, h: 2400, d: 100, low: 0, shelves: 0, spacing: 400, pitch: 0 },
@@ -150,7 +150,7 @@ function freshState(template = 'eaves') {
     thickness: cab ? 18 : 47,
     sheetW: 2440, sheetH: 1220, kerf: 3,
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
-    compartments: 1, doors: 'auto', joinery: 'screws', scribe: true,
+    compartments: d.bays || 1, doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
     unit: 'mm', done: []
   };
@@ -163,7 +163,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -183,7 +183,7 @@ function sanitizeProject(p) {
     spacing: num(pick('spacing', 'dimSpacing'), ...LIMITS.spacing, base.spacing), pitch: num(pick('pitch', 'dimPitch'), 0, 70, base.pitch),
     compartments: Math.round(num(p.compartments, 1, 8, 1)),
     doors: p.doors === 'auto' || p.doors === undefined ? 'auto' : Math.round(num(p.doors, 0, 8, 0)),
-    joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false,
+    joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false, load: LOADS[p.load] ? p.load : base.load,
     priceSheet: p.priceSheet == null ? null : num(p.priceSheet, 0, 1000, null),
     delivery: DELIVERY.some(d => d.id === p.delivery) ? p.delivery : 'standard',
     postcode: String(p.postcode || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 8),
@@ -1050,6 +1050,7 @@ function renderControls() {
         <div class="seg" role="group" aria-label="Joinery">${Object.entries(JOINERY).map(([k, j]) => `<button type="button" data-action="joinery" data-value="${k}" aria-pressed="${S.joinery === k}">${j.short}</button>`).join('')}</div>
         <p class="group-sub">${esc(JOINERY[S.joinery].note)}</p>
       </div>
+      <div class="group">${safetyHTML()}</div>
       <div class="group">
         <label class="check"><input type="checkbox" data-field="scribe"${S.scribe ? ' checked' : ''}><span>Leave 2mm to scribe against walls<small>Walls are never straight. Trim the edge to fit with a plane.</small></span></label>
         <details class="more">
@@ -1169,10 +1170,110 @@ function renderCutPage() {
       <div class="stat"><div class="k">Offcut</div><div class="v">${R.nMain ? Math.round(R.waste) : 0}<small>%</small></div></div>
       <div class="stat"><div class="k">Estimate</div><div class="v">${gbp0(R.total)}</div></div>
     </div>
-    ${scribe}${tables}
+    ${safetyHTML(true)}${scribe}${tables}
     ${sheetBlock('main', 'Sheet layouts', S.sheetW, S.sheetH)}${sheetBlock('ply3', 'Back panel sheets', 2440, 1220)}${sheetBlock('ply6', 'Drawer base sheets', 2440, 1220)}
     ${timber}${hingeBlock()}${hw}
   </div>`;
+}
+
+
+// ───────────────────────── Safety checks ─────────────────────────
+// Deterministic engineering checks. Every figure is cited in docs/SAFETY.md. Conservative choices:
+// cross-grain stiffness for plywood and OSB (the cutter may rotate parts), product minimums for MDF and chipboard.
+const SAFETY_MAT = {
+  plywood: { E: 7452, fm: 34.1, kdef: 0.8, kmod: 0.6, gM: 1.2, src: 'Birch plywood 18mm, across the face grain (Metsä DoP)' },
+  mdf: { E: 2200, fm: 20, kdef: 2.25, kmod: 0.2, gM: 1.3, src: 'MDF, EN 622-5 minimum' },
+  melamine: { E: 1600, fm: 11, kdef: 2.25, kmod: 0.3, gM: 1.3, src: 'Chipboard P2, EN 312 minimum' },
+  osb: { E: 1980, fm: 8.2, kdef: 1.5, kmod: 0.4, gM: 1.2, src: 'OSB/3 across the strands (EN 12369-1)' }
+};
+const LOADS = {
+  light: { name: 'Light', note: 'Clothes, towels, ornaments', perDm2: 1.0, perM: 0 },
+  books: { name: 'Books', note: 'Books, files, games', perDm2: 1.0, perM: 60 },
+  heavy: { name: 'Heavy', note: 'Tins, crockery, tools, paint', perDm2: 1.5, perM: 60 }
+};
+const PIN_KG = 12; // lowest common UK shelf-pin rating found (Häfele 12.5kg), rounded down
+function defaultLoad(t) { return t === 'wardrobe' ? 'light' : t === 'kitchenbase' || t === 'kitchenwall' ? 'heavy' : 'books'; }
+
+// kg per metre of shelf: the larger of the area load and the running load
+const shelfKgPerM = (depth, load) => Math.max(LOADS[load].perDm2 * depth / 100 * 10, LOADS[load].perM);
+
+function shelfCheck(span, depth, t, material, load) {
+  const m = SAFETY_MAT[material];
+  if (!m || span <= 0 || depth <= 0 || t <= 0) return null;
+  const kgm = shelfKgPerM(depth, load), w = kgm * 9.81 / 1000; // N/mm
+  const I = depth * t ** 3 / 12, Z = depth * t ** 2 / 6;
+  const uInst = 5 * w * span ** 4 / (384 * m.E * I), uFin = uInst * (1 + m.kdef);
+  const sigma = 1.5 * w * span ** 2 / 8 / Z, fd = m.kmod * m.fm / m.gM;
+  const kgShelf = kgm * span / 1000, perPin = kgShelf / 4;
+  const sagOK = uFin <= span / 200, looksOK = uInst <= span / 600, strong = sigma <= fd;
+  return { span, depth, t, kgm, kgShelf, perPin, uInst, uFin, sigma, fd, sagOK, looksOK, strong, ok: sagOK && strong };
+}
+
+// Smallest change that makes the worst shelf pass: more compartments, or a thicker board
+function safetyFixes(depth, load) {
+  const out = [];
+  const inner = S.w - 2 * S.thickness;
+  if (BAY_TEMPLATES.has(S.template)) {
+    for (let n = Math.max(1, S.compartments) + 1; n <= 8; n++) {
+      const span = Math.floor((inner - (n - 1) * S.thickness) / n);
+      const c = shelfCheck(span, depth, S.thickness, S.material, load);
+      if (c && c.ok && c.perPin <= PIN_KG) { out.push({ kind: 'compartments', value: n, label: `Use ${n} compartments` }); break; }
+    }
+  }
+  const span = bayInfo().bayW;
+  for (const t of (S.material === 'plywood' ? [24] : [25]).filter(x => x > S.thickness)) {
+    const c = shelfCheck(span, depth, t, S.material, load);
+    if (c && c.ok) { out.push({ kind: 'thickness', value: t, label: `Use ${t}mm board` }); break; }
+  }
+  if (S.material !== 'plywood') {
+    const c = shelfCheck(span, depth, S.thickness, 'plywood', load);
+    if (c && c.ok) out.push({ kind: 'material', value: 'plywood', label: 'Switch to plywood' });
+  }
+  return out;
+}
+
+function safetyChecks() {
+  const out = [];
+  if (!isCabinet(S.template)) {
+    out.push({ status: STRUCTURAL.has(S.template) ? 'stop' : 'info', title: 'Building work', text: 'Structural sizes must be checked by an engineer or Building Control. This app does not check them.' });
+    return out;
+  }
+  const load = LOADS[S.load] ? S.load : defaultLoad(S.template);
+  const shelves = R.parts.filter(p => p.role === 'shelf');
+  const mat = SAFETY_MAT[S.material];
+  if (shelves.length && mat) {
+    const checks = shelves.map(p => ({ p, c: shelfCheck(p.w, p.h, S.thickness, S.material, load) })).filter(x => x.c);
+    const worst = checks.reduce((a, b) => (b.c.uFin / b.c.span > a.c.uFin / a.c.span ? b : a), checks[0]);
+    if (worst) {
+      const c = worst.c;
+      const sagTxt = `${c.uFin.toFixed(1)}mm over time on a ${Math.round(c.span)}mm span, loaded with about ${Math.round(c.kgShelf)}kg`;
+      if (!c.ok) out.push({ status: 'fail', id: 'sag', title: c.strong ? 'Shelves will sag too much' : 'Shelves are not strong enough', text: `The widest shelf would bend ${sagTxt}. The limit is ${(c.span / 200).toFixed(1)}mm.`, fixes: safetyFixes(worst.p.h, load) });
+      else if (!c.looksOK) out.push({ status: 'warn', id: 'sag', title: 'Shelves will sag a little', text: `Safe, but you may see the widest shelf dip (${sagTxt}). More compartments or a thicker board would stop it.`, fixes: safetyFixes(worst.p.h, load) });
+      else out.push({ status: 'pass', id: 'sag', title: 'Shelves are stiff and strong enough', text: `The widest shelf bends ${sagTxt}, within the ${(c.span / 200).toFixed(1)}mm limit.` });
+      const pin = Math.max(...checks.map(x => x.c.perPin));
+      if (pin > PIN_KG) out.push({ status: 'fail', id: 'pins', title: 'Too much weight for shelf pins', text: `Each pin would carry about ${Math.round(pin)}kg. Common pins are rated about 12kg. Screw the shelves in place${BAY_TEMPLATES.has(S.template) ? ' or add compartments' : ''}.` });
+      else out.push({ status: 'pass', id: 'pins', title: 'Shelf pins can take the load', text: `About ${pin.toFixed(1)}kg on each pin. Buy pins rated 12kg or more.` });
+    }
+  }
+  const back = R.parts.some(p => p.role === 'back');
+  out.push(back
+    ? { status: 'pass', id: 'back', title: 'Back panel stops it racking', text: 'Pin the back to every edge and divider so it holds the unit square.' }
+    : { status: 'fail', id: 'back', title: 'No back panel', text: 'Without a fixed back the unit can lean sideways and collapse.' });
+  out.push({ status: 'action', id: 'wall', title: S.template === 'eaves' ? 'Fix it to the floor and knee wall' : S.template === 'kitchenwall' ? 'Hang it on rated wall fixings' : 'Fix it to the wall', text: S.template === 'kitchenwall' ? 'Wall cupboards hang from the wall, so use fixings rated for your wall type and the full load.' : 'Furniture can tip forward, especially if a child climbs it. Always fix it, even if it feels steady.' });
+  if (S.joinery === 'screws' && (S.material === 'mdf' || S.material === 'melamine')) out.push({ status: 'warn', id: 'joints', title: 'Screws hold poorly in board edges', text: `${MATERIALS[S.material].name} edges split and strip easily. Drill pilot holes, keep screws well away from corners, or switch to cam and dowel fittings.` });
+  if (S.material === 'osb') out.push({ status: 'warn', id: 'osb', title: 'OSB is a building board', text: 'It is rough, flexible across the strands and can shed splinters. Fine for a loft store, not for a child\'s room.' });
+  return out;
+}
+
+const SAFETY_ICON = { pass: 'check-circle', warn: 'warning', fail: 'x-circle', action: 'hand-pointing', info: 'info', stop: 'hard-hat' };
+function safetyHTML(compact = false) {
+  const list = safetyChecks();
+  const fails = list.filter(c => c.status === 'fail').length, warns = list.filter(c => c.status === 'warn').length;
+  const head = fails ? `${fails} safety check${fails > 1 ? 's' : ''} failed` : warns ? 'Safe, with things to watch' : 'All safety checks passed';
+  const items = list.map(c => `<li class="sc sc-${c.status}"><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><strong>${esc(c.title)}</strong><span>${esc(c.text)}</span>${c.fixes && c.fixes.length ? `<div class="sc-fixes">${c.fixes.map(f => `<button type="button" class="chip" data-action="safety-fix" data-kind="${f.kind}" data-value="${esc(String(f.value))}">${esc(f.label)}</button>`).join('')}</div>` : ''}</div></li>`).join('');
+  const loadSeg = isCabinet(S.template) && R.parts.some(p => p.role === 'shelf') ? `<div class="sc-load"><span class="lbl" id="loadLbl">The shelves will hold</span><div class="seg" role="group" aria-labelledby="loadLbl">${Object.entries(LOADS).map(([k, l]) => `<button type="button" data-action="load" data-value="${k}" aria-pressed="${(S.load || defaultLoad(S.template)) === k}" title="${esc(l.note)}">${l.name}</button>`).join('')}</div></div>` : '';
+  return `<section class="safety${fails ? ' has-fail' : ''}" aria-labelledby="safetyH"><div class="safety-head"><i class="ph ph-shield-check" aria-hidden="true"></i><h3 id="safetyH">${head}</h3></div>${compact ? '' : loadSeg}<ul class="sc-list">${items}</ul>
+    <details class="more sc-src"><summary>How we check</summary><p>Shelf sag uses the standard beam formula with long-term creep from Eurocode 5 (EN 1995-1-1), board stiffness from manufacturer and EN data, and a limit of 1/200 of the span, the figure most furniture specifications use with the EN 16122 shelf test. Loads follow the EN furniture test levels and the Sagulator figure for books (up to 60kg per metre). Wall fixing follows RoSPA and GOV.UK advice. These are estimates, not a certificate. If in doubt, ask a carpenter. <a href="https://github.com/alice04121982/cutlist-pro/blob/main/docs/SAFETY.md" target="_blank" rel="noopener noreferrer">Every rule and source</a>.</p></details></section>`;
 }
 
 // ── Build guide ──
@@ -1474,6 +1575,9 @@ function renderManual(print = false) {
   }).join('')}</div>`));
   // Hardware
   pages.push(page(`<h4 class="m-h">Hardware</h4><p class="m-sub">Screws, pins and dowels are printed at actual size. Lay yours on top to check.</p><div class="m-hw">${hw.list.map(f => { const a = hwArt(f.name); return `<div class="m-hwi">${a.art}<div class="m-hwq"><b>${f.total_qty}x</b> <span>${f.id}</span></div><div class="m-hwn">${esc(f.name)}${a.actual ? ' <em>1:1</em>' : ''}</div></div>`; }).join('')}</div>`));
+  // Safety
+  const sc = safetyChecks().filter(c => c.status !== 'pass');
+  if (sc.length) pages.push(page(`<h4 class="m-h">Before you start</h4><ul class="m-safety">${sc.map(c => `<li><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><b>${esc(c.title)}</b><span>${esc(c.text)}</span></div></li>`).join('')}</ul>`));
   // Assembly
   let built = ['Left Side'];
   steps.forEach((st, i) => {
@@ -1509,6 +1613,7 @@ function renderOrderPage() {
   const pcErr = S.postcode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(S.postcode.trim());
   return `<div class="page">
     <div class="page-head"><div><h2>Order your materials</h2><p>Send the cut file to a cutting service. They cut, edge and deliver the panels, ready to build.</p></div></div>
+    ${safetyChecks().some(c => c.status === 'fail') ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span><strong>A safety check failed.</strong> Go back to Design and fix it before you order.</span><button type="button" class="chip" data-action="goto" data-step="1">Fix it</button></div>` : ''}
     <div class="order">
       <div>
         <div class="card">
@@ -2124,6 +2229,14 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
+  load: el => { if (LOADS[el.dataset.value]) { S.load = el.dataset.value; saveDraft(); render(); } },
+  'safety-fix': el => {
+    const v = el.dataset.value;
+    if (el.dataset.kind === 'compartments') S.compartments = clamp(Math.round(Number(v)), 1, 8);
+    else if (el.dataset.kind === 'thickness' && [24, 25].includes(Number(v))) S.thickness = Number(v);
+    else if (el.dataset.kind === 'material' && v === 'plywood') { S.material = 'plywood'; S.priceSheet = null; }
+    saveDraft(); render(); toast('Design updated. Safety checks re-run.');
+  },
   'manual-anim': () => { S.manualAnim = S.manualAnim === false; render(); },
   'build-mode': el => { S.buildMode = el.dataset.value === 'steps' ? 'steps' : 'manual'; render(); },
   'print-manual': () => { $('#printSheet').innerHTML = `<h1>${esc(S.name)}</h1>` + renderManual(true); document.body.classList.add('print-manual'); window.print(); document.body.classList.remove('print-manual'); },
