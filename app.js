@@ -1453,29 +1453,65 @@ function isoSVG(items, opt = {}) {
   const scr = p => { const r = rot(p); return [ox + r[0] * sc, oy - r[1] * sc, r[2]]; };
   const cen = pts => pts.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [0, 0, 0]).map(c => c / pts.length);
   const light = [0.35, 0.6, -0.72];
-  const faces = [];
-  const addFaces = (it, verts, cls, mvd) => {
-    const rv = verts.map(rot), c = cen(rv);
-    it.f.forEach(f => {
-      const fc = cen(f.map(i => rv[i]));
-      const nrm = [fc[0] - c[0], fc[1] - c[1], fc[2] - c[2]], len = Math.hypot(...nrm) || 1;
-      const nn = nrm.map(x => x / len);
-      if (nn[2] > 0.02) return;
-      const k = 0.78 + 0.26 * Math.max(0, nn[0] * light[0] + nn[1] * light[1] + nn[2] * light[2]);
-      faces.push({ z: fc[2], pts: f.map(i => scr(verts[i])), fill: shadeHex(it.fill, k), cls, mv: mvd });
-    });
-  };
   // Animated steps: each moving part is drawn twice. The "fly" copy slides from the exploded spot
-  // into place (sorted for depth where it starts), then swaps for the "land" copy (sorted where it ends).
+  // into place, then swaps for the "land" copy drawn where it ends.
   const travel = it => { const a = scr(cen(it.mv)), b = scr(cen(it.v)); return [(b[0] - a[0]).toFixed(1), (b[1] - a[1]).toFixed(1)]; };
+  // Order whole parts, not faces. Every part is a convex solid, and parts in an assembly only touch, so
+  // for any two parts one of their face planes separates them. The part on the camera's side of that
+  // plane is drawn later. Faces of one convex part never overlap each other, so their order is free.
+  const sub = (p, q) => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
+  const cross = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const solidsList = [];
+  const addSolid = (it, verts, cls, mvd) => {
+    const c = cen(verts);
+    const normals = it.f.map(f => {
+      let n = cross(sub(verts[f[1]], verts[f[0]]), sub(verts[f[2]], verts[f[0]]));
+      const l = Math.hypot(...n) || 1; n = n.map(x => x / l);
+      return dot(n, sub(cen(f.map(i => verts[i])), c)) < 0 ? n.map(x => -x) : n;
+    });
+    solidsList.push({ it, verts, cls, mvd, normals, depth: rot(c)[2] });
+  };
   moved.forEach(it => {
-    if (opt.animate && it.offset) { addFaces(it, it.mv, 'm-fly', travel(it)); addFaces(it, it.v, 'm-land'); }
-    else addFaces(it, it.mv);
+    if (opt.animate && it.offset) { addSolid(it, it.mv, 'm-fly', travel(it)); addSolid(it, it.v, 'm-land'); }
+    else addSolid(it, it.mv);
   });
-  faces.sort((a, b) => b.z - a.z);
+  const N = solidsList.length, ahead = solidsList.map(() => []), indeg = new Array(N).fill(0);
+  const range = (vs, n) => { let lo = Infinity, hi = -Infinity; vs.forEach(v => { const d = dot(v, n); if (d < lo) lo = d; if (d > hi) hi = d; }); return [lo, hi]; };
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+    const A = solidsList[i], B = solidsList[j];
+    for (const n of A.normals.concat(B.normals)) {
+      const tz = rot(n)[2];
+      if (Math.abs(tz) < 1e-6) continue;
+      const [a0, a1] = range(A.verts, n), [b0, b1] = range(B.verts, n);
+      const plus = a1 <= b0 + 0.5 ? j : b1 <= a0 + 0.5 ? i : -1;
+      if (plus < 0) continue;
+      // +n points at the camera when its view-space z is negative
+      const front = tz < 0 ? plus : (plus === i ? j : i), back = front === i ? j : i;
+      ahead[back].push(front); indeg[front]++;
+      break;
+    }
+  }
+  const order = [], done = new Array(N).fill(false);
+  for (let k = 0; k < N; k++) {
+    // Among parts with nothing left behind them, draw the farthest first; a cycle falls back to depth
+    let pick = -1;
+    for (let i = 0; i < N; i++) if (!done[i] && indeg[i] === 0 && (pick < 0 || solidsList[i].depth > solidsList[pick].depth)) pick = i;
+    if (pick < 0) for (let i = 0; i < N; i++) if (!done[i] && (pick < 0 || solidsList[i].depth > solidsList[pick].depth)) pick = i;
+    done[pick] = true; order.push(pick);
+    ahead[pick].forEach(q => indeg[q]--);
+  }
   const anim = f => f.cls ? ` class="${f.cls}"${f.mv ? ` data-dx="${f.mv[0]}" data-dy="${f.mv[1]}"` : ''}` : '';
   let s = `<svg viewBox="0 0 ${VW} ${VH}" class="m-iso" role="img" aria-label="${esc(opt.alt || 'Assembly drawing')}"><defs><marker id="mArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${MP.ink}"/></marker></defs>`;
-  faces.forEach(f => { s += `<polygon${anim(f)} points="${f.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${f.fill}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`; });
+  order.forEach(idx => {
+    const { it, verts, cls, mvd, normals } = solidsList[idx];
+    it.f.forEach((f, fi) => {
+      const nn = rot(normals[fi]);
+      if (nn[2] > 0.02) return;
+      const k = 0.78 + 0.26 * Math.max(0, nn[0] * light[0] + nn[1] * light[1] + nn[2] * light[2]);
+      s += `<polygon${anim({ cls, mv: mvd })} points="${f.map(i => scr(verts[i])).map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${shadeHex(it.fill, k)}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`;
+    });
+  });
   // Movement arrows for exploded parts, then letter callouts
   const seen = new Set();
   moved.forEach(it => {
