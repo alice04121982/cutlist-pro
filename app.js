@@ -395,15 +395,15 @@ function generateParts() {
       const qty = L.boxes.filter(b => b.type === k.type).length, inner = k.w - 2 * th;
       if (t === 'understairs') {
         const sg = stairGeom(), rise = sg.rise * k.w / w;
-        sheet({ name: boxPart('Bottom', k), w: inner, h: d - s, qty, role: 'bottom', edge: 1 });
+        sheet({ name: boxPart('Bottom', k), w: inner, h: d - s, qty, role: 'bottom', edge: 1, bx: k.i });
         sheet({ name: boxPart('Sloped Top', k), w: Math.round(Math.hypot(k.w, rise)), h: d - s, qty, role: 'top', note: `Sits on the uprights. Bevel both ends at ${sg.angDeg} deg`, edge: 1 });
       } else if (eaves) {
-        sheet({ name: boxPart('Bottom', k), w: inner, h: g.run, qty, role: 'bottom', edge: 1 });
-        sheet({ name: boxPart('Sloped Top', k), w: inner, h: Math.round(Math.hypot(g.run, g.rise)), qty, role: 'top', note: `Bevel front and back edges at ${g.angDeg} deg`, edge: 1 });
+        sheet({ name: boxPart('Bottom', k), w: inner, h: g.run, qty, role: 'bottom', edge: 1, bx: k.i });
+        sheet({ name: boxPart('Sloped Top', k), w: inner, h: Math.round(Math.hypot(g.run, g.rise)), qty, role: 'top', bx: k.i, note: `Bevel front and back edges at ${g.angDeg} deg`, edge: 1 });
         thin({ name: boxPart('Back Panel', k), w: k.w - 4, h: Math.max(50, S.low - 4), qty, role: 'back', note: '3mm, glued and pinned on' });
       } else {
-        sheet({ name: boxPart('Top', k), w: inner, h: d - s, qty, scribed: sc, role: 'top', edge: 1 });
-        sheet({ name: boxPart('Bottom', k), w: inner, h: d - s, qty, scribed: sc, role: 'bottom', edge: 1 });
+        sheet({ name: boxPart('Top', k), w: inner, h: d - s, qty, scribed: sc, role: 'top', edge: 1, bx: k.i });
+        sheet({ name: boxPart('Bottom', k), w: inner, h: d - s, qty, scribed: sc, role: 'bottom', edge: 1, bx: k.i });
         thin({ name: boxPart('Back Panel', k), w: k.w - 4, h: h - 4, qty, role: 'back', note: '3mm, glued and pinned on. Stops the unit racking sideways' });
       }
     });
@@ -1143,7 +1143,7 @@ function renderStepper() {
 }
 
 function renderBar() {
-  const labels = ['Design it', 'See the cut list', 'How to build it', 'Order materials', 'Download order pack'];
+  const labels = ['Design it', 'See the cut list', 'How to build it', 'Order materials', 'Send to a cutter'];
   $('#nextBtn span').textContent = labels[S.step];
   $('[data-action="prev"]').disabled = false;
   $('#barSum').innerHTML = `<span class="bs-long"><strong>${R.pieceCount}</strong> parts, <strong>${R.nMain || R.linear.reduce((s, g) => s + g.count, 0)}</strong> ${R.nMain ? 'sheets' : 'lengths'}, </span><span class="bs-about">about </span><strong>${gbp0(R.total)}</strong>`;
@@ -1977,7 +1977,7 @@ function renderManual(print = false) {
   if (sc.length) pages.push(page(`<h4 class="m-h">Before you start</h4><ul class="m-safety">${sc.map(c => `<li><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><b>${esc(c.title)}</b><span>${esc(c.text)}</span></div></li>`).join('')}</ul>`));
   // Drill first, while every panel is flat
   const holes = pinHoleSVG(), hasDiv = R.parts.some(p => p.role === 'divider');
-  if (holes) pages.push(page(`<h4 class="m-h">Drill first</h4><div class="m-calls">${hwCallouts([['shelf pins', 0]], hw.find)}</div>${holes}<p class="m-note">Lay each side${hasDiv ? ' and divider' : ''} flat, inside face up. Each number is a height in mm from the <b>bottom edge</b> of the panel to the centre of the hole. Drill two holes at each height: 37mm in from the front edge and 37mm in from the back edge. Three heights per shelf, 32mm apart, let you move the shelf up or down. Drill 5mm wide and 10mm deep (tape on the drill bit marks the depth).${hasDiv ? ' Drill right through the dividers so one hole holds a pin on each side.' : ''}</p>`));
+  if (holes) pages.push(page(`<h4 class="m-h">Drill first</h4><div class="m-calls">${hwCallouts([['shelf pins', 0]], hw.find)}</div>${holes}<p class="m-note">If your cutter drilled the holes, skip this page. Otherwise lay each side${hasDiv ? ' and divider' : ''} flat, inside face up. Each number is a height in mm from the <b>bottom edge</b> of the panel to the centre of the hole. Drill two holes at each height: 37mm in from the front edge and 37mm in from the back edge. Three heights per shelf, 32mm apart, let you move the shelf up or down. Drill 5mm wide and 10mm deep (tape on the drill bit marks the depth).${hasDiv ? ' Drill right through the dividers so one hole holds a pin on each side.' : ''}</p>`));
   // Assembly. Multi-box units: the first steps show one box on its own, then a step joins them all.
   const Lay = layout(), oneBox = Lay.n > 1 ? partSolids({ box: 0 }) : null;
   let built = ['Left Side'];
@@ -2071,6 +2071,15 @@ function hardwareCard() {
     <p class="fine">Pick branded fittings. Shelf pins must be rated 12kg or more each. Prices are estimates for the amount you use.</p>
   </div>`;
 }
+function postcodeField() {
+  const pcErr = S.postcode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(S.postcode.trim());
+  return `<div class="field" >
+            <label for="f-postcode">Delivery postcode</label>
+            <input id="f-postcode" class="input" autocomplete="postal-code" maxlength="8" value="${esc(S.postcode)}" data-field="postcode" aria-invalid="${pcErr}" aria-describedby="pcHelp">
+            <span class="help" id="pcHelp">Used to pick a supplier near you. It stays on this device.</span>
+            ${pcErr ? '<span class="err">That does not look like a UK postcode.</span>' : ''}
+          </div>`;
+}
 function cutterCard() {
   if (!isCabinet(S.template)) return `<div class="card"><h3><i class="ph ph-storefront" aria-hidden="true"></i>Where to buy</h3><p class="sub">Timber merchants deliver C16 and boards cut to length. Take the timber list to your nearest merchant.</p></div>`;
   const need = orderNeeds(), pc = (S.postcode || '').trim().toUpperCase(), area = (pc.match(/^([A-Z]{1,2})\d/) || [])[1];
@@ -2082,7 +2091,8 @@ function cutterCard() {
   const mail = sup => {
     const body = [`Hello ${sup.name},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
       `Material: ${MATERIALS[S.material].name} ${S.thickness}mm${R.sheets.ply3 ? ', plus 3mm backs' : ''}`, `Pieces: ${need.pieces} (about ${R.nMain} sheets)`,
-      need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes (DXF layers starting DRILL_, named by diameter and depth, measured from the front or hinge edge).` : '',
+      need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes, all on the panel faces: shelf pins, hinge cups, joint screws and connector screws. They are in the DXF on layers starting DRILL_, named by diameter and depth. Through holes for screws should be countersunk on the outside face.` : '',
+      S.joinery === 'cam' ? 'Cam fittings also need an 8mm hole into the end edge of each top and bottom. Please say if you can edge-bore; if not we will drill those.' : '',
       need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
     return `mailto:${sup.email || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
   };
@@ -2091,7 +2101,8 @@ function cutterCard() {
     <p class="sub">Your order pack has every panel, its shape, its edging and every hole to drill. ${req.length ? 'This design needs: ' + req.map(r => r[2]).join(', ') + '.' : ''}</p>
     <button type="button" class="btn btn-primary" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download the order pack</button>
     <span class="help">Two files: a cut list spreadsheet (CSV) and a drawing (DXF) with shapes and holes.</span>
-    ${area ? `<p class="sub">Showing services that deliver to ${esc(area)}.</p>` : '<p class="sub">Add your postcode under Delivery to see who serves your area.</p>'}
+    ${postcodeField()}
+    ${area ? `<p class="sub">Showing services that deliver to ${esc(area)}.</p>` : ''}
     <ul class="sup-list">${list.map(sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
       <div class="sup-head"><strong>${esc(sup.name)}</strong>${score(sup) === 0 ? '<span class="cap cap-yes">Good match</span>' : ''}</div>
       <div class="sup-meta">${esc(sup.howTo)}. ${sup.lead !== 'Ask' ? esc(sup.lead) + '. ' : ''}${esc(sup.note)}</div>
@@ -2111,12 +2122,12 @@ function renderOrderPage() {
   R.linear.forEach(g => lines.push([g.section, `${g.count} x ${fmtLen(g.stock)}${g.long.length ? ', plus long lengths' : ''}`, g.cost]));
   R.whole.forEach(p => lines.push([WHOLE[p.kind].name, `${p.qty} boards`, p.qty * WHOLE[p.kind].price]));
   R.rolls.forEach(p => lines.push(['Breathable membrane', `${p.rolls} roll${p.rolls > 1 ? 's' : ''}`, p.rolls * FELT_ROLL]));
-  const pcErr = S.postcode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(S.postcode.trim());
   return `<div class="page">
     <div class="page-head"><div><h2>Order your materials</h2><p>Send the order pack to a cutting service. They cut, drill, edge and deliver every panel, ready to build like flat-pack.</p></div></div>
     ${safetyChecks().some(c => c.status === 'fail') ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span><strong>A safety check failed.</strong> Go back to Design and fix it before you order.</span><button type="button" class="chip" data-action="goto" data-step="1">Fix it</button></div>` : ''}
     <div class="order">
       <div>
+        ${cutterCard()}
         <div class="card">
           <h3><i class="ph ph-package" aria-hidden="true"></i>Materials</h3>
           <ul class="lines">${lines.map(([a, b, p]) => `<li><span>${esc(a)}<small>${esc(b)}</small></span><span>${gbp(p)}</span></li>`).join('')}</ul>
@@ -2125,15 +2136,9 @@ function renderOrderPage() {
         ${hardwareCard()}
         <div class="card">
           <h3><i class="ph ph-truck" aria-hidden="true"></i>Delivery</h3>
-          <div class="field" style-mt>
-            <label for="f-postcode">Delivery postcode</label>
-            <input id="f-postcode" class="input" autocomplete="postal-code" maxlength="8" value="${esc(S.postcode)}" data-field="postcode" aria-invalid="${pcErr}" aria-describedby="pcHelp">
-            <span class="help" id="pcHelp">Used to pick a supplier near you. It stays on this device.</span>
-            ${pcErr ? '<span class="err">That does not look like a UK postcode.</span>' : ''}
-          </div>
+
           <div class="opts" role="radiogroup" aria-label="Delivery">${DELIVERY.map(d => `<label class="opt"><input type="radio" name="delivery" value="${d.id}" data-field="delivery"${S.delivery === d.id ? ' checked' : ''}><span><span class="t">${d.t}</span><br><span class="s">${d.s}</span></span><span class="p">${d.p ? gbp0(d.p) : 'Free'}</span></label>`).join('')}</div>
         </div>
-        ${cutterCard()}
       </div>
       <aside class="card summary" aria-label="Order summary">
         <h3>Summary</h3>
@@ -2340,15 +2345,50 @@ function renderProjects() {
 // ───────────────────────── Exports ─────────────────────────
 // Every hole a CNC cutter should drill, in the panel's own coordinates (mm): x from the front edge
 // (or the hinge edge on doors), y up from the bottom edge. Shelf-pin rows match the build guide.
+// Every hole the cutter can drill, so the panels arrive ready to screw together like flat-pack.
+// x is from the front edge (hinge edge on doors), y up from the bottom edge, both in mm.
 function panelHoles(p) {
-  const holes = [];
+  const holes = [], th = S.thickness, cab = isCabinet(S.template), us = S.template === 'understairs';
+  const along = len => { const n = Math.max(2, Math.ceil(len / 150)), a = 50, b = len - 50; return Array.from({ length: n }, (_, i) => Math.round(a + (b - a) * i / (n - 1))); };
+  const topAt = x => p.shape ? p.shape.front - (p.shape.front - p.shape.back) * x / p.w : p.h;
+  const slopeIn = p.shape ? Math.hypot(p.w, p.shape.front - p.shape.back) / p.w : 1; // vertical distance that is th/2 square to the slope
   if (p.role === 'side' || p.role === 'divider') {
     const shelves = R.parts.filter(q => q.role === 'shelf');
     if (shelves.length) {
       const depth = Math.max(...shelves.map(q => q.h)), back = Math.min(p.w - 37, depth - 37);
       const through = p.role === 'divider';
-      pinRows().filter(r => r.y < p.h - 40).forEach(r => [37, back].forEach(x => holes.push({ x, y: r.y, dia: 5, depth: through ? S.thickness : 10, kind: through ? 'Shelf pin, drill through' : 'Shelf pin' })));
+      pinRows().filter(r => r.y < p.h - 40).forEach(r => [37, back].forEach(x => { if (r.y < topAt(x) - 30) holes.push({ x, y: r.y, dia: 5, depth: through ? th : 10, kind: through ? 'Shelf pin, drill through' : 'Shelf pin' }); }));
     }
+  }
+  if (cab && p.role === 'side' && p.stock === 'sheet') {
+    // Corner joints: the bottom and top sit between the sides
+    const rows = [y => Math.round(th / 2)];
+    if (!us) rows.push(x => Math.round(topAt(x) - th / 2 * slopeIn));
+    rows.forEach(yAt => along(p.w).forEach(x => {
+      if (S.joinery === 'screws') holes.push({ x, y: yAt(x), dia: 4, depth: th, kind: 'Screw, countersink outside' });
+      else if (S.joinery === 'cam') holes.push({ x, y: yAt(x), dia: 5, depth: 11, kind: 'Cam bolt' });
+    }));
+    // Where two boxes meet, matching holes for the connector screws
+    if (/^Box Side/.test(p.name)) {
+      const pts = [[60, 100], [60, topAt(60) - 100], [p.w - 60, 100]];
+      if (S.h > 900) pts.push([p.w - 60, topAt(p.w - 60) - 100]);
+      pts.forEach(([x, y]) => {
+        while (holes.some(h => Math.hypot(h.x - x, h.y - y) < 20)) y += 25;
+        holes.push({ x: Math.round(x), y: Math.round(y), dia: 5, depth: th, kind: 'Connector screw, drill through' });
+      });
+    }
+  }
+  if (cab && (p.role === 'bottom' || p.role === 'top') && p.bx !== undefined) {
+    // Dividers are screwed through the bottom and top into their edges
+    const L = layout(), b = L.boxes[p.bx];
+    if (b) L.verticals.filter(v => v.kind === 'divider' && v.box === b.i).forEach(v => {
+      const x = Math.round(v.x + th / 2 - (b.x0 + th));
+      along(p.h).forEach(y => holes.push({ x, y, dia: 4, depth: th, kind: 'Divider screw, countersink outside' }));
+    });
+    // Cam housings 34mm in from each end
+    // On a sloped top the bolts are spaced square to the floor, so stretch their spacing along the slope
+    const run = S.template === 'eaves' && p.role === 'top' ? eavesGeom().run : p.h;
+    if (S.joinery === 'cam' && !(us && p.role === 'top')) [34, p.w - 34].forEach(x => along(run).forEach(y => holes.push({ x, y: Math.round(y * p.h / run), dia: 15, depth: 13, kind: 'Cam housing' })));
   }
   if (p.hinges) p.hinges.forEach(h => holes.push({ x: h.inset, y: p.h - h.y, dia: h.bore, depth: h.depth, kind: 'Hinge cup' }));
   return holes;
@@ -2814,7 +2854,7 @@ const ACTIONS = {
   'start-template': el => { startTemplate(el.dataset.template); setView('plan', 0); },
   resume: () => { if (applyProject(store.get('cutlist_draft', null))) setView('plan', 0); },
   goto: el => setView('plan', Number(el.dataset.step)),
-  next: () => { if (S.step < 4) setView('plan', S.step + 1); else exportCNC(); },
+  next: () => { if (S.step < 4) setView('plan', S.step + 1); else { const c = $('.cutters'); if (c) { c.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' }); c.querySelector('button')?.focus({ preventScroll: true }); } else exportCNC(); } },
   prev: () => { if (S.step > 0) setView('plan', S.step - 1); else setView('home'); },
   template: el => {
     if (el.dataset.template === S.template) return;
