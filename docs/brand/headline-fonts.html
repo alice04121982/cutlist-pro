@@ -1,0 +1,59 @@
+<title>Made to Fit Headline Fonts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Funnel+Display:wght@700;800&family=Gabarito:wght@700;800&family=Rethink+Sans:wght@700;800&family=Geologica:wght@700;800&family=Mona+Sans:wdth,wght@100,800&family=Anybody:wdth,wght@90,800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one row per typeface, each showing the logo, the hero headline and a step title in the real Chalk Line colours. */
+:root{--paper:#F4F6F8;--card:#FFFFFF;--ink:#0E1726;--ink-2:#3F4A5C;--ink-3:#5B6678;--rule:#DCE1E8;--chalk:#1E4FD8;--tape:#FFD23F;
+  --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#0B1220;--card:#121B2C;--ink:#E8EDF5;--ink-2:#B4BED0;--ink-3:#8E9AB0;--rule:#22304A;--chalk:#6B95FF;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0B1220;--card:#121B2C;--ink:#E8EDF5;--ink-2:#B4BED0;--ink-3:#8E9AB0;--rule:#22304A;--chalk:#6B95FF;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;padding-inline:clamp(16px,4vw,48px);padding-block:40px 72px}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:28px}
+h1{font-family:var(--body);font-weight:600;font-size:clamp(28px,4vw,40px);letter-spacing:-.02em;line-height:1.1;margin:0;text-wrap:balance}
+p{margin:0;max-width:65ch;color:var(--ink-2)}
+p strong{color:var(--ink)}
+.row{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:22px 24px;display:grid;grid-template-columns:240px 1fr;gap:16px 32px;align-items:start}
+@media (max-width:760px){.row{grid-template-columns:1fr}}
+.row.ref{opacity:.72}
+.info{display:grid;gap:8px;min-width:0}
+.info b{font-size:17px}
+.info span{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.info p{font-size:14px}
+.tagx{justify-self:start;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--tape);color:#0E1726}
+.tagx.grey{background:var(--rule);color:var(--ink-2)}
+.demo{display:grid;gap:14px;min-width:0}
+.wm{display:inline-flex;align-items:baseline;font-size:34px;line-height:1;letter-spacing:-.045em}
+.dim{position:relative;display:inline-block;width:1.7em;height:.72em;margin:0 .12em}
+.dim::before{content:"";position:absolute;left:0;right:0;bottom:.12em;border-bottom:.08em solid currentColor}
+.dim::after{content:"";position:absolute;left:0;right:0;bottom:.02em;height:.42em;border-left:.08em solid currentColor;border-right:.08em solid currentColor}
+.dim i{position:absolute;left:50%;bottom:.24em;transform:translateX(-50%);font:600 .44em/1.15 var(--mono);letter-spacing:0;background:var(--tape);color:#0E1726;padding:0 .3em;border-radius:.15em}
+.hl{font-size:clamp(32px,4.4vw,52px);line-height:.98;letter-spacing:-.04em;margin:0;text-wrap:balance}
+.st{font-size:22px;letter-spacing:-.02em;display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+.st small{font:500 13px var(--mono);color:var(--ink-3);letter-spacing:0}
+.st em{font-style:normal;color:var(--chalk)}
+</style>
+<div class="wrap">
+  <h1>Headline fonts close to Bricolage, but your own</h1>
+  <p>Your IVF app uses Bricolage Grotesque and Hanken Grotesk, and Stay Prepared uses Archivo, so all three are out. Each option below is free on Google Fonts and is shown as the logo, the home page headline and a step title from the app, in the Chalk Line colours.</p>
+  <div class="wrap" id="rows" style="gap:12px"></div>
+  <p><strong>My pick is Funnel Display.</strong> It has Bricolage's warmth and slightly quirky letters (look at the f, t and y), but with its own sharper, more engineered feel, which suits a measuring tool. <strong>Gabarito</strong> is the friendlier, rounder alternative.</p>
+</div>
+<script>
+const F=[
+ ["Bricolage Grotesque","'Bricolage Grotesque'",800,"Already used in your IVF app. Shown for comparison only.","ref"],
+ ["Funnel Display","'Funnel Display'",800,"Closest in spirit. Warm, slightly quirky, but sharper and more engineered. Released 2024, so rarely seen yet.","pick"],
+ ["Gabarito","'Gabarito'",800,"Rounder and friendlier. Very approachable for first-time builders; a little less precise.","alt"],
+ ["Rethink Sans","'Rethink Sans'",800,"Calm and well made. The safest choice, but closer to a standard app font.",""],
+ ["Geologica","'Geologica'",800,"Crisp with a slight technical edge. Good with numbers; less warm.",""],
+ ["Mona Sans","'Mona Sans'",800,"Strong and confident. Well known as GitHub's typeface, which weakens it as yours.",""],
+ ["Anybody","'Anybody'",800,"Slightly condensed, workshop feel. Distinctive, but loudest of the set.",""]
+];
+document.getElementById("rows").innerHTML=F.map(f=>`<div class="row ${f[4]==="ref"?"ref":""}">
+ <div class="info"><b>${f[0]}</b>${f[4]==="pick"?'<span class="tagx">Recommended</span>':f[4]==="alt"?'<span class="tagx grey">Alternative</span>':f[4]==="ref"?'<span class="tagx grey">In use elsewhere</span>':""}<p>${f[3]}</p></div>
+ <div class="demo" style="font-family:${f[1]},sans-serif;font-weight:${f[2]}">
+  <span class="wm">made<span class="dim"><i>to</i></span>fit</span>
+  <p class="hl" style="color:var(--ink);max-width:none">Fitted cupboards you build yourself.</p>
+  <div class="st">Under-eaves cupboard <em>Design it</em><small>1800 × 1200 × 600 mm</small></div>
+ </div></div>`).join("");
+</script>
