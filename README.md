@@ -12,11 +12,11 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
 5. **Order**: itemised estimate, delivery options, CNC cut file for UK cutting services.
 
-Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
+Templates: under-eaves cupboard, under-stairs cupboard (tall end left or right, every upright, top and door cut to the stair angle), wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 
 ## Built as boxes
 
-Long furniture is split automatically into separate boxes no wider than 1200mm, the way kitchen units are made: each box is a complete carcass (two sides, top, bottom, back) that fits on one sheet and up the stairs. Boxes are joined in place with cabinet connector screws. The number of boxes can be set by hand. The cut list, fittings (screws per joint, connectors, panel pins per back, brackets, packers), drawings and the picture manual all follow the boxes: build one box, make N, join them, fix to the wall.
+Long furniture is split automatically into separate boxes. How big a box can be depends on where it is going (ground floor 2400mm, upstairs 1800mm, loft or attic 1200mm: the longest panel you can carry in), and every panel, including sloped tops and 3mm backs, must also fit its sheet. This works like kitchen units: each box is a complete carcass (two sides, top, bottom, back) that fits on one sheet and up the stairs. Boxes are joined in place with cabinet connector screws. The number of boxes can be set by hand. The cut list, fittings (screws per joint, connectors, panel pins per back, brackets, packers), drawings and the picture manual all follow the boxes: build one box, make N, join them, fix to the wall.
 
 ## Safety checks
 
