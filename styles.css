@@ -140,7 +140,9 @@ body[data-view="plan"] .home-only{display:none!important}
 .compare-handle{position:absolute;top:0;bottom:0;width:2px;background:#fff;left:var(--cmp,100%);transform:translateX(-1px);pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
 .compare-handle span{position:absolute;top:50%;left:50%;width:40px;height:40px;border-radius:50%;transform:translate(-50%,-50%);background:#fff;color:#15181B;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .compare-handle i{font-size:20px}
-.compare-range{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;margin:0;touch-action:pan-y}
+.compare-range{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;pointer-events:none}
+.hero-compare{cursor:ew-resize}
+.compare:has(.compare-range:focus-visible){outline:2px solid var(--accent);outline-offset:3px}
 .compare-tag{position:absolute;bottom:12px;padding:5px 10px;border-radius:var(--pill);font-size:12px;font-weight:700;background:rgba(17,19,21,.72);color:#fff;pointer-events:none}
 .compare-tag-l{left:12px}.compare-tag-r{right:12px}
 .ov-box{position:absolute;pointer-events:auto}

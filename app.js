@@ -2251,11 +2251,30 @@ function renderHome() {
   compute();
   const range = $('#heroSlider');
   const set = v => setCompare(root, 100 - Number(v));
-  range.addEventListener('input', () => set(range.value));
+  let touched = false;
+  range.addEventListener('input', () => { touched = true; set(range.value); });
+  // Drag anywhere on the picture. iOS Safari only moves a range input from its thumb,
+  // and the thumb here is invisible, so the range is kept for keyboard use only.
+  const fromX = x => {
+    const r = root.getBoundingClientRect();
+    const pct = Math.min(100, Math.max(0, (x - r.left) / r.width * 100));
+    range.value = String(Math.round(100 - pct));
+    set(range.value);
+  };
+  let dragging = false;
+  root.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    dragging = touched = true;
+    root.setPointerCapture(e.pointerId);
+    fromX(e.clientX);
+  });
+  root.addEventListener('pointermove', e => { if (dragging) fromX(e.clientX); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => root.addEventListener(t, () => { dragging = false; }));
   set(0);
   if (!reduceMotion()) {
     const t0 = performance.now();
     const step = now => {
+      if (touched) return;
       const k = Math.min(1, (now - t0 - 500) / 1400);
       if (k >= 0) { const e = 1 - Math.pow(1 - k, 3); range.value = String(Math.round(e * 58)); set(range.value); }
       if (k < 1) requestAnimationFrame(step);
