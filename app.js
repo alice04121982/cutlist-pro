@@ -2041,6 +2041,7 @@ function hardwareCard() {
     <p class="sub">Cutters supply boards only. Buy these yourself while the panels are being cut. Quantities are rounded up to whole packs.</p>
     ${basket ? `<a class="btn btn-primary" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add all to Amazon basket</a>` : ''}
     <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
+    <p class="sub hw-collect"><i class="ph ph-storefront" aria-hidden="true"></i><span>Want to start today? Copy the list and collect from your nearest Screwfix. <a href="https://www.screwfix.com/stores" target="_blank" rel="noopener noreferrer">Find a Screwfix</a></span></p>
     <ul class="lines hw">${items.map(i => `<li><span>${esc(i.name)}<small>Need ${i.total_qty}. ${i.pack > 1 ? `Buy ${i.packs} pack${i.packs > 1 ? 's' : ''} of ${i.pack}${i.spare ? `, ${i.spare} spare` : ''}` : `Buy ${i.packs}`}${i.note ? '. ' + esc(i.note) : ''}</small>
       <span class="sup-act"><a class="chip" href="${amazonSearch(i.q)}" target="_blank" rel="noopener noreferrer">Amazon</a><a class="chip" href="${screwfixSearch(i.q)}" target="_blank" rel="noopener noreferrer">Screwfix</a></span></span><span>${gbp(i.total_cost)}</span></li>`).join('')}</ul>
     <p class="fine">Pick branded fittings. Shelf pins must be rated 12kg or more each. Prices are estimates for the amount you use.</p>

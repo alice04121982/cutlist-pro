@@ -702,3 +702,7 @@ dialog.ask{width:min(620px,100%)}
 .sup-act a{text-decoration:none}
 .lines.hw .sup-act{font-family:inherit;white-space:normal;margin-top:6px}
 .lines.hw .sup-act a{font-size:12px;padding:4px 10px}
+
+.hw-collect{display:flex;gap:10px;align-items:flex-start;margin-top:4px}
+.hw-collect i{font-size:20px;color:var(--accent);margin-top:2px;flex:none}
+.hw-collect a{color:var(--accent-ink);font-weight:600;text-underline-offset:3px}
