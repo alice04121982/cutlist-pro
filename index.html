@@ -18,7 +18,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" integrity="sha384-6p9AefaqUhEVheRlj1mpAkbngHXy9mbYMrIdcIt4Jlc9lOLIablJq3bBsLOjGwZ7" crossorigin="anonymous">
 <link rel="stylesheet" href="styles.css">
-<link rel="preload" as="image" href="assets/loft.jpg">
 </head>
 <body data-view="home">
 <a class="skip" href="#main">Skip to content</a>
@@ -75,18 +74,19 @@
     </div>
 
     <figure class="hero-media reveal">
-      <div class="compare" id="heroCompare" data-compare>
-        <img src="assets/loft.jpg" width="1600" height="1067" alt="A bright loft bedroom with a plain wall under the sloping ceiling" class="compare-img" fetchpriority="high">
+      <div class="compare hero-compare" id="heroCompare" data-compare>
+        <div class="hero-scene" id="heroBefore"></div>
         <div class="compare-layer" data-layer>
-          <div class="ov-box" id="heroOverlay"></div>
+          <div class="hero-scene" id="heroOverlay"></div>
         </div>
-        <div class="compare-handle" data-handle aria-hidden="true"><span><i class="ph ph-arrows-out-cardinal"></i></span></div>
+        <div class="compare-handle" data-handle aria-hidden="true"><span><i class="ph ph-arrows-left-right"></i></span></div>
         <label class="sr-only" for="heroSlider">Compare the room with and without the design</label>
         <input id="heroSlider" class="compare-range" type="range" min="0" max="100" value="100" data-compare-range>
-        <div class="compare-tag compare-tag-l" aria-hidden="true">Your photo</div>
-        <div class="compare-tag compare-tag-r" aria-hidden="true">With the design</div>
+        <div class="compare-tag compare-tag-l" aria-hidden="true">Before</div>
+        <div class="compare-tag compare-tag-r" aria-hidden="true">After</div>
       </div>
-      <figcaption class="credit">Photo by <a href="https://unsplash.com/@albeg" target="_blank" rel="noopener noreferrer">Алан Албегов</a> on <a href="https://unsplash.com/photos/f9ITpNeLSMo" target="_blank" rel="noopener noreferrer">Unsplash</a></figcaption>
+      <ul class="hero-stats" id="heroStats" aria-label="What this example design gives you"></ul>
+      <figcaption class="credit">Example: five under-eaves cupboards built into a loft. Drag the handle to compare.</figcaption>
     </figure>
   </section>
 

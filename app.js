@@ -78,9 +78,9 @@ const isCabinet = id => tplOf(id).kind === 'cabinet';
 const STRUCTURAL = new Set(['floorjoists', 'flatroof', 'pitchedroof']);
 
 const DEFAULTS = {
-  eaves: { w: 1800, h: 1200, d: 600, low: 700, shelves: 1, spacing: 400, pitch: 0 },
-  shelving: { w: 800, h: 1200, d: 300, low: 0, shelves: 4, spacing: 400, pitch: 0 },
-  wardrobe: { w: 1000, h: 2100, d: 600, low: 0, shelves: 2, spacing: 400, pitch: 0 },
+  eaves: { w: 1800, h: 1200, d: 600, low: 700, shelves: 1, bays: 3, spacing: 400, pitch: 0 },
+  shelving: { w: 800, h: 1200, d: 300, low: 0, shelves: 4, bays: 2, spacing: 400, pitch: 0 },
+  wardrobe: { w: 1000, h: 2100, d: 600, low: 0, shelves: 2, bays: 2, spacing: 400, pitch: 0 },
   kitchenbase: { w: 600, h: 720, d: 560, low: 0, shelves: 1, spacing: 400, pitch: 0 },
   kitchenwall: { w: 600, h: 720, d: 330, low: 0, shelves: 2, spacing: 400, pitch: 0 },
   studwall: { w: 2400, h: 2400, d: 100, low: 0, shelves: 0, spacing: 400, pitch: 0 },
@@ -150,7 +150,7 @@ function freshState(template = 'eaves') {
     thickness: cab ? 18 : 47,
     sheetW: 2440, sheetH: 1220, kerf: 3,
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
-    compartments: 1, doors: 'auto', joinery: 'screws', scribe: true,
+    compartments: d.bays || 1, doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
     unit: 'mm', done: []
   };
@@ -163,7 +163,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -183,7 +183,7 @@ function sanitizeProject(p) {
     spacing: num(pick('spacing', 'dimSpacing'), ...LIMITS.spacing, base.spacing), pitch: num(pick('pitch', 'dimPitch'), 0, 70, base.pitch),
     compartments: Math.round(num(p.compartments, 1, 8, 1)),
     doors: p.doors === 'auto' || p.doors === undefined ? 'auto' : Math.round(num(p.doors, 0, 8, 0)),
-    joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false,
+    joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false, load: LOADS[p.load] ? p.load : base.load,
     priceSheet: p.priceSheet == null ? null : num(p.priceSheet, 0, 1000, null),
     delivery: DELIVERY.some(d => d.id === p.delivery) ? p.delivery : 'standard',
     postcode: String(p.postcode || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 8),
@@ -277,7 +277,7 @@ function generateParts() {
     sheet({ name: 'Bottom', w: w - 2 * th, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
     for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - s - 2, qty: bays, role: 'shelf', edge: 1 });
     if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
-    if (w > 600) thin({ name: 'Back Panel', w, h, role: 'back', note: '3mm, pinned on' });
+    thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on. Stops the unit racking sideways' });
     overlayDoors(w, h - 4);
   } else if (t === 'wardrobe') {
     const inner = w - 2 * th;
@@ -668,8 +668,8 @@ function elevationSVG(mode = 'elev', hl = null) {
   const cab = isCabinet(S.template);
   let sh, vw, vh;
   if (cab) { sh = cabinetShapes(); vw = S.w; vh = S.h; } else ({ sh, vw, vh } = frameShapes());
-  if (mode === 'photo') {
-    return `<svg viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="none" class="on-photo" aria-hidden="true">${shapesSVG(sh, null)}</svg>`;
+  if (mode === 'photo' || mode === 'solid') {
+    return `<svg viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="none" class="on-photo${mode === 'solid' ? ' solid' : ''}" aria-hidden="true">${shapesSVG(sh, null)}</svg>`;
   }
   const big = Math.max(vw, vh);
   const fs = big / 32, pad = fs * 3.4;
@@ -962,7 +962,7 @@ function renderStage() {
   const box = $('#stageBox'), foot = $('#stageFoot');
   if (S.stage === 'photo') {
     ensureOverlay();
-    box.innerHTML = `<div class="compare" id="planCompare"><img class="compare-img" alt="Your photo" src="${esc(S.photo.url)}"><div class="compare-layer" data-layer><div class="ov-box" id="planOverlay"></div></div><div class="compare-handle" aria-hidden="true"><span><i class="ph ph-arrows-out-cardinal"></i></span></div></div>`;
+    box.innerHTML = `<div class="compare" id="planCompare"><img class="compare-img" alt="Your photo" src="${esc(S.photo.url)}"><div class="compare-layer" data-layer><div class="ov-box" id="planOverlay"></div></div><div class="compare-handle" aria-hidden="true"><span><i class="ph ph-arrows-left-right"></i></span></div></div>`;
     const root = $('#planCompare'), ovb = $('#planOverlay');
     root.style.aspectRatio = `${S.photo.w} / ${S.photo.h}`;
     ovb.innerHTML = elevationSVG('photo');
@@ -1050,6 +1050,7 @@ function renderControls() {
         <div class="seg" role="group" aria-label="Joinery">${Object.entries(JOINERY).map(([k, j]) => `<button type="button" data-action="joinery" data-value="${k}" aria-pressed="${S.joinery === k}">${j.short}</button>`).join('')}</div>
         <p class="group-sub">${esc(JOINERY[S.joinery].note)}</p>
       </div>
+      <div class="group">${safetyHTML()}</div>
       <div class="group">
         <label class="check"><input type="checkbox" data-field="scribe"${S.scribe ? ' checked' : ''}><span>Leave 2mm to scribe against walls<small>Walls are never straight. Trim the edge to fit with a plane.</small></span></label>
         <details class="more">
@@ -1169,10 +1170,110 @@ function renderCutPage() {
       <div class="stat"><div class="k">Offcut</div><div class="v">${R.nMain ? Math.round(R.waste) : 0}<small>%</small></div></div>
       <div class="stat"><div class="k">Estimate</div><div class="v">${gbp0(R.total)}</div></div>
     </div>
-    ${scribe}${tables}
+    ${safetyHTML(true)}${scribe}${tables}
     ${sheetBlock('main', 'Sheet layouts', S.sheetW, S.sheetH)}${sheetBlock('ply3', 'Back panel sheets', 2440, 1220)}${sheetBlock('ply6', 'Drawer base sheets', 2440, 1220)}
     ${timber}${hingeBlock()}${hw}
   </div>`;
+}
+
+
+// ───────────────────────── Safety checks ─────────────────────────
+// Deterministic engineering checks. Every figure is cited in docs/SAFETY.md. Conservative choices:
+// cross-grain stiffness for plywood and OSB (the cutter may rotate parts), product minimums for MDF and chipboard.
+const SAFETY_MAT = {
+  plywood: { E: 7452, fm: 34.1, kdef: 0.8, kmod: 0.6, gM: 1.2, src: 'Birch plywood 18mm, across the face grain (Metsä DoP)' },
+  mdf: { E: 2200, fm: 20, kdef: 2.25, kmod: 0.2, gM: 1.3, src: 'MDF, EN 622-5 minimum' },
+  melamine: { E: 1600, fm: 11, kdef: 2.25, kmod: 0.3, gM: 1.3, src: 'Chipboard P2, EN 312 minimum' },
+  osb: { E: 1980, fm: 8.2, kdef: 1.5, kmod: 0.4, gM: 1.2, src: 'OSB/3 across the strands (EN 12369-1)' }
+};
+const LOADS = {
+  light: { name: 'Light', note: 'Clothes, towels, ornaments', perDm2: 1.0, perM: 0 },
+  books: { name: 'Books', note: 'Books, files, games', perDm2: 1.0, perM: 60 },
+  heavy: { name: 'Heavy', note: 'Tins, crockery, tools, paint', perDm2: 1.5, perM: 60 }
+};
+const PIN_KG = 12; // lowest common UK shelf-pin rating found (Häfele 12.5kg), rounded down
+function defaultLoad(t) { return t === 'wardrobe' ? 'light' : t === 'kitchenbase' || t === 'kitchenwall' ? 'heavy' : 'books'; }
+
+// kg per metre of shelf: the larger of the area load and the running load
+const shelfKgPerM = (depth, load) => Math.max(LOADS[load].perDm2 * depth / 100 * 10, LOADS[load].perM);
+
+function shelfCheck(span, depth, t, material, load) {
+  const m = SAFETY_MAT[material];
+  if (!m || span <= 0 || depth <= 0 || t <= 0) return null;
+  const kgm = shelfKgPerM(depth, load), w = kgm * 9.81 / 1000; // N/mm
+  const I = depth * t ** 3 / 12, Z = depth * t ** 2 / 6;
+  const uInst = 5 * w * span ** 4 / (384 * m.E * I), uFin = uInst * (1 + m.kdef);
+  const sigma = 1.5 * w * span ** 2 / 8 / Z, fd = m.kmod * m.fm / m.gM;
+  const kgShelf = kgm * span / 1000, perPin = kgShelf / 4;
+  const sagOK = uFin <= span / 200, looksOK = uInst <= span / 600, strong = sigma <= fd;
+  return { span, depth, t, kgm, kgShelf, perPin, uInst, uFin, sigma, fd, sagOK, looksOK, strong, ok: sagOK && strong };
+}
+
+// Smallest change that makes the worst shelf pass: more compartments, or a thicker board
+function safetyFixes(depth, load) {
+  const out = [];
+  const inner = S.w - 2 * S.thickness;
+  if (BAY_TEMPLATES.has(S.template)) {
+    for (let n = Math.max(1, S.compartments) + 1; n <= 8; n++) {
+      const span = Math.floor((inner - (n - 1) * S.thickness) / n);
+      const c = shelfCheck(span, depth, S.thickness, S.material, load);
+      if (c && c.ok && c.perPin <= PIN_KG) { out.push({ kind: 'compartments', value: n, label: `Use ${n} compartments` }); break; }
+    }
+  }
+  const span = bayInfo().bayW;
+  for (const t of (S.material === 'plywood' ? [24] : [25]).filter(x => x > S.thickness)) {
+    const c = shelfCheck(span, depth, t, S.material, load);
+    if (c && c.ok) { out.push({ kind: 'thickness', value: t, label: `Use ${t}mm board` }); break; }
+  }
+  if (S.material !== 'plywood') {
+    const c = shelfCheck(span, depth, S.thickness, 'plywood', load);
+    if (c && c.ok) out.push({ kind: 'material', value: 'plywood', label: 'Switch to plywood' });
+  }
+  return out;
+}
+
+function safetyChecks() {
+  const out = [];
+  if (!isCabinet(S.template)) {
+    out.push({ status: STRUCTURAL.has(S.template) ? 'stop' : 'info', title: 'Building work', text: 'Structural sizes must be checked by an engineer or Building Control. This app does not check them.' });
+    return out;
+  }
+  const load = LOADS[S.load] ? S.load : defaultLoad(S.template);
+  const shelves = R.parts.filter(p => p.role === 'shelf');
+  const mat = SAFETY_MAT[S.material];
+  if (shelves.length && mat) {
+    const checks = shelves.map(p => ({ p, c: shelfCheck(p.w, p.h, S.thickness, S.material, load) })).filter(x => x.c);
+    const worst = checks.reduce((a, b) => (b.c.uFin / b.c.span > a.c.uFin / a.c.span ? b : a), checks[0]);
+    if (worst) {
+      const c = worst.c;
+      const sagTxt = `${c.uFin.toFixed(1)}mm over time on a ${Math.round(c.span)}mm span, loaded with about ${Math.round(c.kgShelf)}kg`;
+      if (!c.ok) out.push({ status: 'fail', id: 'sag', title: c.strong ? 'Shelves will sag too much' : 'Shelves are not strong enough', text: `The widest shelf would bend ${sagTxt}. The limit is ${(c.span / 200).toFixed(1)}mm.`, fixes: safetyFixes(worst.p.h, load) });
+      else if (!c.looksOK) out.push({ status: 'warn', id: 'sag', title: 'Shelves will sag a little', text: `Safe, but you may see the widest shelf dip (${sagTxt}). More compartments or a thicker board would stop it.`, fixes: safetyFixes(worst.p.h, load) });
+      else out.push({ status: 'pass', id: 'sag', title: 'Shelves are stiff and strong enough', text: `The widest shelf bends ${sagTxt}, within the ${(c.span / 200).toFixed(1)}mm limit.` });
+      const pin = Math.max(...checks.map(x => x.c.perPin));
+      if (pin > PIN_KG) out.push({ status: 'fail', id: 'pins', title: 'Too much weight for shelf pins', text: `Each pin would carry about ${Math.round(pin)}kg. Common pins are rated about 12kg. Screw the shelves in place${BAY_TEMPLATES.has(S.template) ? ' or add compartments' : ''}.` });
+      else out.push({ status: 'pass', id: 'pins', title: 'Shelf pins can take the load', text: `About ${pin.toFixed(1)}kg on each pin. Buy pins rated 12kg or more.` });
+    }
+  }
+  const back = R.parts.some(p => p.role === 'back');
+  out.push(back
+    ? { status: 'pass', id: 'back', title: 'Back panel stops it racking', text: 'Pin the back to every edge and divider so it holds the unit square.' }
+    : { status: 'fail', id: 'back', title: 'No back panel', text: 'Without a fixed back the unit can lean sideways and collapse.' });
+  out.push({ status: 'action', id: 'wall', title: S.template === 'eaves' ? 'Fix it to the floor and knee wall' : S.template === 'kitchenwall' ? 'Hang it on rated wall fixings' : 'Fix it to the wall', text: S.template === 'kitchenwall' ? 'Wall cupboards hang from the wall, so use fixings rated for your wall type and the full load.' : 'Furniture can tip forward, especially if a child climbs it. Always fix it, even if it feels steady.' });
+  if (S.joinery === 'screws' && (S.material === 'mdf' || S.material === 'melamine')) out.push({ status: 'warn', id: 'joints', title: 'Screws hold poorly in board edges', text: `${MATERIALS[S.material].name} edges split and strip easily. Drill pilot holes, keep screws well away from corners, or switch to cam and dowel fittings.` });
+  if (S.material === 'osb') out.push({ status: 'warn', id: 'osb', title: 'OSB is a building board', text: 'It is rough, flexible across the strands and can shed splinters. Fine for a loft store, not for a child\'s room.' });
+  return out;
+}
+
+const SAFETY_ICON = { pass: 'check-circle', warn: 'warning', fail: 'x-circle', action: 'hand-pointing', info: 'info', stop: 'hard-hat' };
+function safetyHTML(compact = false) {
+  const list = safetyChecks();
+  const fails = list.filter(c => c.status === 'fail').length, warns = list.filter(c => c.status === 'warn').length;
+  const head = fails ? `${fails} safety check${fails > 1 ? 's' : ''} failed` : warns ? 'Safe, with things to watch' : 'All safety checks passed';
+  const items = list.map(c => `<li class="sc sc-${c.status}"><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><strong>${esc(c.title)}</strong><span>${esc(c.text)}</span>${c.fixes && c.fixes.length ? `<div class="sc-fixes">${c.fixes.map(f => `<button type="button" class="chip" data-action="safety-fix" data-kind="${f.kind}" data-value="${esc(String(f.value))}">${esc(f.label)}</button>`).join('')}</div>` : ''}</div></li>`).join('');
+  const loadSeg = isCabinet(S.template) && R.parts.some(p => p.role === 'shelf') ? `<div class="sc-load"><span class="lbl" id="loadLbl">The shelves will hold</span><div class="seg" role="group" aria-labelledby="loadLbl">${Object.entries(LOADS).map(([k, l]) => `<button type="button" data-action="load" data-value="${k}" aria-pressed="${(S.load || defaultLoad(S.template)) === k}" title="${esc(l.note)}">${l.name}</button>`).join('')}</div></div>` : '';
+  return `<section class="safety${fails ? ' has-fail' : ''}" aria-labelledby="safetyH"><div class="safety-head"><i class="ph ph-shield-check" aria-hidden="true"></i><h3 id="safetyH">${head}</h3></div>${compact ? '' : loadSeg}<ul class="sc-list">${items}</ul>
+    <details class="more sc-src"><summary>How we check</summary><p>Shelf sag uses the standard beam formula with long-term creep from Eurocode 5 (EN 1995-1-1), board stiffness from manufacturer and EN data, and a limit of 1/200 of the span, the figure most furniture specifications use with the EN 16122 shelf test. Loads follow the EN furniture test levels and the Sagulator figure for books (up to 60kg per metre). Wall fixing follows RoSPA and GOV.UK advice. These are estimates, not a certificate. If in doubt, ask a carpenter. <a href="https://github.com/alice04121982/cutlist-pro/blob/main/docs/SAFETY.md" target="_blank" rel="noopener noreferrer">Every rule and source</a>.</p></details></section>`;
 }
 
 // ── Build guide ──
@@ -1328,32 +1429,43 @@ function isoSVG(items, opt = {}) {
   const cen = pts => pts.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [0, 0, 0]).map(c => c / pts.length);
   const light = [0.35, 0.6, -0.72];
   const faces = [];
-  moved.forEach(it => {
-    const rv = it.mv.map(rot), c = cen(rv);
+  const addFaces = (it, verts, cls, mvd) => {
+    const rv = verts.map(rot), c = cen(rv);
     it.f.forEach(f => {
       const fc = cen(f.map(i => rv[i]));
       const nrm = [fc[0] - c[0], fc[1] - c[1], fc[2] - c[2]], len = Math.hypot(...nrm) || 1;
       const nn = nrm.map(x => x / len);
       if (nn[2] > 0.02) return;
       const k = 0.78 + 0.26 * Math.max(0, nn[0] * light[0] + nn[1] * light[1] + nn[2] * light[2]);
-      faces.push({ z: fc[2], pts: f.map(i => scr(it.mv[i])), fill: shadeHex(it.fill, k) });
+      faces.push({ z: fc[2], pts: f.map(i => scr(verts[i])), fill: shadeHex(it.fill, k), cls, mv: mvd });
     });
+  };
+  // Animated steps: each moving part is drawn twice. The "fly" copy slides from the exploded spot
+  // into place (sorted for depth where it starts), then swaps for the "land" copy (sorted where it ends).
+  const travel = it => { const a = scr(cen(it.mv)), b = scr(cen(it.v)); return [(b[0] - a[0]).toFixed(1), (b[1] - a[1]).toFixed(1)]; };
+  moved.forEach(it => {
+    if (opt.animate && it.offset) { addFaces(it, it.mv, 'm-fly', travel(it)); addFaces(it, it.v, 'm-land'); }
+    else addFaces(it, it.mv);
   });
   faces.sort((a, b) => b.z - a.z);
+  const anim = f => f.cls ? ` class="${f.cls}"${f.mv ? ` data-dx="${f.mv[0]}" data-dy="${f.mv[1]}"` : ''}` : '';
   let s = `<svg viewBox="0 0 ${VW} ${VH}" class="m-iso" role="img" aria-label="${esc(opt.alt || 'Assembly drawing')}"><defs><marker id="mArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${MP.ink}"/></marker></defs>`;
-  faces.forEach(f => { s += `<polygon points="${f.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${f.fill}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`; });
+  faces.forEach(f => { s += `<polygon${anim(f)} points="${f.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${f.fill}" stroke="${MP.line}" stroke-width="1.1" stroke-linejoin="round"/>`; });
   // Movement arrows for exploded parts, then letter callouts
   const seen = new Set();
   moved.forEach(it => {
     if (!it.offset) return;
     const a = scr(cen(it.mv)), b = scr(cen(it.v));
-    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 24) s += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${MP.ink}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#mArr)"/>`;
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 24) s += `<line${opt.animate ? ' class="m-arrow"' : ''} x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${MP.ink}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#mArr)"/>`;
   });
   moved.forEach(it => {
     if (!it.label || seen.has(it.label + (it.offset ? 'o' : ''))) return;
     seen.add(it.label + (it.offset ? 'o' : ''));
     const p = scr(cen(it.mv)), lx = p[0] + 26, ly = p[1] - 26;
+    const g = opt.animate && it.offset ? travel(it) : null;
+    if (g) s += `<g class="m-fly-lab" data-dx="${g[0]}" data-dy="${g[1]}">`;
     s += `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${lx}" y2="${ly}" stroke="${MP.ink}" stroke-width="1"/><circle cx="${lx}" cy="${ly}" r="13" fill="${MP.paper}" stroke="${MP.ink}" stroke-width="1.4"/><text x="${lx}" y="${ly + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="${MP.ink}" font-family="General Sans, sans-serif">${esc(it.label)}</text>`;
+    if (g) s += '</g>';
   });
   return s + '</svg>';
 }
@@ -1440,7 +1552,7 @@ function hwCallouts(hwList, find) {
   }).join('');
 }
 
-function renderManual() {
+function renderManual(print = false) {
   if (!isCabinet(S.template)) return `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The picture manual is for furniture designs. Building work uses the step-by-step guide.</span></div>`;
   const solids = partSolids();
   const { groups, letterOf } = manualParts();
@@ -1463,6 +1575,9 @@ function renderManual() {
   }).join('')}</div>`));
   // Hardware
   pages.push(page(`<h4 class="m-h">Hardware</h4><p class="m-sub">Screws, pins and dowels are printed at actual size. Lay yours on top to check.</p><div class="m-hw">${hw.list.map(f => { const a = hwArt(f.name); return `<div class="m-hwi">${a.art}<div class="m-hwq"><b>${f.total_qty}x</b> <span>${f.id}</span></div><div class="m-hwn">${esc(f.name)}${a.actual ? ' <em>1:1</em>' : ''}</div></div>`; }).join('')}</div>`));
+  // Safety
+  const sc = safetyChecks().filter(c => c.status !== 'pass');
+  if (sc.length) pages.push(page(`<h4 class="m-h">Before you start</h4><ul class="m-safety">${sc.map(c => `<li><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><b>${esc(c.title)}</b><span>${esc(c.text)}</span></div></li>`).join('')}</ul>`));
   // Assembly
   let built = ['Left Side'];
   steps.forEach((st, i) => {
@@ -1472,7 +1587,7 @@ function renderManual() {
       else if (st.add.includes(s.part)) items.push({ ...s, fill: MP.add, offset: st.ex && st.ex[s.part], label: letterOf(s.part) });
     });
     if (i === 0) items.forEach(it => { if (it.part === 'Left Side') it.label = letterOf('Left Side'); });
-    const art = isoSVG(items, { alt: 'Step ' + (i + 1) });
+    const art = isoSVG(items, { alt: 'Step ' + (i + 1), animate: !print && items.some(it => it.offset) });
     pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
       <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}
       ${st.check ? `<div class="m-check"><svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="10" y="10" width="100" height="60" fill="none" stroke="${MP.ink}" stroke-width="2"/><line x1="10" y1="10" x2="110" y2="70" stroke="${MP.add}" stroke-width="2"/><line x1="110" y1="10" x2="10" y2="70" stroke="${MP.add}" stroke-width="2"/></svg><span>A = B</span></div>` : ''}
@@ -1481,7 +1596,8 @@ function renderManual() {
     built = built.concat(st.add);
   });
   pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight. Re-check the doors after a week as the hinges settle.</p></div>`));
-  return `<div class="manual">${pages.join('')}</div>`;
+  const play = print ? '' : `<div class="m-play"><button type="button" class="chip" data-action="manual-anim" aria-pressed="${S.manualAnim !== false}"><i class="ph ph-${S.manualAnim !== false ? 'pause' : 'play'}" aria-hidden="true"></i>${S.manualAnim !== false ? 'Pause animations' : 'Play animations'}</button></div>`;
+  return `<div class="manual${!print && S.manualAnim !== false ? ' anim' : ''}">${play}${pages.join('')}</div>`;
 }
 
 // ── Order ──
@@ -1497,6 +1613,7 @@ function renderOrderPage() {
   const pcErr = S.postcode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(S.postcode.trim());
   return `<div class="page">
     <div class="page-head"><div><h2>Order your materials</h2><p>Send the cut file to a cutting service. They cut, edge and deliver the panels, ready to build.</p></div></div>
+    ${safetyChecks().some(c => c.status === 'fail') ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span><strong>A safety check failed.</strong> Go back to Design and fix it before you order.</span><button type="button" class="chip" data-action="goto" data-step="1">Fix it</button></div>` : ''}
     <div class="order">
       <div>
         <div class="card">
@@ -1549,8 +1666,98 @@ function renderOrderPage() {
 
 function afterPage() {
   // Size timber bar segments without inline style attributes
+  $$('[data-dx]', $('#pageCol')).forEach(el => { el.style.setProperty('--dx', el.dataset.dx + 'px'); el.style.setProperty('--dy', el.dataset.dy + 'px'); });
   $$('[style-w]', $('#pageCol')).forEach(el => { el.style.flex = '0 0 ' + (Number(el.getAttribute('style-w')) * 100) + '%'; el.removeAttribute('style-w'); });
   $$('[style-mt]', $('#pageCol')).forEach(el => { el.style.marginTop = '16px'; el.removeAttribute('style-mt'); });
+}
+
+
+// ───────────────────────── Hero scene ─────────────────────────
+// A loft room drawn in true perspective from one fixed camera, so "before" and "after" line up exactly.
+// Units are mm. x across the room, y up, z away from the camera. The knee wall is at z = KZ, roof pitch 45 deg.
+function heroScene(after, d) {
+  const VW = 1200, VH = 800, F = 1100, CX = 600, CY = 330, CAM = { x: 1500, y: 1350 };
+  const L = d.w, KZ = 5000, KH = d.low, RIDGE = 2600;
+  const P = (x, y, z) => [CX + F * (x - CAM.x) / z, CY - F * (y - CAM.y) / z];
+  const pts = a => a.map(v => P(...v).map(n => n.toFixed(1)).join(',')).join(' ');
+  const poly = (a, fill, extra = '') => `<polygon points="${pts(a)}" fill="${fill}"${extra}/>`;
+  const slopeZ = y => KZ - (y - KH); // 45 deg roof
+  const zr = slopeZ(RIDGE);
+  let s = `<svg viewBox="0 0 ${VW} ${VH}" class="hero-svg" role="img" aria-label="${after ? 'The loft with built-in cupboards under the eaves' : 'An empty loft with boxes stacked under the eaves'}" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="hsSlope${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBFAF7"/><stop offset="1" stop-color="#E9E6E0"/></linearGradient>
+    <linearGradient id="hsFloor${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9A57A"/><stop offset="1" stop-color="#DDBE93"/></linearGradient>
+    <linearGradient id="hsGlass${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FC3DD"/><stop offset="1" stop-color="#E4EEF4"/></linearGradient>
+    <linearGradient id="hsIn${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3F3A"/><stop offset="1" stop-color="#5B625A"/></linearGradient>
+  </defs>
+  <rect width="${VW}" height="${VH}" fill="#F3F1EC"/>`;
+  const zn = 1200; // near plane for walls that run off screen
+  // Floor and boards
+  s += poly([[0, 0, zn], [L, 0, zn], [L, 0, KZ], [0, 0, KZ]], `url(#hsFloor${+after})`);
+  for (let x = 0; x <= L; x += 160) s += `<line x1="${P(x, 0, zn)[0].toFixed(1)}" y1="${P(x, 0, zn)[1].toFixed(1)}" x2="${P(x, 0, KZ)[0].toFixed(1)}" y2="${P(x, 0, KZ)[1].toFixed(1)}" stroke="#B48F63" stroke-width="1" opacity=".55"/>`;
+  // Gable walls, knee wall, slope, flat ceiling
+  s += poly([[0, 0, zn], [0, 0, KZ], [0, KH, KZ], [0, RIDGE, zr], [0, RIDGE, zn]], '#E2DED7');
+  s += poly([[L, 0, zn], [L, 0, KZ], [L, KH, KZ], [L, RIDGE, zr], [L, RIDGE, zn]], '#E9E6E0');
+  s += poly([[0, 0, KZ], [L, 0, KZ], [L, KH, KZ], [0, KH, KZ]], '#ECE9E3');
+  s += poly([[0, KH, KZ], [L, KH, KZ], [L, RIDGE, zr], [0, RIDGE, zr]], `url(#hsSlope${+after})`);
+  s += poly([[0, RIDGE, zr], [L, RIDGE, zr], [L, RIDGE, zn], [0, RIDGE, zn]], '#F7F6F2');
+  // Skirting boards
+  s += poly([[0, 0, KZ], [L, 0, KZ], [L, 80, KZ], [0, 80, KZ]], '#F8F7F4', ' stroke="#D9D5CD" stroke-width="1"');
+  s += poly([[0, 0, zn], [0, 0, KZ], [0, 80, KZ], [0, 80, zn]], '#F4F2EE');
+  s += poly([[L, 0, zn], [L, 0, KZ], [L, 80, KZ], [L, 80, zn]], '#F6F4F0');
+  // Roof window in the slope, with a patch of light on the floor
+  const wx0 = L * 0.36, wx1 = L * 0.58, wy0 = 1500, wy1 = 2200;
+  const win = [[wx0, wy0, slopeZ(wy0)], [wx1, wy0, slopeZ(wy0)], [wx1, wy1, slopeZ(wy1)], [wx0, wy1, slopeZ(wy1)]];
+  s += poly(win, '#FFFFFF', ' stroke="#D3CFC7" stroke-width="2"');
+  const inset = 70, iw = [[wx0 + inset, wy0 + inset, slopeZ(wy0 + inset)], [wx1 - inset, wy0 + inset, slopeZ(wy0 + inset)], [wx1 - inset, wy1 - inset, slopeZ(wy1 - inset)], [wx0 + inset, wy1 - inset, slopeZ(wy1 - inset)]];
+  s += poly(iw, `url(#hsGlass${+after})`);
+  // Boxes: faces drawn back to front
+  const box = (x0, x1, y0, y1, z0, z1, c) => {
+    let o = '';
+    if (CAM.x < x0) o += poly([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], shadeHex(c, 0.86));
+    if (CAM.x > x1) o += poly([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], shadeHex(c, 0.86));
+    if (CAM.y > y1) o += poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], shadeHex(c, 1.08));
+    return o + poly([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], c, ' stroke="rgba(0,0,0,.12)" stroke-width="1"');
+  };
+  if (!after) {
+    s += box(200, 800, 0, 420, 4500, 4980, '#C8A574') + box(300, 700, 420, 700, 4600, 4950, '#D5B484');
+    s += box(1000, 1350, 0, 260, 4550, 4900, '#BFA07A');
+    s += box(L - 1100, L - 450, 0, 380, 4520, 4990, '#C9A877') + box(L - 380, L - 120, 0, 600, 4700, 4990, '#9AA59B');
+    return s + '</svg>';
+  }
+  // Built-in cupboards: front face at z = FZ, top follows the slope back to the knee wall
+  const FZ = KZ - d.d, FH = d.h, n = d.bays, dw = L / n, plinth = 80;
+  const sage = '#C3CDBD', sageDark = '#AEB9A8';
+  s += poly([[0, FH, FZ], [L, FH, FZ], [L, KH, KZ], [0, KH, KZ]], '#F1EFEA');
+  s += poly([[0, 0, FZ], [L, 0, FZ], [L, FH, FZ], [0, FH, FZ]], sage);
+  s += poly([[0, 0, FZ], [L, 0, FZ], [L, plinth, FZ], [0, plinth, FZ]], '#8E9989');
+  s += `<line x1="${P(0, FH, FZ)[0].toFixed(1)}" y1="${P(0, FH, FZ)[1].toFixed(1)}" x2="${P(L, FH, FZ)[0].toFixed(1)}" y2="${P(L, FH, FZ)[1].toFixed(1)}" stroke="#9AA595" stroke-width="2"/>`;
+  const openIdx = 1;
+  for (let i = 1; i < n; i++) { const x = i * dw; s += `<line x1="${P(x, plinth, FZ)[0].toFixed(1)}" y1="${P(x, plinth, FZ)[1].toFixed(1)}" x2="${P(x, FH - 10, FZ)[0].toFixed(1)}" y2="${P(x, FH - 10, FZ)[1].toFixed(1)}" stroke="#7F8B7A" stroke-width="2"/>`; }
+  // Open compartment: interior clipped to the door opening
+  const ox0 = openIdx * dw, ox1 = ox0 + dw;
+  s += `<clipPath id="hsOpen"><polygon points="${pts([[ox0, plinth, FZ], [ox1, plinth, FZ], [ox1, FH - 10, FZ], [ox0, FH - 10, FZ]])}"/></clipPath><g clip-path="url(#hsOpen)">`;
+  s += poly([[ox0 - 50, -50, FZ], [ox1 + 50, -50, FZ], [ox1 + 50, FH + 50, FZ], [ox0 - 50, FH + 50, FZ]], `url(#hsIn${+after})`);
+  const sy = Math.round(FH * 0.5), sd = FZ + d.d - 40;
+  s += poly([[ox0, sy, FZ], [ox1, sy, FZ], [ox1, sy, sd], [ox0, sy, sd]], '#E2C79C');
+  s += poly([[ox0, sy - 18, FZ], [ox1, sy - 18, FZ], [ox1, sy, FZ], [ox0, sy, FZ]], '#C9AC7E');
+  s += box(ox0 + 60, ox0 + 110, sy, sy + 230, 4700, 4900, '#B5533A') + box(ox0 + 115, ox0 + 160, sy, sy + 260, 4700, 4900, '#3F5A73') + box(ox0 + 165, ox0 + 205, sy, sy + 210, 4700, 4900, '#E0B54E');
+  s += box(ox0 + 320, ox1 - 80, sy, sy + 160, 4600, 4880, '#E9E4DA');
+  s += box(ox0 + 80, ox1 - 120, plinth, plinth + 260, 4500, 4850, '#B99366');
+  s += '</g>';
+  // Handles on the closed doors, at the meeting edges
+  for (let i = 0; i < n; i++) {
+    if (i === openIdx) continue;
+    const hx = i % 2 === 0 ? (i + 1) * dw - 60 : i * dw + 60;
+    s += poly([[hx - 8, FH * 0.55, FZ - 5], [hx + 8, FH * 0.55, FZ - 5], [hx + 8, FH * 0.75, FZ - 5], [hx - 8, FH * 0.75, FZ - 5]], '#B48A4A');
+  }
+  // The open door, hinged on its left edge and swung past square towards the room
+  const a = 100 * Math.PI / 180, fx = ox0 + dw * Math.cos(a), fz = FZ - dw * Math.sin(a);
+  s += poly([[ox0, plinth + 4, FZ], [ox0, FH - 12, FZ], [fx, FH - 12, fz], [fx, plinth + 4, fz]], sageDark, ' stroke="#7F8B7A" stroke-width="1.5"');
+  // Measurements
+  const chip = (x, y, z, txt, dx = 0, dy = 0) => { const [px, py] = P(x, y, z); return `<g transform="translate(${(px + dx).toFixed(1)} ${(py + dy).toFixed(1)})"><rect x="-44" y="-14" width="88" height="28" rx="14" fill="#FF5B1F"/><text x="0" y="5" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" fill="#15181B">${txt}</text></g>`; };
+  s += chip(L * 0.8, FH, FZ, fmt(L), 0, -26) + chip(L, FH / 2, FZ, fmt(FH), -54, 0);
+  return s + '</svg>';
 }
 
 // ───────────────────────── Home ─────────────────────────
@@ -1561,14 +1768,16 @@ function renderHome() {
   if (draft && draft.name) { card.hidden = false; $('#resumeName').textContent = String(draft.name).slice(0, 60); } else card.hidden = true;
   if (heroBuilt) return;
   heroBuilt = true;
-  // Demo: open shelving drawn onto the sample photo
-  const demo = { template: 'shelving', w: 1500, h: 1000, d: 300, shelves: 2, thickness: 18, doors: 0, scribe: true, overrides: {} };
+  // Demo: five-compartment under-eaves cupboards in a loft, shown in a drawn 3D room
+  const demo = { template: 'eaves', w: 3600, h: 1300, d: 600, low: 700, shelves: 1, compartments: 5, thickness: 18, material: 'plywood', doors: 5, joinery: 'screws', scribe: true, load: 'books', overrides: {} };
   const saved = {}; Object.keys(demo).forEach(k => { saved[k] = S[k]; S[k] = demo[k]; });
   compute();
-  const box = $('#heroOverlay');
-  box.innerHTML = elevationSVG('photo');
   const root = $('#heroCompare');
-  placeOverlay(box, { wf: () => 0.38, aspect: () => 1.5, imgW: 1600, imgH: 1067, pos: () => ({ x: 0.565, yb: 0.6 }) });
+  $('#heroBefore').innerHTML = heroScene(false, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments });
+  $('#heroOverlay').innerHTML = heroScene(true, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments });
+  $('#heroStats').innerHTML = `<li><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>${fmt(S.w)} x ${fmt(S.h)}</strong> measured from the photo</span></li>`
+    + `<li><i class="ph ph-scissors" aria-hidden="true"></i><span><strong>${R.pieceCount} cuts</strong> from ${R.nMain} ${R.nMain === 1 ? 'sheet' : 'sheets'} of plywood</span></li>`
+    + `<li><i class="ph ph-truck" aria-hidden="true"></i><span><strong>About ${gbp0(R.total)}</strong> cut and delivered</span></li>`;
   Object.assign(S, saved);
   compute();
   const range = $('#heroSlider');
@@ -2108,8 +2317,17 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
+  load: el => { if (LOADS[el.dataset.value]) { S.load = el.dataset.value; saveDraft(); render(); } },
+  'safety-fix': el => {
+    const v = el.dataset.value;
+    if (el.dataset.kind === 'compartments') S.compartments = clamp(Math.round(Number(v)), 1, 8);
+    else if (el.dataset.kind === 'thickness' && [24, 25].includes(Number(v))) S.thickness = Number(v);
+    else if (el.dataset.kind === 'material' && v === 'plywood') { S.material = 'plywood'; S.priceSheet = null; }
+    saveDraft(); render(); toast('Design updated. Safety checks re-run.');
+  },
+  'manual-anim': () => { S.manualAnim = S.manualAnim === false; render(); },
   'build-mode': el => { S.buildMode = el.dataset.value === 'steps' ? 'steps' : 'manual'; render(); },
-  'print-manual': () => { $('#printSheet').innerHTML = `<h1>${esc(S.name)}</h1>` + renderManual(); document.body.classList.add('print-manual'); window.print(); document.body.classList.remove('print-manual'); },
+  'print-manual': () => { $('#printSheet').innerHTML = `<h1>${esc(S.name)}</h1>` + renderManual(true); document.body.classList.add('print-manual'); window.print(); document.body.classList.remove('print-manual'); },
   'build-go': el => { S.buildIdx = Number(el.dataset.step); render(); },
   'build-prev': () => { S.buildIdx = Math.max(0, S.buildIdx - 1); render(); },
   'build-done': () => { const d = new Set(S.done); d.add(S.buildIdx); S.done = [...d]; const n = buildSteps().length; if (S.buildIdx < n - 1) S.buildIdx++; else toast('All steps done. Nice work.'); saveDraft(); render(); },

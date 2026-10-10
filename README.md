@@ -14,6 +14,12 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 
 Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 
+## Safety checks
+
+Every furniture design is checked as you edit it: shelf sag over time (beam formula with Eurocode 5 creep), shelf strength, load per shelf pin, back panel against racking, and wall fixing. Failing checks offer a one-tap fix (more compartments, thicker board, plywood). The rules, figures and sources are in [docs/SAFETY.md](docs/SAFETY.md) for professional review. Building work (walls, joists, roofs) is not checked and shows a stop notice.
+
+The picture manual animates each step: parts slide into place, with a pause button, and stays still for reduced motion and in print.
+
 ## Design assistant ("Change it")
 
 Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (`claude-opus-5-5`, low effort, structured JSON output, server-side refusal fallback) for a list of setting changes. The browser validates every change again before applying it.
@@ -33,7 +39,7 @@ Without a key, or if the AI is unreachable, a built-in phrase parser handles the
 - Light and dark themes follow the system, with a manual toggle.
 - Icons: Phosphor (regular).
 
-UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider), Cal AI and Quizlet capture tips, IKEA camera framing, IKEA and LARQ step-by-step setup, Stripe split configurator with live preview, Instacart and Amazon checkout summaries.
+UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider, shown on a drawn 3D loft), Cal AI and Quizlet capture tips, IKEA camera framing, IKEA and LARQ step-by-step setup, Stripe split configurator with live preview, Instacart and Amazon checkout summaries.
 
 ## Privacy and security
 
@@ -53,6 +59,6 @@ Permissions-Policy: camera=(self), geolocation=(), microphone=(), xr-spatial-tra
 
 ## Credits
 
-Hero photo by Алан Албегов, design tile photo by Andrea Davis, both on Unsplash.
+The home page loft scene is drawn in code (`heroScene()` in `app.js`). Design tile photo by Andrea Davis on Unsplash.
 
 Prices are estimates. Always check measurements before you order.
