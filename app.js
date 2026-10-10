@@ -1164,6 +1164,7 @@ function renderStage() {
       </div>
     </div>
     <div class="stage-box" id="stageBox"></div>
+    ${S.template === 'understairs' ? `<div class="stage-tools"><button type="button" class="chip" data-action="hand" data-value="${S.hand === 'left' ? 'right' : 'left'}"><i class="ph ph-flip-horizontal" aria-hidden="true"></i>Flip stairs</button><span class="help">Tall end on the ${S.hand === 'left' ? 'left' : 'right'}</span></div>` : ''}
     <div class="stage-foot" id="stageFoot"></div>`;
   const box = $('#stageBox'), foot = $('#stageFoot');
   if (S.stage === 'photo') {

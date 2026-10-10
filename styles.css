@@ -699,3 +699,5 @@ dialog.ask{width:min(620px,100%)}
 .hero-compare{cursor:ew-resize}
 .hero-compare .compare-range{pointer-events:none}
 .hero-compare:has(.compare-range:focus-visible) .compare-handle span,.hero-compare.dragging .compare-handle span{outline:3px solid var(--accent,#E8643A);outline-offset:2px}
+.stage-tools{display:flex;align-items:center;gap:10px;margin-top:10px}
+.stage-tools .help{margin:0}
