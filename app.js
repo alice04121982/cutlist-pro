@@ -243,6 +243,11 @@ const SITES = {
 };
 function defaultSite(t) { return t === 'eaves' ? 'loft' : t === 'understairs' ? 'ground' : 'upstairs'; }
 // Longest panel that can be carried in, and so the widest box
+// Why a split unit has paired sides instead of single dividers, in plain words
+function boxSideWhy(L) {
+  const site = SITES[S.site] || SITES.upstairs;
+  return `2 per box: where two boxes meet, their sides sit back to back and are screwed together. ${L.n} boxes keep every panel under ${fmt(maxBox())} so it can be carried in (${site.name.toLowerCase()}).`;
+}
 function maxBox() { return Math.min((SITES[S.site] || SITES.upstairs).carry, Math.max(S.sheetW, S.sheetH) - 40); }
 function layout() {
   const th = S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
@@ -373,7 +378,7 @@ function generateParts() {
     // Built from one or more boxes (see layout()). Panels shared by identical boxes are grouped.
     const L = layout(), eaves = t === 'eaves', g = eaves ? eavesGeom() : null, cosA = eaves ? (Math.cos(g.ang) || 1) : 1;
     const dep = eaves ? g.run : d - s, sideNote = eaves ? `Angled top: ${Math.round(h)} at the front, ${Math.round(S.low)} at the back (${g.angDeg} deg)` : null;
-    const side = (name, qty, scribed) => qty > 0 && sheet({ name, w: dep, h, qty, scribed, role: 'side', edge: 1, ...(eaves ? { shape: { front: h, back: S.low }, note: sideNote } : {}) });
+    const side = (name, qty, scribed, why) => qty > 0 && sheet({ name, w: dep, h, qty, scribed, role: 'side', edge: 1, ...(why ? { why } : {}), ...(eaves ? { shape: { front: h, back: S.low }, note: sideNote } : {}) });
     if (t === 'understairs') {
       // Every upright is cut to the slope of the stairs: height to the underside of the top, top edge bevelled
       const sg = stairGeom();
@@ -383,7 +388,7 @@ function generateParts() {
       });
     } else {
       side('Left Side', 1, sc); side('Right Side', 1, sc);
-      side('Box Side', 2 * L.n - 2, false);
+      side('Box Side', 2 * L.n - 2, false, boxSideWhy(L));
     }
     const kinds = [...new Map(L.boxes.map(b => [b.type, b])).values()];
     kinds.forEach(k => {
@@ -1282,6 +1287,7 @@ function boxesControl() {
       <output aria-live="polite">${L.n}</output>
       <button type="button" data-action="step" data-k="boxes" data-d="1" aria-label="One more box"${L.n >= 8 ? ' disabled' : ''}><i class="ph ph-plus" aria-hidden="true"></i></button>
     </div><span class="help">${esc(help)}${auto ? '' : ' <button type="button" class="link-btn" data-action="boxes-auto">Back to auto</button>'}</span>
+    ${L.n > 1 && S.template !== 'understairs' ? `<span class="help why"><i class="ph ph-info" aria-hidden="true"></i>Why ${2 * L.n - 2} box sides? One box would need a ${fmt(S.w)} top, too long to carry in. Split into ${L.n}, each box has its own two sides, so where boxes meet there are two sides screwed together instead of one divider. It costs ${L.n - 1} extra panel${L.n > 2 ? 's' : ''}, but each box is rigid on its own, you build them one at a time on the floor, and they come apart if you move. If it is going somewhere with easier access, change the location above: longer boxes fit, so some pairs become single dividers.</span>` : ''}
     ${L.raised ? `<span class="help">Raised to ${L.C} compartments so every box has at least one.</span>` : ''}</div>`;
 }
 
@@ -1331,7 +1337,7 @@ function partRows(parts) {
     const cellW = S.editParts ? `<input class="input num" type="number" min="1" value="${p.w}" data-ov="${esc(p.name)}" data-k="w" aria-label="${esc(p.name)} width">` : fmt(p.w);
     const cellH = S.editParts ? `<input class="input num" type="number" min="1" value="${p.h}" data-ov="${esc(p.name)}" data-k="h" aria-label="${esc(p.name)} height">` : fmt(p.h);
     const cellQ = S.editParts ? `<input class="input num qty" type="number" min="0" value="${p.qty}" data-ov="${esc(p.name)}" data-k="qty" aria-label="${esc(p.name)} quantity">` : p.qty;
-    return `<tr><td class="c-name"><div class="pname">${esc(p.name)}</div>${p.note ? `<div class="help">${esc(p.note)}</div>` : ''}${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}</td>
+    return `<tr><td class="c-name"><div class="pname">${esc(p.name)}</div>${p.note ? `<div class="help">${esc(p.note)}</div>` : ''}${p.why ? `<div class="help">${esc(p.why)}</div>` : ''}${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}</td>
       <td class="num" data-l="L">${cellW}</td><td class="num" data-l="W">${cellH}</td><td class="num" data-l="Qty">${cellQ}</td><td class="num c-area">${area.toFixed(2)} m²</td></tr>`;
   }).join('');
 }
@@ -1943,7 +1949,7 @@ function renderManual(print = false) {
   pages.push(page(`<h4 class="m-h">Parts</h4><div class="m-parts">${groups.map(g => {
     const sc = 120 / maxDim, w = Math.max(8, g.p.w * sc), h = Math.max(6, g.p.h * sc);
     const shape = g.p.shape ? `<polygon points="0,${h} ${w},${h} ${w},${h - g.p.shape.back * sc} 0,0" fill="${MP.wood}" stroke="${MP.ink}" stroke-width="1.2" transform="translate(2 2)"/>` : `<rect x="2" y="2" width="${w}" height="${h}" fill="${g.p.stock === 'linear' ? '#E9EAEC' : MP.wood}" stroke="${MP.ink}" stroke-width="1.2"/>`;
-    return `<div class="m-part"><span class="m-letter">${g.letter}</span><svg viewBox="0 0 ${w + 4} ${h + 4}" width="${w + 4}" height="${h + 4}" aria-hidden="true">${shape}</svg><div class="m-pq">${g.qty}x</div><div class="m-pn">${esc(g.p.name.replace(/ \d+$/, ''))}</div><div class="m-ps">${Math.round(g.p.w)} x ${Math.round(g.p.h)}</div></div>`;
+    return `<div class="m-part"><span class="m-letter">${g.letter}</span><svg viewBox="0 0 ${w + 4} ${h + 4}" width="${w + 4}" height="${h + 4}" aria-hidden="true">${shape}</svg><div class="m-pq">${g.qty}x</div><div class="m-pn">${esc(g.p.name.replace(/ \d+$/, ''))}</div><div class="m-ps">${Math.round(g.p.w)} x ${Math.round(g.p.h)}</div>${g.p.why ? `<div class="m-pw">${esc(g.p.why.split(':')[0])}, paired where boxes meet</div>` : ''}</div>`;
   }).join('')}</div>`));
   // Hardware
   pages.push(page(`<h4 class="m-h">Hardware</h4><p class="m-sub">Screws, pins and dowels are printed at actual size. Lay yours on top to check.</p><div class="m-hw">${hw.list.map(f => { const a = hwArt(f.name); return `<div class="m-hwi">${a.art}<div class="m-hwq"><b>${f.total_qty}x</b> <span>${f.id}</span></div><div class="m-hwn">${esc(f.name)}${a.actual ? ' <em>1:1</em>' : ''}</div></div>`; }).join('')}</div>`));
