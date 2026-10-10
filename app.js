@@ -150,7 +150,7 @@ function freshState(template = 'eaves') {
     thickness: cab ? 18 : 47,
     sheetW: 2440, sheetH: 1220, kerf: 3,
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
-    compartments: d.bays || 1, doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
+    compartments: d.bays || 1, boxes: 'auto', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
     unit: 'mm', done: []
   };
@@ -163,7 +163,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -182,6 +182,7 @@ function sanitizeProject(p) {
     low: num(p.low, ...LIMITS.low, base.low), shelves: Math.round(num(pick('shelves', 'dimShelves'), ...LIMITS.shelves, base.shelves)),
     spacing: num(pick('spacing', 'dimSpacing'), ...LIMITS.spacing, base.spacing), pitch: num(pick('pitch', 'dimPitch'), 0, 70, base.pitch),
     compartments: Math.round(num(p.compartments, 1, 8, 1)),
+    boxes: p.boxes === undefined || p.boxes === 'auto' ? 'auto' : Math.round(num(p.boxes, 1, 8, 1)),
     doors: p.doors === 'auto' || p.doors === undefined ? 'auto' : Math.round(num(p.doors, 0, 8, 0)),
     joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false, load: LOADS[p.load] ? p.load : base.load,
     priceSheet: p.priceSheet == null ? null : num(p.priceSheet, 0, 1000, null),
@@ -220,12 +221,54 @@ function saveDraft() {
 // ───────────────────────── Generation ─────────────────────────
 // Upright dividers split a unit into bays. Kitchen base units keep one bay (drawer above).
 const BAY_TEMPLATES = new Set(['eaves', 'shelving', 'wardrobe', 'kitchenwall']);
-function bayInfo() {
-  const bays = BAY_TEMPLATES.has(S.template) ? clamp(Math.round(S.compartments || 1), 1, 8) : 1;
-  const inner = S.w - 2 * S.thickness;
-  return { bays, bayW: Math.floor((inner - (bays - 1) * S.thickness) / bays), inner };
+// Long units are built as separate boxes, like kitchen units: each box is a complete carcass with its
+// own sides, top, bottom and back, small enough to cut from one sheet and carry up the stairs.
+const MAX_BOX = 1200;
+function layout() {
+  const th = S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
+  let C = bayTpl ? clamp(Math.round(S.compartments || 1), 1, 8) : 1;
+  const widthOf = (k, bay) => 2 * th + k * bay + (k - 1) * th;
+  const plan = (n, c) => {
+    const base = Math.floor(c / n), extra = c % n;
+    return { ks: Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0)), bay: (W - 2 * th * n - (c - n) * th) / c };
+  };
+  let n = 1;
+  if (bayTpl) {
+    const want = S.boxes === 'auto' || S.boxes == null ? 0 : clamp(Math.round(S.boxes), 1, 8);
+    if (want) n = want;
+    else {
+      const fits = m => { const q = plan(m, Math.max(C, m)); return Math.max(...q.ks.map(k => widthOf(k, q.bay))) <= MAX_BOX; };
+      while (n < 8 && !fits(n)) n++;
+    }
+    C = Math.max(C, n);
+  }
+  const { ks, bay } = plan(n, C);
+  const boxes = [], bays = [], verticals = [];
+  let x = 0;
+  ks.forEach((k, i) => {
+    const w = i === n - 1 ? W - x : Math.round(widthOf(k, bay));
+    boxes.push({ i, x0: x, w, k });
+    verticals.push({ x, box: i, kind: i === 0 ? 'left' : 'boxside' });
+    for (let j = 0; j < k; j++) {
+      const bx = x + th + j * (bay + th);
+      bays.push({ x: bx, w: bay, box: i });
+      if (j > 0) verticals.push({ x: bx - th, box: i, kind: 'divider' });
+    }
+    verticals.push({ x: x + w - th, box: i, kind: i === n - 1 ? 'right' : 'boxside' });
+    x += w;
+  });
+  // Boxes with the same number of compartments are identical; give each kind a letter
+  const kinds = [...new Set(ks)].sort((a, b) => b - a);
+  boxes.forEach(b => { b.type = kinds.length > 1 ? String.fromCharCode(65 + kinds.indexOf(b.k)) : ''; });
+  return { n, C, bay, bayW: Math.floor(bay), boxes, bays, verticals, raised: bayTpl && C > clamp(Math.round(S.compartments || 1), 1, 8) };
 }
-const bayX = (b, bayW) => S.thickness + b * (bayW + S.thickness);
+// Part name for a box-level panel: "Bottom", or "Bottom A" when boxes come in two sizes
+const boxPart = (name, b) => b.type ? name + ' ' + b.type : name;
+function bayInfo() {
+  const L = layout();
+  return { bays: L.C, bayW: L.bayW, inner: S.w - 2 * S.thickness, boxes: L.n };
+}
+const bayX = b => layout().bays[b].x;
 
 function doorCount() {
   if (S.doors !== 'auto') return S.doors;
@@ -270,29 +313,59 @@ function generateParts() {
     sheet({ name: 'Door', w: dw, h: doorH, qty: nd, hinges, role: 'door', note: hinges.length + ' hinges each, 35mm bore', edge: 4 });
   };
 
-  if (t === 'shelving') {
-    sheet({ name: 'Left Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
-    sheet({ name: 'Right Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
-    sheet({ name: 'Top', w: w - 2 * th, h: d - s, scribed: sc, role: 'top', edge: 1 });
-    sheet({ name: 'Bottom', w: w - 2 * th, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
-    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - s - 2, qty: bays, role: 'shelf', edge: 1 });
-    if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
-    thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on. Stops the unit racking sideways' });
-    overlayDoors(w, h - 4);
-  } else if (t === 'wardrobe') {
-    const inner = w - 2 * th;
-    sheet({ name: 'Left Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
-    sheet({ name: 'Right Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
-    sheet({ name: 'Top', w: inner, h: d - s, scribed: sc, role: 'top', edge: 1 });
-    sheet({ name: 'Bottom', w: inner, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
-    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - 20 - s, qty: bays, role: 'shelf', edge: 1 });
-    if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
-    thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on' });
-    lin({ name: 'Hanging Rail', w: bayW - 20, h: 30, qty: bays, section: '25mm rail', role: 'rail', note: 'Round chrome rail' });
+  if (BAY_TEMPLATES.has(t)) {
+    // Built from one or more boxes (see layout()). Panels shared by identical boxes are grouped.
+    const L = layout(), eaves = t === 'eaves', g = eaves ? eavesGeom() : null, cosA = eaves ? (Math.cos(g.ang) || 1) : 1;
+    const dep = eaves ? g.run : d - s, sideNote = eaves ? `Angled top: ${Math.round(h)} at the front, ${Math.round(S.low)} at the back (${g.angDeg} deg)` : null;
+    const side = (name, qty, scribed) => qty > 0 && sheet({ name, w: dep, h, qty, scribed, role: 'side', edge: 1, ...(eaves ? { shape: { front: h, back: S.low }, note: sideNote } : {}) });
+    side('Left Side', 1, sc); side('Right Side', 1, sc);
+    side('Box Side', 2 * L.n - 2, false);
+    const kinds = [...new Map(L.boxes.map(b => [b.type, b])).values()];
+    kinds.forEach(k => {
+      const qty = L.boxes.filter(b => b.type === k.type).length, inner = k.w - 2 * th;
+      if (eaves) {
+        sheet({ name: boxPart('Bottom', k), w: inner, h: g.run, qty, role: 'bottom', edge: 1 });
+        sheet({ name: boxPart('Sloped Top', k), w: inner, h: Math.round(Math.hypot(g.run, g.rise)), qty, role: 'top', note: `Bevel front and back edges at ${g.angDeg} deg`, edge: 1 });
+        thin({ name: boxPart('Back Panel', k), w: k.w - 4, h: Math.max(50, S.low - 4), qty, role: 'back', note: '3mm, glued and pinned on' });
+      } else {
+        sheet({ name: boxPart('Top', k), w: inner, h: d - s, qty, scribed: sc, role: 'top', edge: 1 });
+        sheet({ name: boxPart('Bottom', k), w: inner, h: d - s, qty, scribed: sc, role: 'bottom', edge: 1 });
+        thin({ name: boxPart('Back Panel', k), w: k.w - 4, h: h - 4, qty, role: 'back', note: '3mm, glued and pinned on. Stops the unit racking sideways' });
+      }
+    });
+    // Shelves: one per compartment per row; on eaves they get shallower to clear the slope
+    for (let i = 0; i < n; i++) {
+      if (eaves) {
+        const yc = th + (h - 2 * th) * (i + 1) / (n + 1), yTop = yc + th / 2;
+        const maxDepth = g.rise > 0 ? (h - th / cosA - yTop) * S.d / g.rise : g.run;
+        const depth = Math.floor(Math.min(g.run - 2, maxDepth) - 5);
+        if (depth >= 100) sheet({ name: 'Shelf ' + (i + 1), w: L.bayW, h: depth, qty: L.C, role: 'shelf', edge: 1, yc, note: 'Shallower to clear the slope' });
+      } else sheet({ name: 'Shelf ' + (i + 1), w: L.bayW, h: t === 'shelving' ? d - s - 2 : d - 20 - s, qty: L.C, role: 'shelf', edge: 1 });
+    }
+    const divs = L.verticals.filter(v => v.kind === 'divider').length;
+    if (divs) {
+      if (eaves) {
+        const front = Math.round(h - th - th / cosA), back = Math.max(50, Math.round(S.low - th - th / cosA));
+        sheet({ name: 'Divider', w: g.run, h: front, qty: divs, role: 'divider', shape: { front, back }, note: `Angled top: ${front} at the front, ${back} at the back (${g.angDeg} deg)`, edge: 1 });
+      } else sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: divs, role: 'divider', edge: 1 });
+    }
+    if (t === 'wardrobe') lin({ name: 'Hanging Rail', w: L.bayW - 20, h: 30, qty: L.C, section: '25mm rail', role: 'rail', note: 'Round chrome rail' });
+    // Doors: one per compartment on multi-box units, so no door spans two boxes
     if (nd) {
-      const dw = Math.floor((inner - 2 * (nd + 1)) / nd), dh = h - 2 * th - 4;
-      const hinges = calcHingePositions(dh);
-      sheet({ name: 'Door', w: dw, h: dh, qty: nd, hinges, role: 'door', inset: true, note: 'Inset doors, ' + hinges.length + ' hinges each', edge: 4 });
+      if (L.n === 1) {
+        if (t === 'wardrobe') {
+          const inner = w - 2 * th, dw = Math.floor((inner - 2 * (nd + 1)) / nd), dh = h - 2 * th - 4, hinges = calcHingePositions(dh);
+          sheet({ name: 'Door', w: dw, h: dh, qty: nd, hinges, role: 'door', inset: true, note: 'Inset doors, ' + hinges.length + ' hinges each', edge: 4 });
+        } else overlayDoors(w, h - 4);
+      } else {
+        const sizes = new Map();
+        L.boxes.forEach(b => {
+          const dw = t === 'wardrobe' ? Math.floor((b.w - 2 * th - 2 * (b.k + 1)) / b.k) : Math.floor((b.w - 4 - 3 * (b.k - 1)) / b.k);
+          sizes.set(dw, (sizes.get(dw) || 0) + b.k);
+        });
+        const dh = t === 'wardrobe' ? h - 2 * th - 4 : h - 4, hinges = calcHingePositions(dh);
+        [...sizes.entries()].sort((x, y) => y[0] - x[0]).forEach(([dw, qty], i) => sheet({ name: i ? 'Door ' + String.fromCharCode(65 + i) : 'Door', w: dw, h: dh, qty, hinges, role: 'door', inset: t === 'wardrobe', note: (t === 'wardrobe' ? 'Inset doors, ' : '') + hinges.length + ' hinges each, 35mm bore', edge: 4 }));
+      }
     }
   } else if (t === 'kitchenbase') {
     const hc = h - 100, inner = w - 2 * th;
@@ -308,37 +381,6 @@ function generateParts() {
     sheet({ name: 'Drawer Back', w: inner - 40, h: 150, role: 'drawer' });
     thin({ name: 'Drawer Base', w: inner - 36, h: d - 44, role: 'drawer', note: '6mm ply' }, 'ply6');
     overlayDoors(w, hc - 185);
-  } else if (t === 'kitchenwall') {
-    sheet({ name: 'Left Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
-    sheet({ name: 'Right Side', w: d - s, h, scribed: sc, role: 'side', edge: 1 });
-    sheet({ name: 'Top', w: w - 2 * th, h: d - s, scribed: sc, role: 'top', edge: 1 });
-    sheet({ name: 'Bottom', w: w - 2 * th, h: d - s, scribed: sc, role: 'bottom', edge: 1 });
-    for (let i = 0; i < n; i++) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: d - 20 - s, qty: bays, role: 'shelf', edge: 1 });
-    if (bays > 1) sheet({ name: 'Divider', w: d - s, h: h - 2 * th, qty: bays - 1, role: 'divider', edge: 1 });
-    thin({ name: 'Back Panel', w: w - 4, h: h - 4, role: 'back', note: '3mm, pinned on' });
-    overlayDoors(w, h - 4);
-  } else if (t === 'eaves') {
-    const g = eavesGeom(), inner = w - 2 * th;
-    const sideNote = `Angled top: ${Math.round(h)} at the front, ${Math.round(S.low)} at the back (${g.angDeg} deg)`;
-    sheet({ name: 'Left Side', w: g.run, h, scribed: sc, role: 'side', shape: { front: h, back: S.low }, note: sideNote, edge: 1 });
-    sheet({ name: 'Right Side', w: g.run, h, scribed: sc, role: 'side', shape: { front: h, back: S.low }, note: sideNote, edge: 1 });
-    sheet({ name: 'Bottom', w: inner, h: g.run, role: 'bottom', edge: 1 });
-    sheet({ name: 'Sloped Top', w: inner, h: Math.round(Math.hypot(g.run, g.rise)), role: 'top', note: `Bevel front and back edges at ${g.angDeg} deg`, edge: 1 });
-    const cosA = Math.cos(g.ang) || 1;
-    for (let i = 0; i < n; i++) {
-      const yc = th + (h - 2 * th) * (i + 1) / (n + 1);
-      const yTop = yc + th / 2;
-      const maxDepth = g.rise > 0 ? (h - th / cosA - yTop) * S.d / g.rise : g.run;
-      const depth = Math.floor(Math.min(g.run - 2, maxDepth) - 5);
-      if (depth >= 100) sheet({ name: 'Shelf ' + (i + 1), w: bayW, h: depth, qty: bays, role: 'shelf', edge: 1, yc, note: 'Shallower to clear the slope' });
-    }
-    if (bays > 1) {
-      // Dividers sit between the bottom and the underside of the sloped top, so they follow the roof angle too
-      const front = Math.round(h - th - th / cosA), back = Math.max(50, Math.round(S.low - th - th / cosA));
-      sheet({ name: 'Divider', w: g.run, h: front, qty: bays - 1, role: 'divider', shape: { front, back }, note: `Angled top: ${front} at the front, ${back} at the back (${g.angDeg} deg)`, edge: 1 });
-    }
-    thin({ name: 'Back Panel', w: w - 4, h: Math.max(50, S.low - 4), role: 'back', note: '3mm, pinned on' });
-    overlayDoors(w, h - 4);
   } else if (t === 'studwall' || t === 'partition') {
     const sec = th + 'x100 C16';
     const studCount = Math.floor(w / sp) + 1;
@@ -493,18 +535,22 @@ const FITTING_DB = {
 
 function calcFittings(parts) {
   const sum = (f) => parts.filter(f).reduce((s, p) => s + p.qty, 0);
+  const nBox = layout().n;
   const cnt = {
-    unit: 1, shelf: sum(p => p.role === 'shelf'), rail: sum(p => p.role === 'rail'), drawer: sum(p => p.name === 'Drawer Front'),
+    unit: nBox, shelf: sum(p => p.role === 'shelf'), rail: sum(p => p.role === 'rail'), drawer: sum(p => p.name === 'Drawer Front'),
     handle: sum(p => p.role === 'door') + sum(p => p.name === 'Drawer Front'),
     stud: sum(p => p.role === 'stud'), noggin: sum(p => p.role === 'noggin'), joist: sum(p => p.role === 'joist'),
     board: sum(p => p.stock === 'whole' && p.kind !== 'plaster'), plaster: sum(p => p.kind === 'plaster'), rafter: sum(p => p.role === 'rafter'),
     area: Math.ceil(S.w * S.d / 1e6)
   };
-  const out = (FITTING_DB[S.template] || []).map(f => ({ ...f, total_qty: Math.ceil(f.qty * (cnt[f.per] ?? 1)) })).filter(f => f.total_qty > 0);
+  // Joined boxes brace each other, so wall and floor fixings are 2 per box plus 2, not the full set each
+  const perUnit = f => (f.per === 'unit' && nBox > 1 && /bracket|fixing/i.test(f.name) && !/hanging|anti-tip/i.test(f.name)) ? 2 * nBox + 2 : Math.ceil(f.qty * (cnt[f.per] ?? 1));
+  const out = (FITTING_DB[S.template] || []).map(f => ({ ...f, total_qty: perUnit(f) })).filter(f => f.total_qty > 0);
   const hinges = parts.filter(p => p.hinges).reduce((s, p) => s + p.hinges.length * p.qty, 0);
   if (hinges) out.unshift({ name: 'Soft-close 35mm hinges', total_qty: hinges, unit_cost: 2.5, note: 'With mounting plates' });
   if (isCabinet(S.template)) {
-    const joints = 4 + 2 * sum(p => p.role === 'divider'), perJoint = Math.max(2, Math.ceil(S.d / 150));
+    // Each box has four corner joints, each divider two
+    const joints = 4 * nBox + 2 * sum(p => p.role === 'divider'), perJoint = Math.max(2, Math.ceil(S.d / 150));
     const f = joints * perJoint;
     if (S.joinery === 'screws') {
       out.push({ name: 'Wood screws 4x40mm', total_qty: f + 10, unit_cost: 0.05 });
@@ -517,7 +563,14 @@ function calcFittings(parts) {
       out.push({ name: 'Cam lock and bolt sets', total_qty: f, unit_cost: 0.35 });
       out.push({ name: 'Wooden dowels 8x30mm', total_qty: f, unit_cost: 0.05 });
     }
-    if (parts.some(p => p.role === 'back')) out.push({ name: 'Panel pins 25mm', total_qty: 40, unit_cost: 0.02 });
+    if (parts.some(p => p.role === 'back')) {
+      // One pin every 150mm round each back and along every divider
+      const backs = parts.filter(p => p.role === 'back'), divs = sum(p => p.role === 'divider');
+      const pins = backs.reduce((a, p) => a + p.qty * Math.ceil(2 * (p.w + p.h) / 150), 0) + divs * Math.ceil((S.template === 'eaves' ? S.low : S.h) / 150);
+      out.push({ name: 'Panel pins 25mm', total_qty: Math.ceil(pins * 1.1), unit_cost: 0.02 });
+    }
+    if (nBox > 1) out.push({ name: 'Cabinet connector screws', total_qty: (nBox - 1) * (S.h > 900 ? 4 : 3), unit_cost: 0.45, note: 'Join the boxes side by side, through both sides' });
+    out.push({ name: 'Plastic packers (assorted)', total_qty: 1, unit_cost: 4, note: 'For levelling on uneven floors' });
   }
   return out.map(f => ({ ...f, total_cost: +(f.total_qty * f.unit_cost).toFixed(2) }));
 }
@@ -560,27 +613,39 @@ function compute() {
 function cabinetShapes() {
   const t = S.template, th = S.thickness, W = S.w, H = S.h;
   const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base;
+  const L = layout(), sh = [];
   const has = name => R.parts.some(p => p.name === name || p.name.startsWith(name));
-  const sh = [];
-  if (has('Back Panel')) sh.push(t === 'eaves' ? { x: th, y: H - S.low, w: W - 2 * th, h: S.low - th, c: 'bk', part: 'Back Panel' } : { x: th, y: th, w: W - 2 * th, h: Hc - 2 * th, c: 'bk', part: 'Back Panel' });
-  sh.push({ x: 0, y: 0, w: th, h: Hc, c: 'p', part: 'Left Side' });
-  sh.push({ x: W - th, y: 0, w: th, h: Hc, c: 'p', part: 'Right Side' });
-  if (t === 'kitchenbase') sh.push({ x: th, y: 0, w: W - 2 * th, h: th * 1.2, c: 'p2', part: 'Top Rail' });
-  else sh.push({ x: th, y: 0, w: W - 2 * th, h: th, c: 'p2', part: t === 'eaves' ? 'Sloped Top' : 'Top' });
-  sh.push({ x: th, y: Hc - th, w: W - 2 * th, h: th, c: 'p2', part: 'Bottom' });
-  const { bays, bayW } = bayInfo();
+  L.boxes.forEach(b => {
+    if (has('Back Panel')) sh.push(t === 'eaves' ? { x: b.x0 + th, y: H - S.low, w: b.w - 2 * th, h: S.low - th, c: 'bk', part: boxPart('Back Panel', b) } : { x: b.x0 + th, y: th, w: b.w - 2 * th, h: Hc - 2 * th, c: 'bk', part: boxPart('Back Panel', b) });
+    if (t === 'kitchenbase') sh.push({ x: b.x0 + th, y: 0, w: b.w - 2 * th, h: th * 1.2, c: 'p2', part: 'Top Rail' });
+    else sh.push({ x: b.x0 + th, y: 0, w: b.w - 2 * th, h: th, c: 'p2', part: boxPart(t === 'eaves' ? 'Sloped Top' : 'Top', b) });
+    sh.push({ x: b.x0 + th, y: Hc - th, w: b.w - 2 * th, h: th, c: 'p2', part: boxPart('Bottom', b) });
+  });
+  L.verticals.forEach(v => {
+    const part = v.kind === 'left' ? 'Left Side' : v.kind === 'right' ? 'Right Side' : v.kind === 'boxside' ? 'Box Side' : 'Divider';
+    sh.push(v.kind === 'divider' ? { x: v.x, y: th, w: th, h: Hc - 2 * th, c: 'p', part } : { x: v.x, y: 0, w: th, h: Hc, c: 'p', part });
+  });
   R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
     const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
-    for (let b = 0; b < bays; b++) sh.push({ x: bayX(b, bayW), y: Hc - yc - th / 2, w: bayW, h: th, c: 'p2', part: p.name });
+    L.bays.forEach(bay => sh.push({ x: bay.x, y: Hc - yc - th / 2, w: L.bayW, h: th, c: 'p2', part: p.name }));
   });
-  for (let b = 1; b < bays; b++) sh.push({ x: bayX(b, bayW) - th, y: th, w: th, h: Hc - 2 * th, c: 'p', part: 'Divider' });
   if (base) sh.push({ x: 0, y: Hc, w: W, h: base, c: 'p', part: 'Plinth' });
-  if (t === 'wardrobe') for (let b = 0; b < bays; b++) sh.push({ line: [bayX(b, bayW) + 20, th + 70, bayX(b, bayW) + bayW - 20, th + 70], c: 'rl', part: 'Hanging Rail' });
+  if (t === 'wardrobe') L.bays.forEach(bay => sh.push({ line: [bay.x + 20, th + 70, bay.x + L.bayW - 20, th + 70], c: 'rl', part: 'Hanging Rail' }));
   const drawer = R.parts.find(p => p.name === 'Drawer Front');
   if (drawer) sh.push({ x: 2, y: 2, w: W - 4, h: 180, c: 'dr', part: 'Drawer Front', handle: [W / 2, 60] });
-  const door = R.parts.find(p => p.role === 'door');
-  if (door) {
-    const n = door.qty;
+  const doors = R.parts.filter(p => p.role === 'door');
+  if (doors.length && L.n > 1) {
+    // One door per compartment, each box on its own
+    L.boxes.forEach(b => {
+      for (let j = 0; j < b.k; j++) {
+        const dw = doors[0].inset ? Math.floor((b.w - 2 * th - 2 * (b.k + 1)) / b.k) : Math.floor((b.w - 4 - 3 * (b.k - 1)) / b.k);
+        const x = doors[0].inset ? b.x0 + th + 2 + j * (dw + 2) : b.x0 + 2 + j * (dw + 3), y = doors[0].inset ? th + 2 : 2;
+        const part = (doors.find(p => p.w === dw) || doors[0]).name, hingeLeft = b.k === 1 ? b.i % 2 === 0 : j < b.k / 2;
+        sh.push({ x, y, w: dw, h: doors[0].h, c: 'dr', part, handle: [hingeLeft ? x + dw - 50 : x + 50, y + Math.min(doors[0].h / 2, 900)] });
+      }
+    });
+  } else if (doors.length) {
+    const door = doors[0], n = door.qty;
     for (let i = 0; i < n; i++) {
       const x = door.inset ? th + 2 + i * (door.w + 2) : 2 + i * (door.w + 3);
       const y = door.inset ? th + 2 : (drawer ? 185 : 2);
@@ -711,26 +776,24 @@ function solids() {
     out.push({ v, f, col });
   };
   if (isCabinet(t)) {
-    const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base;
-    if (t === 'eaves') {
-      const L = S.low, prof = [[0, 0], [H, 0], [L, D], [0, D]];
-      prismX(0, th, prof, 'panel'); prismX(W - th, W, prof, 'panel');
-      prismX(th, W - th, [[H, 0], [L, D], [L - th, D], [H - th, 0]], 'panel2');
-    } else {
-      box(0, base, 0, th, Hc, D, 'panel'); box(W - th, base, 0, th, Hc, D, 'panel');
-      box(th, H - th, 0, W - 2 * th, th, D, 'panel2');
-    }
-    box(th, base, 0, W - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0), 'panel2');
-    const { bays, bayW } = bayInfo();
+    const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base, Lay = layout();
+    const prof = [[0, 0], [H, 0], [S.low, D], [0, D]], c = t === 'eaves' ? (Math.cos(eavesGeom().ang) || 1) : 1;
+    Lay.verticals.forEach(v => {
+      if (v.kind === 'divider') {
+        if (t === 'eaves') prismX(v.x, v.x + th, [[th, 0], [H - th / c, 0], [S.low - th / c, D], [th, D]], 'panel');
+        else box(v.x, base + th, 0, th, Hc - 2 * th, D, 'panel');
+      } else if (t === 'eaves') prismX(v.x, v.x + th, prof, 'panel');
+      else box(v.x, base, 0, th, Hc, D, 'panel');
+    });
+    Lay.boxes.forEach(b => {
+      if (t === 'eaves') prismX(b.x0 + th, b.x0 + b.w - th, [[H, 0], [S.low, D], [S.low - th, D], [H - th, 0]], 'panel2');
+      else box(b.x0 + th, H - th, 0, b.w - 2 * th, th, D, 'panel2');
+      box(b.x0 + th, base, 0, b.w - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0), 'panel2');
+    });
     R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
       const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
-      for (let b = 0; b < bays; b++) box(bayX(b, bayW), base + yc - th / 2, 0, bayW, th, Math.min(D, p.h), 'shelf');
+      Lay.bays.forEach(bay => box(bay.x, base + yc - th / 2, 0, Lay.bayW, th, Math.min(D, p.h), 'shelf'));
     });
-    for (let b = 1; b < bays; b++) {
-      const x = bayX(b, bayW) - th;
-      if (t === 'eaves') { const c = Math.cos(eavesGeom().ang) || 1; prismX(x, x + th, [[th, 0], [H - th / c, 0], [S.low - th / c, D], [th, D]], 'panel'); }
-      else box(x, base + th, 0, th, Hc - 2 * th, D, 'panel');
-    }
     if (base) box(0, 0, 20, W, base, th, 'panel');
   } else if (t === 'studwall' || t === 'partition') {
     const sp = S.spacing, cnt = Math.floor(W / sp) + 1;
@@ -1044,6 +1107,7 @@ function renderControls() {
         <div class="steppers">
           ${BAY_TEMPLATES.has(S.template) ? stepper('compartments', 'Compartments side by side', 'Upright dividers split the unit into bays') : ''}
           ${stepper('shelves', BAY_TEMPLATES.has(S.template) ? 'Shelves in each compartment' : 'Shelves', BAY_TEMPLATES.has(S.template) ? 'Not counting the top and bottom' : 'Not counting the top and bottom')}
+          ${BAY_TEMPLATES.has(S.template) ? boxesControl() : ''}
           ${layoutPreview()}
         </div>
         ${S.template === 'eaves' && R.parts.filter(p => p.role === 'shelf').length < S.shelves ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Some shelves would sit too close to the slope, so we left them out.</span></div>` : ''}
@@ -1084,15 +1148,28 @@ function stepper(k, label, help) {
     </div><span class="help">${esc(help)}</span></div>`;
 }
 
+// How many separate boxes the unit is built from. Auto keeps each box within MAX_BOX.
+function boxesControl() {
+  const L = layout(), auto = S.boxes === 'auto' || S.boxes == null;
+  const help = auto ? `Auto: each box is ${fmt(MAX_BOX)} or less, so it fits on one sheet and up the stairs` : `${L.n === 1 ? 'One box' : L.n + ' boxes'}, chosen by you`;
+  return `<div class="count-field"><span class="lbl" id="lbl-boxes">Built as separate boxes</span>
+    <div class="count-step" role="group" aria-labelledby="lbl-boxes">
+      <button type="button" data-action="step" data-k="boxes" data-d="-1" aria-label="One fewer box"${L.n <= 1 ? ' disabled' : ''}><i class="ph ph-minus" aria-hidden="true"></i></button>
+      <output aria-live="polite">${L.n}</output>
+      <button type="button" data-action="step" data-k="boxes" data-d="1" aria-label="One more box"${L.n >= 8 ? ' disabled' : ''}><i class="ph ph-plus" aria-hidden="true"></i></button>
+    </div><span class="help">${esc(help)}${auto ? '' : ' <button type="button" class="link-btn" data-action="boxes-auto">Back to auto</button>'}</span>
+    ${L.raised ? `<span class="help">Raised to ${L.C} compartments so every box has at least one.</span>` : ''}</div>`;
+}
+
 // Tiny front view so the numbers above read as a picture
 function layoutPreview() {
-  const { bays } = bayInfo(), W = 132, H = 64, t = 3, n = Math.round(S.shelves || 0);
+  const L = layout(), W = 160, H = 64, t = 3, k = W / S.w;
   const shelves = R.parts.filter(p => p.role === 'shelf').length || 0;
-  const bw = (W - t * (bays + 1)) / bays;
-  let g = `<rect x="0" y="0" width="${W}" height="${H}" rx="2" fill="none" stroke="currentColor" stroke-width="${t}"/>`;
-  for (let b = 1; b < bays; b++) { const x = t + b * (bw + t) - t / 2; g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="currentColor" stroke-width="${t}"/>`; }
-  for (let i = 1; i <= shelves; i++) { const y = H * i / (shelves + 1); g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="var(--accent)" stroke-width="${t}"/>`; }
-  return `<div class="layout-preview" aria-hidden="true"><svg viewBox="-2 -2 ${W + 4} ${H + 4}" width="${W + 4}" height="${H + 4}">${g}</svg><span>${bays} x ${shelves + 1} spaces</span></div>`;
+  let g = '';
+  L.boxes.forEach(b => { g += `<rect x="${b.x0 * k + 1}" y="0" width="${b.w * k - 2}" height="${H}" rx="2" fill="none" stroke="currentColor" stroke-width="${t}"/>`; });
+  L.verticals.filter(v => v.kind === 'divider').forEach(v => { const x = (v.x + S.thickness / 2) * k; g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="currentColor" stroke-width="${t}"/>`; });
+  for (let i = 1; i <= shelves; i++) { const y = H * i / (shelves + 1); g += `<line x1="2" y1="${y}" x2="${W - 2}" y2="${y}" stroke="var(--accent)" stroke-width="${t}"/>`; }
+  return `<div class="layout-preview" aria-hidden="true"><svg viewBox="-2 -2 ${W + 4} ${H + 4}" width="${W + 4}" height="${H + 4}">${g}</svg><span>${L.C} x ${shelves + 1} spaces${L.n > 1 ? `, built as ${L.n} boxes` : ''}</span></div>`;
 }
 
 function numField(k, label, help, unit) {
@@ -1237,10 +1314,9 @@ function shelfCheck(span, depth, t, material, load) {
 // Smallest change that makes the worst shelf pass: more compartments, or a thicker board
 function safetyFixes(depth, load) {
   const out = [];
-  const inner = S.w - 2 * S.thickness;
   if (BAY_TEMPLATES.has(S.template)) {
     for (let n = Math.max(1, S.compartments) + 1; n <= 8; n++) {
-      const span = Math.floor((inner - (n - 1) * S.thickness) / n);
+      const keep = S.compartments; S.compartments = n; const span = layout().bayW; S.compartments = keep;
       const c = shelfCheck(span, depth, S.thickness, S.material, load);
       if (c && c.ok && c.perPin <= PIN_KG) { out.push({ kind: 'compartments', value: n, label: `Use ${n} compartments` }); break; }
     }
@@ -1333,6 +1409,8 @@ function buildSteps() {
     const doors = R.parts.find(p => p.role === 'door');
     const f = Math.max(2, Math.ceil(S.d / 150));
     const eaves = t === 'eaves', hasDiv = R.parts.some(p => p.role === 'divider'), shelves = R.parts.filter(p => p.role === 'shelf');
+    const Lay = layout(), multi = Lay.n > 1, conn = S.h > 900 ? 4 : 3;
+    const boxDesc = multi ? (() => { const g = {}; Lay.boxes.forEach(b => { g[b.w] = (g[b.w] || 0) + 1; }); return Object.entries(g).map(([w, c]) => `${c} x ${fmt(+w)} wide`).join(' and '); })() : '';
     const topName = eaves ? 'sloped top' : t === 'kitchenbase' ? 'top rails' : 'top';
     const pilot = S.joinery === 'screws' ? 'Drill 3mm pilot holes and countersink them. ' : '';
     steps.push({ title: 'Check your delivery', parts: all, tools: ['Tape measure', 'Pencil'], body: ['Lay every panel out flat and match it to the cut list.', 'Measure a few. Tell the supplier now if anything is off.', 'Pencil the part name on a hidden edge, and a small triangle on the inside face pointing to the front edge, so nothing goes in back to front.'] });
@@ -1355,15 +1433,21 @@ function buildSteps() {
       : S.joinery === 'pocket'
         ? ['Set your pocket-hole jig for 18mm board and drill pocket holes on the underside of the bottom.', `Clamp each side flush at the front, glue, then drive ${f} 32mm pocket screws per joint.`]
         : ['Push glued dowels into the side panels.', 'Fit the cam bolts, slide the bottom on and turn each cam a quarter turn. Do not over-tighten.'];
-    steps.push({ title: 'Build the base', parts: [...names('side'), ...names('bottom')], tools: S.joinery === 'pocket' ? ['Drill', 'Pocket-hole jig', 'Clamps'] : S.joinery === 'cam' ? ['Screwdriver', 'Rubber mallet'] : ['Drill', '3mm bit', 'Countersink', 'Clamps'], body: join });
-    if (hasDiv) { const bi = bayInfo(); steps.push({ title: 'Stand the dividers', parts: names('divider'), tools: ['Tape measure', 'Square', 'Drill'], body: [`Mark the divider positions on the bottom. Each compartment is ${bi.bayW}mm wide inside.`, 'Cut a spacer from an offcut to that width. Use it to set each divider square and parallel.', `${pilot}Screw through the underside of the bottom into each divider, ${f} screws each.`] }); }
-    steps.push({ title: eaves ? 'Fit the sloped top' : t === 'kitchenbase' ? 'Fit the top rails' : 'Fit the top', parts: names('top'), tools: ['Drill', 'Clamps'], body: [eaves ? `Check the front and back edges are bevelled at ${eavesGeom().angDeg} degrees.` : 'Lay the top on, flush at the front.', `${pilot}Glue and screw it down into the sides${hasDiv ? ' and every divider' : ''}, ${f} screws per joint.`] });
-    if (R.parts.some(p => p.role === 'back')) steps.push({ title: 'Square it and fit the back', parts: ['Back Panel'], tools: ['Tape measure', 'Hammer'], body: ['Turn the unit over so it lies face down on a blanket.', 'Measure both diagonals. Push the corners until they match: then the box is square.', `Run glue along every edge${hasDiv ? ' and divider' : ''}, lay the back on and pin it every 150mm with 25mm panel pins.`], warn: eaves ? 'Do this now, before it goes in. Once the unit is under the eaves you cannot reach the back.' : 'The back holds the unit square. Fit it before you stand the unit up or move it.' });
+    if (multi) join.unshift(`This unit is built as ${Lay.n} separate boxes (${boxDesc}) so each one fits on a sheet and up the stairs. Build every box with the next ${hasDiv ? 4 : 3} steps, then join them in place.`);
+    steps.push({ title: multi ? 'Build each box: the base' : 'Build the base', parts: [...names('side'), ...names('bottom')], tools: S.joinery === 'pocket' ? ['Drill', 'Pocket-hole jig', 'Clamps'] : S.joinery === 'cam' ? ['Screwdriver', 'Rubber mallet'] : ['Drill', '3mm bit', 'Countersink', 'Clamps'], body: join });
+    if (hasDiv) { const bi = bayInfo(); steps.push({ title: multi ? 'Each box: stand the dividers' : 'Stand the dividers', parts: names('divider'), tools: ['Tape measure', 'Square', 'Drill'], body: [`Mark the divider positions on the bottom. Each compartment is ${bi.bayW}mm wide inside.`, 'Cut a spacer from an offcut to that width. Use it to set each divider square and parallel.', `${pilot}Screw through the underside of the bottom into each divider, ${f} screws each.`] }); }
+    steps.push({ title: (multi ? 'Each box: ' : '') + (eaves ? (multi ? 'fit the sloped top' : 'Fit the sloped top') : t === 'kitchenbase' ? 'Fit the top rails' : (multi ? 'fit the top' : 'Fit the top')), parts: names('top'), tools: ['Drill', 'Clamps'], body: [eaves ? `Check the front and back edges are bevelled at ${eavesGeom().angDeg} degrees.` : 'Lay the top on, flush at the front.', `${pilot}Glue and screw it down into the sides${hasDiv ? ' and every divider' : ''}, ${f} screws per joint.`] });
+    if (R.parts.some(p => p.role === 'back')) steps.push({ title: multi ? 'Each box: square it and fit the back' : 'Square it and fit the back', parts: names('back'), tools: ['Tape measure', 'Hammer'], body: ['Turn the unit over so it lies face down on a blanket.', 'Measure both diagonals. Push the corners until they match: then the box is square.', `Run glue along every edge${hasDiv ? ' and divider' : ''}, lay the back on and pin it every 150mm with 25mm panel pins.`], warn: eaves ? 'Do this now, before it goes in. Once the unit is under the eaves you cannot reach the back.' : 'The back holds the unit square. Fit it before you stand the unit up or move it.' });
     if (t === 'kitchenbase') steps.push({ title: 'Make the drawer', parts: names('drawer'), tools: ['Drill', 'Clamps'], body: ['Glue and screw the sides to the back.', 'Slide the 6mm base in and pin it from below.', 'Fit the runners to the drawer and the cabinet.'] });
     if (t === 'kitchenbase') steps.push({ title: 'Legs and plinth', parts: ['Plinth'], tools: ['Spirit level'], body: ['Screw the legs to the underside, one near each corner.', 'Level the unit by twisting the legs.', 'Clip the plinth to the front legs.'] });
-    steps.push({ title: eaves ? 'Slide it in and fix it' : 'Fix it in place', parts: names('side'), tools: ['Spirit level', 'Packers', 'Drill', 'Stud and cable detector'], twoPeople: true,
+    if (multi) steps.push({ title: 'Put the boxes in place and join them', parts: names('side'), tools: ['Clamps', 'Drill', '5mm bit', 'Spirit level'], twoPeople: S.h > 1200, body: [
+      `Carry the boxes in one at a time, starting at ${eaves ? 'one end of the eaves' : 'one end of the wall'}.${eaves ? ' Slide each one back under the slope, keeping the 25mm air gap.' : ''}`,
+      'Stand the next box beside it. Line up the fronts and tops flush, level it with packers to match, and clamp the two sides together.',
+      `Drill ${conn} 5mm holes through both sides, about 50mm in from the front and back edges, and fit a connector screw in each.`,
+      'Repeat until every box is joined, checking with a level as you go.'] });
+    steps.push({ title: eaves ? (multi ? 'Fix it to the floor and knee wall' : 'Slide it in and fix it') : 'Fix it in place', parts: names('side'), tools: ['Spirit level', 'Packers', 'Drill', 'Stud and cable detector'], twoPeople: true,
       body: eaves
-        ? ['With two people, carry the unit in and slide it back under the slope, keeping the 25mm air gap behind it.', 'Level it front to back and side to side with packers under the bottom.', 'Inside the unit, screw angle brackets to the floor. Screw through the top back edge into the knee wall studs you marked.', 'Fill the gaps to the walls and slope with a scribe strip or decorators caulk.']
+        ? [...(multi ? [] : ['With two people, carry the unit in and slide it back under the slope, keeping the 25mm air gap behind it.']), 'Level it front to back and side to side with packers under the bottom.', 'Inside the unit, screw angle brackets to the floor. Screw through the top back edge into the knee wall studs you marked.', 'Fill the gaps to the walls and slope with a scribe strip or decorators caulk.']
         : ['Level the unit, packing under it if needed.', 'Fix it to the studs you marked, or with wall plugs that suit the wall.', 'Fill any gap to the wall with a scribe strip or caulk.'],
       warn: (t === 'wardrobe' || (t === 'shelving' && S.h > 1000)) ? 'Tall units can tip forward. Always fix them to the wall.' : null });
     if (shelves.length || t === 'wardrobe') steps.push({ title: t === 'wardrobe' ? 'Fit shelves and rail' : 'Fit the shelves', parts: [...names('shelf'), ...names('rail')], tools: ['Screwdriver'], body: ['Push four pins into the holes for each shelf and rest the shelf on them.', t === 'wardrobe' ? 'Screw the rail sockets 70mm below the top, then drop the rail in.' : 'Check each shelf sits flat and does not rock.'] });
@@ -1427,7 +1511,7 @@ function renderBuildPage() {
 const MP = { ink: '#15181B', done: '#E4E2DC', wood: '#E9D9BC', add: '#FF8A5C', line: '#15181B', paper: '#FBFBFA' };
 
 // 3D solids for each named part, in mm. x right, y up, z from the front (0) to the back (D).
-function partSolids() {
+function partSolids(opt = {}) {
   const t = S.template, th = S.thickness, W = S.w, H = S.h, D = S.d;
   const out = [];
   const box = (part, x, y, z, w, h, d) => {
@@ -1442,33 +1526,40 @@ function partSolids() {
     for (let i = 0; i < n; i++) f.push([i, (i + 1) % n, n + (i + 1) % n, n + i]);
     out.push({ part, v, f });
   };
-  const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base;
-  if (t === 'eaves') {
-    const L = S.low, prof = [[0, 0], [H, 0], [L, D], [0, D]];
-    prismX('Left Side', 0, th, prof); prismX('Right Side', W - th, W, prof);
-    prismX('Sloped Top', th, W - th, [[H, 0], [L, D], [L - th, D], [H - th, 0]]);
-  } else {
-    box('Left Side', 0, base, 0, th, Hc, D); box('Right Side', W - th, base, 0, th, Hc, D);
-    if (t === 'kitchenbase') { box('Top Rail', th, H - th, 0, W - 2 * th, th, 100); box('Top Rail', th, H - th, D - 100, W - 2 * th, th, 100); }
-    else box('Top', th, H - th, 0, W - 2 * th, th, D);
-  }
-  box('Bottom', th, base, 0, W - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0));
-  const { bays, bayW } = bayInfo();
+  const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base, Lay = layout();
+  // opt.box: only that box's carcass, moved to x = 0 (for the "build one box" steps)
+  const only = opt.box != null ? Lay.boxes[opt.box] : null, dx = only ? -only.x0 : 0;
+  const inBox = i => !only || i === only.i;
+  const prof = [[0, 0], [H, 0], [S.low, D], [0, D]], c = t === 'eaves' ? (Math.cos(eavesGeom().ang) || 1) : 1;
+  Lay.verticals.forEach(v => {
+    if (!inBox(v.box)) return;
+    const part = v.kind === 'left' ? 'Left Side' : v.kind === 'right' ? 'Right Side' : v.kind === 'boxside' ? 'Box Side' : 'Divider', x = v.x + dx;
+    if (v.kind === 'divider') {
+      if (t === 'eaves') prismX(part, x, x + th, [[th, 0], [H - th / c, 0], [S.low - th / c, D], [th, D]]);
+      else box(part, x, base + th, 0, th, Hc - 2 * th, D);
+    } else if (t === 'eaves') prismX(part, x, x + th, prof);
+    else box(part, x, base, 0, th, Hc, D);
+    out[out.length - 1].side = v.kind; out[out.length - 1].box = v.box;
+  });
+  Lay.boxes.forEach(b => {
+    if (!inBox(b.i)) return;
+    const x = b.x0 + dx;
+    if (t === 'eaves') prismX(boxPart('Sloped Top', b), x + th, x + b.w - th, [[H, 0], [S.low, D], [S.low - th, D], [H - th, 0]]);
+    else if (t === 'kitchenbase') { box('Top Rail', x + th, H - th, 0, b.w - 2 * th, th, 100); box('Top Rail', x + th, H - th, D - 100, b.w - 2 * th, th, 100); }
+    else box(boxPart('Top', b), x + th, H - th, 0, b.w - 2 * th, th, D);
+    box(boxPart('Bottom', b), x + th, base, 0, b.w - 2 * th, th, D - (t === 'kitchenbase' ? 20 : 0));
+    if (R.parts.some(p => p.role === 'back')) box(boxPart('Back Panel', b), x, base, D, b.w, t === 'eaves' ? S.low : Hc, 3);
+    out.filter(o => o.box === undefined).forEach(o => { o.box = b.i; });
+  });
+  if (only) return out;
   R.parts.filter(p => p.role === 'shelf').forEach((p, i, arr) => {
     const yc = p.yc ?? (th + (Hc - 2 * th) * (i + 1) / (arr.length + 1));
-    for (let b = 0; b < bays; b++) box(p.name, bayX(b, bayW), base + yc - th / 2, 0, bayW, th, Math.min(D, p.h));
+    Lay.bays.forEach(bay => box(p.name, bay.x, base + yc - th / 2, 0, Lay.bayW, th, Math.min(D, p.h)));
   });
-  for (let b = 1; b < bays; b++) {
-    const x = bayX(b, bayW) - th;
-    if (t === 'eaves') { const c = Math.cos(eavesGeom().ang) || 1; prismX('Divider', x, x + th, [[th, 0], [H - th / c, 0], [S.low - th / c, D], [th, D]]); }
-    else box('Divider', x, base + th, 0, th, Hc - 2 * th, D);
-  }
-  const back = R.parts.find(p => p.name === 'Back Panel');
-  if (back) box('Back Panel', 0, base, D, W, t === 'eaves' ? S.low : Hc, 3);
   if (base) box('Plinth', 0, 0, 30, W, base, th);
-  if (t === 'wardrobe') for (let b = 0; b < bays; b++) box('Hanging Rail', bayX(b, bayW) + 10, H - th - 90, D / 2 - 12, bayW - 20, 25, 25);
+  if (t === 'wardrobe') Lay.bays.forEach(bay => box('Hanging Rail', bay.x + 10, H - th - 90, D / 2 - 12, Lay.bayW - 20, 25, 25));
   // Doors and drawer fronts come from the front elevation, laid on the front face
-  cabinetShapes().filter(s => s.part === 'Door' || s.part === 'Drawer Front').forEach(s => box(s.part, s.x, H - s.y - s.h, -th, s.w, s.h, th));
+  cabinetShapes().filter(s => /^Door( [A-Z])?$/.test(s.part) || s.part === 'Drawer Front').forEach(s => box(s.part, s.x, H - s.y - s.h, -th, s.w, s.h, th));
   return out;
 }
 
@@ -1601,6 +1692,8 @@ function hwArt(name) {
     return mm(L + 2, 10, `<path d="M1,1.5 L4,1.5 L5.5,${5 - d / 2} L${L - 3},${5 - d / 2} L${L + 1},5 L${L - 3},${5 + d / 2} L5.5,${5 + d / 2} L4,8.5 L1,8.5 Z" fill="#fff" stroke="${ink}" stroke-width=".45"/>${th}`);
   };
   if (/pocket/.test(n)) return { art: screw(32, 4), actual: true };
+  if (/connector/.test(n)) return { art: mm(34, 12, `<rect x="1" y="2.5" width="3" height="7" rx="1" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/><rect x="4" y="4" width="26" height="4" fill="#fff" stroke="${ink}" stroke-width=".45"/><rect x="30" y="2.5" width="3" height="7" rx="1" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/>`), actual: true };
+  if (/packer/.test(n)) return { art: `<svg viewBox="0 0 60 40" width="60" height="40" class="m-hw-art" aria-hidden="true"><path d="M4,32 L56,32 L56,24 L4,30 Z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><path d="M8,22 L52,22 L52,14 L8,20 Z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/></svg>` };
   if (/screw/.test(n)) return { art: screw(/32/.test(n) ? 32 : /30/.test(n) ? 30 : 40, 4), actual: true };
   if (/panel pin|nail/.test(n)) return { art: mm(27, 6, `<rect x="1" y="1.6" width="1" height="2.8" fill="${ink}"/><path d="M2,2.6 L24,2.6 L26,3 L24,3.4 L2,3.4 Z" fill="#fff" stroke="${ink}" stroke-width=".35"/>`), actual: true };
   if (/dowel/.test(n)) return { art: mm(32, 10, `<rect x="1" y="1" width="30" height="8" rx="2" fill="#F1E6D2" stroke="${ink}" stroke-width=".45"/>${[6, 11, 16, 21, 26].map(x => `<line x1="${x}" y1="1" x2="${x - 2}" y2="9" stroke="${ink}" stroke-width=".3"/>`).join('')}`), actual: true };
@@ -1625,25 +1718,29 @@ function manualSteps() {
   const join = k => S.joinery === 'cam' ? [['cam lock', f * k], ['dowels', f * k]] : S.joinery === 'pocket' ? [['pocket-hole screws', f * k]] : [['wood screws', f * k]];
   const topName = t === 'eaves' ? 'Sloped Top' : t === 'kitchenbase' ? 'Top Rail' : 'Top';
   const steps = [];
-  const eaves = t === 'eaves';
+  const eaves = t === 'eaves', L = layout(), b0 = L.boxes[0], multi = L.n > 1;
+  const rightName = multi ? 'Box Side' : 'Right Side', bName = boxPart('Bottom', b0), tName = t === 'kitchenbase' ? 'Top Rail' : boxPart(topName, b0), backName = boxPart('Back Panel', b0);
+  const box0Divs = b0.k - 1, scope = multi ? 'box' : null;
+  const makeNote = multi ? (L.boxes.some(b => b.k !== b0.k) ? ` Build ${L.boxes.filter(b => b.k === b0.k).length} boxes like this, and ${L.boxes.filter(b => b.k !== b0.k).length} with ${L.boxes.find(b => b.k !== b0.k).k} compartment${L.boxes.find(b => b.k !== b0.k).k > 1 ? 's' : ''}.` : ` Build ${L.n} boxes like this.`) : '';
   // Same order as a carpenter: base, right side, dividers onto the base, top down onto them,
   // back on while it is still out in the room, then into place, then the loose parts.
-  steps.push({ add: ['Bottom'], ex: { Bottom: [W * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Work on a flat floor with the unit on its back. Fix the bottom to the left side, flush at the front.' });
-  steps.push({ add: ['Right Side'], ex: { 'Right Side': [W * 0.45, 0, 0] }, hw: join(1), note: 'Fix the right side to the bottom.', twoPeople: H > 1500 });
-  const dividers = R.parts.find(p => p.name === 'Divider');
-  if (dividers) steps.push({ add: ['Divider'], ex: { Divider: [0, H * 0.9, 0] }, hw: join(dividers.qty), note: `Stand the dividers on the bottom, ${bayInfo().bayW}mm apart. Use a spacer cut to that width to keep them square, then screw through the underside of the bottom.` });
-  steps.push({ add: [topName], ex: { [topName]: [0, H * 0.6, 0] }, hw: join(2 + (dividers ? dividers.qty : 0)), note: eaves ? 'Lay the sloped top on and screw it down into the sides and every divider.' : 'Lay the top on, flush at the front, and screw it down.' });
-  if (has('Back Panel')) steps.push({ add: ['Back Panel'], ex: { 'Back Panel': [0, 0, D * 1.1] }, hw: [['panel pins', 40], ['glue', 0]], note: eaves ? 'Turn the unit face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back on now, before it goes under the eaves.' : 'Turn the unit face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back every 150mm.', check: true });
+  steps.push({ scope, times: multi ? L.n : 0, add: [bName], ex: { [bName]: [b0.w * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Work on a flat floor with the box on its back. Fix the bottom to the left side, flush at the front.' + makeNote });
+  steps.push({ scope, add: [rightName], ex: { [rightName]: [b0.w * 0.45, 0, 0] }, hw: join(1), note: 'Fix the right side to the bottom.', twoPeople: H > 1500 });
+  if (box0Divs > 0) steps.push({ scope, add: ['Divider'], ex: { Divider: [0, H * 0.9, 0] }, hw: join(box0Divs), note: `Stand the divider${box0Divs > 1 ? 's' : ''} on the bottom, ${L.bayW}mm apart. Use a spacer cut to that width to keep ${box0Divs > 1 ? 'them' : 'it'} square, then screw through the underside of the bottom.` });
+  steps.push({ scope, add: [tName], ex: { [tName]: [0, H * 0.6, 0] }, hw: join(2 + box0Divs), note: eaves ? `Lay the sloped top on and screw it down into the sides${box0Divs ? ' and every divider' : ''}.` : 'Lay the top on, flush at the front, and screw it down.' });
+  if (R.parts.some(p => p.role === 'back')) steps.push({ scope, add: [backName], ex: { [backName]: [0, 0, D * 1.1] }, hw: [['panel pins', Math.ceil(2 * (b0.w + (eaves ? S.low : H)) / 150) + box0Divs * Math.ceil((eaves ? S.low : H) / 150)], ['glue', 0]], note: (eaves ? 'Turn the box face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back on now, before it goes under the eaves.' : 'Turn the box face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back every 150mm.'), check: true });
+  if (multi) steps.push({ join: true, add: [], hw: [['connector', (S.h > 900 ? 4 : 3)]], note: `Carry the boxes in one at a time${eaves ? ' and slide each back under the slope' : ''}. Stand each one beside the last with the fronts and tops flush, clamp the sides together and drill ${S.h > 900 ? 4 : 3} holes through both. Fit the connector screws.`, twoPeople: H > 1200 });
   if (has('Plinth')) steps.push({ add: ['Plinth'], ex: { Plinth: [0, -H * 0.1, -D * 0.7] }, hw: [['legs', 4], ['plinth clips', 4]], note: 'Screw on the legs. Level the unit, then clip the plinth onto the front legs.' });
   const wallHw = eaves ? [['angle brackets', 6]] : t === 'wardrobe' ? [['anti-tip', 2]] : t === 'kitchenwall' ? [['wall hanging', 2]] : t === 'shelving' ? [['wall fixing', 4]] : [];
-  steps.push({ add: [], wall: true, hw: wallHw, note: eaves ? 'Slide it back under the slope, leaving a 25mm air gap behind. Level it with packers, then screw brackets to the floor and into the knee wall studs.' : 'Level it, then fix it to the wall studs.', twoPeople: true });
+  steps.push({ add: [], wall: true, hw: wallHw.map(([k, q]) => [k, multi && !/anti|hanging/.test(k) ? 2 * L.n + 2 : q * L.n]), note: eaves ? `${multi ? 'Push the joined boxes' : 'Slide it'} back under the slope, leaving a 25mm air gap behind. Level ${multi ? 'them' : 'it'} with packers, then screw brackets to the floor and into the knee wall studs.` : `Level ${multi ? 'the boxes' : 'it'}, then fix ${multi ? 'each one' : 'it'} to the wall studs.`, twoPeople: true });
   const shelves = names('shelf');
-  if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, 0, -D * 1.05]])), hw: [['shelf pins', 4 * shelves.length]], note: 'Push the pins into the holes you drilled, then rest each shelf on four pins.' });
+  if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, 0, -D * 1.05]])), hw: [['shelf pins', 4 * R.parts.filter(p => p.role === 'shelf').reduce((a, p) => a + p.qty, 0)]], note: 'Push the pins into the holes you drilled, then rest each shelf on four pins.' });
   if (has('Hanging Rail')) steps.push({ add: ['Hanging Rail'], ex: { 'Hanging Rail': [0, 0, -D * 0.9] }, hw: [['rail end sockets', 2]], note: 'Screw the sockets to the sides, then drop the rail in.' });
   if (has('Drawer Front')) steps.push({ add: ['Drawer Front'], ex: { 'Drawer Front': [0, 0, -D * 0.8] }, hw: [['runners', 1]], note: 'Build the drawer box from its sides, back and base. Fit the runners, then slide it in.' });
-  if (has('Door')) {
-    const nd = R.parts.find(p => p.name === 'Door').qty;
-    steps.push({ add: ['Door'], ex: { Door: [0, 0, -D * 0.7] }, hw: [['hinges', R.parts.find(p => p.name === 'Door').hinges.length * nd], ['knob', nd], ['handles', nd]], note: 'Clip each hinge onto its plate. Turn the adjusting screws until the gaps are even.', twoPeople: H > 1500 });
+  const doorParts = R.parts.filter(p => p.role === 'door');
+  if (doorParts.length) {
+    const nd = doorParts.reduce((a, p) => a + p.qty, 0), names = doorParts.map(p => p.name);
+    steps.push({ add: names, ex: Object.fromEntries(names.map(n => [n, [0, 0, -D * 0.7]])), hw: [['hinges', doorParts[0].hinges.length * nd], ['knob', nd], ['handles', nd]], note: 'Clip each hinge onto its plate. Turn the adjusting screws until the gaps are even.', twoPeople: H > 1500 });
   }
   return steps;
 }
@@ -1704,24 +1801,31 @@ function renderManual(print = false) {
   // Drill first, while every panel is flat
   const holes = pinHoleSVG(), hasDiv = R.parts.some(p => p.role === 'divider');
   if (holes) pages.push(page(`<h4 class="m-h">Drill first</h4><div class="m-calls">${hwCallouts([['shelf pins', 0]], hw.find)}</div>${holes}<p class="m-note">Lay each side${hasDiv ? ' and divider' : ''} flat, inside face up. Drill 5mm holes 10mm deep at these heights, measured up from the bottom edge.${hasDiv ? ' Drill right through the dividers so one hole holds a pin on each side.' : ''}</p>`));
-  // Assembly
+  // Assembly. Multi-box units: the first steps show one box on its own, then a step joins them all.
+  const Lay = layout(), oneBox = Lay.n > 1 ? partSolids({ box: 0 }) : null;
   let built = ['Left Side'];
   steps.forEach((st, i) => {
     const items = [];
-    solids.forEach(s => {
+    if (st.join) {
+      solids.filter(s => s.box != null).forEach(s => items.push(s.box === Lay.n - 1
+        ? { ...s, fill: MP.add, offset: [Lay.boxes[Lay.n - 1].w * 0.5, 0, 0], label: letterOf(s.part) }
+        : { ...s, fill: MP.done }));
+      built = [...new Set(solids.filter(s => s.box != null).map(s => s.part))];
+    }
+    else (st.scope === 'box' && oneBox ? oneBox : solids).forEach(s => {
       if (built.includes(s.part)) items.push({ ...s, fill: MP.done, label: st.wall ? letterOf(s.part) : null });
       else if (st.add.includes(s.part)) items.push({ ...s, fill: MP.add, offset: st.ex && st.ex[s.part], label: letterOf(s.part) });
     });
     if (i === 0) items.forEach(it => { if (it.part === 'Left Side') it.label = letterOf('Left Side'); });
     const art = isoSVG(items, { alt: 'Step ' + (i + 1), animate: !print && items.some(it => it.offset) });
-    pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
+    pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.times ? `<span class="m-2p"><i class="ph ph-copy" aria-hidden="true"></i>Make ${st.times} boxes</span>` : ''}${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
       <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}
       ${st.check ? `<div class="m-check"><svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="10" y="10" width="100" height="60" fill="none" stroke="${MP.ink}" stroke-width="2"/><line x1="10" y1="10" x2="110" y2="70" stroke="${MP.add}" stroke-width="2"/><line x1="110" y1="10" x2="10" y2="70" stroke="${MP.add}" stroke-width="2"/></svg><span>A = B</span></div>` : ''}
       ${st.wall ? `<div class="m-warn"><i class="ph ph-warning" aria-hidden="true"></i>Check for pipes and cables before you drill.</div>` : ''}
       <p class="m-note">${esc(st.note)}</p>`));
-    built = built.concat(st.add);
+    if (!st.join) built = built.concat(st.add);
   });
-  pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight. Re-check the doors after a week as the hinges settle.</p></div>`));
+  pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight.${R.parts.some(p => p.role === 'door') ? ' Re-check the doors after a week as the hinges settle.' : ''}</p></div>`));
   const play = print ? '' : `<div class="m-play"><button type="button" class="chip" data-action="manual-anim" aria-pressed="${S.manualAnim !== false}"><i class="ph ph-${S.manualAnim !== false ? 'pause' : 'play'}" aria-hidden="true"></i>${S.manualAnim !== false ? 'Pause animations' : 'Play animations'}</button></div>`;
   return `<div class="manual${!print && S.manualAnim !== false ? ' anim' : ''}">${play}${pages.join('')}</div>`;
 }
@@ -2444,13 +2548,15 @@ const ACTIONS = {
   print: () => printSheet(),
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
   step: el => {
-    const k = el.dataset.k, lim = LIMITS[k];
-    if (k !== 'compartments' && k !== 'shelves') return;
-    S[k] = clamp(Math.round(S[k] || 0) + (Number(el.dataset.d) > 0 ? 1 : -1), lim[0], lim[1]);
+    const k = el.dataset.k, lim = k === 'boxes' ? [1, 8] : LIMITS[k];
+    if (k !== 'compartments' && k !== 'shelves' && k !== 'boxes') return;
+    const cur = k === 'boxes' ? layout().n : Math.round(S[k] || 0);
+    S[k] = clamp(cur + (Number(el.dataset.d) > 0 ? 1 : -1), lim[0], lim[1]);
     saveDraft(); render();
     const again = document.querySelector(`[data-action="step"][data-k="${k}"][data-d="${el.dataset.d}"]`);
     if (again && !again.disabled) again.focus();
   },
+  'boxes-auto': () => { S.boxes = 'auto'; saveDraft(); render(); },
   load: el => { if (LOADS[el.dataset.value]) { S.load = el.dataset.value; saveDraft(); render(); } },
   'safety-fix': el => {
     const v = el.dataset.value;
