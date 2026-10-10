@@ -940,7 +940,7 @@ function renderBar() {
   const labels = ['Design it', 'See the cut list', 'How to build it', 'Order materials', 'Download order pack'];
   $('#nextBtn span').textContent = labels[S.step];
   $('[data-action="prev"]').disabled = false;
-  $('#barSum').innerHTML = `<span class="bs-long"><strong>${R.pieceCount}</strong> parts, <strong>${R.nMain || R.linear.reduce((s, g) => s + g.count, 0)}</strong> ${R.nMain ? 'sheets' : 'lengths'}, </span>about <strong>${gbp0(R.total)}</strong>`;
+  $('#barSum').innerHTML = `<span class="bs-long"><strong>${R.pieceCount}</strong> parts, <strong>${R.nMain || R.linear.reduce((s, g) => s + g.count, 0)}</strong> ${R.nMain ? 'sheets' : 'lengths'}, </span><span class="bs-about">about </span><strong>${gbp0(R.total)}</strong>`;
 }
 
 // ── Stage (steps 1 and 2) ──
@@ -1040,8 +1040,11 @@ function renderControls() {
               ${[0, 1, 2, 3, 4].map(n => `<option value="${n}"${S.doors === n ? ' selected' : ''}>${n === 0 ? 'No doors' : n + (n === 1 ? ' door' : ' doors')}</option>`).join('')}
             </select>
           </div>
-          ${BAY_TEMPLATES.has(S.template) ? numField('compartments', 'Compartments', 'Upright dividers split it into bays', '') : ''}
-          ${numField('shelves', bayInfo().bays > 1 ? 'Shelves per compartment' : 'Shelves', '', '')}
+        </div>
+        <div class="steppers">
+          ${BAY_TEMPLATES.has(S.template) ? stepper('compartments', 'Compartments side by side', 'Upright dividers split the unit into bays') : ''}
+          ${stepper('shelves', BAY_TEMPLATES.has(S.template) ? 'Shelves in each compartment' : 'Shelves', BAY_TEMPLATES.has(S.template) ? 'Not counting the top and bottom' : 'Not counting the top and bottom')}
+          ${layoutPreview()}
         </div>
         ${S.template === 'eaves' && R.parts.filter(p => p.role === 'shelf').length < S.shelves ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Some shelves would sit too close to the slope, so we left them out.</span></div>` : ''}
       </div>
@@ -1068,6 +1071,28 @@ function renderControls() {
       </div>
       <details class="more"><summary>Saw blade</summary><div class="fields">${numField('kerf', 'Saw kerf', 'Blade width, usually 3', 'mm')}</div></details>`;
   }
+}
+
+// Big +/- control: no keyboard needed, and the number can't land in the wrong box
+function stepper(k, label, help) {
+  const lim = LIMITS[k], v = Math.round(S[k] || 0);
+  return `<div class="count-field"><span class="lbl" id="lbl-${k}">${esc(label)}</span>
+    <div class="count-step" role="group" aria-labelledby="lbl-${k}">
+      <button type="button" data-action="step" data-k="${k}" data-d="-1" aria-label="One fewer"${v <= lim[0] ? ' disabled' : ''}><i class="ph ph-minus" aria-hidden="true"></i></button>
+      <output aria-live="polite">${v}</output>
+      <button type="button" data-action="step" data-k="${k}" data-d="1" aria-label="One more"${v >= lim[1] ? ' disabled' : ''}><i class="ph ph-plus" aria-hidden="true"></i></button>
+    </div><span class="help">${esc(help)}</span></div>`;
+}
+
+// Tiny front view so the numbers above read as a picture
+function layoutPreview() {
+  const { bays } = bayInfo(), W = 132, H = 64, t = 3, n = Math.round(S.shelves || 0);
+  const shelves = R.parts.filter(p => p.role === 'shelf').length || 0;
+  const bw = (W - t * (bays + 1)) / bays;
+  let g = `<rect x="0" y="0" width="${W}" height="${H}" rx="2" fill="none" stroke="currentColor" stroke-width="${t}"/>`;
+  for (let b = 1; b < bays; b++) { const x = t + b * (bw + t) - t / 2; g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="currentColor" stroke-width="${t}"/>`; }
+  for (let i = 1; i <= shelves; i++) { const y = H * i / (shelves + 1); g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="var(--accent)" stroke-width="${t}"/>`; }
+  return `<div class="layout-preview" aria-hidden="true"><svg viewBox="-2 -2 ${W + 4} ${H + 4}" width="${W + 4}" height="${H + 4}">${g}</svg><span>${bays} x ${shelves + 1} spaces</span></div>`;
 }
 
 function numField(k, label, help, unit) {
@@ -2317,6 +2342,14 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
+  step: el => {
+    const k = el.dataset.k, lim = LIMITS[k];
+    if (k !== 'compartments' && k !== 'shelves') return;
+    S[k] = clamp(Math.round(S[k] || 0) + (Number(el.dataset.d) > 0 ? 1 : -1), lim[0], lim[1]);
+    saveDraft(); render();
+    const again = document.querySelector(`[data-action="step"][data-k="${k}"][data-d="${el.dataset.d}"]`);
+    if (again && !again.disabled) again.focus();
+  },
   load: el => { if (LOADS[el.dataset.value]) { S.load = el.dataset.value; saveDraft(); render(); } },
   'safety-fix': el => {
     const v = el.dataset.value;
