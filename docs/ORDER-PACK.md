@@ -36,3 +36,19 @@ One row per physical panel (quantities are expanded). Columns:
 Cutters supply boards only, so the order page lists the hardware separately. Each item is rounded up to a typical pack size and has Amazon and Screwfix search links. "Copy shopping list" copies the whole list.
 
 A one-click "Add all to Amazon basket" button appears once `AMAZON_TAG` (an Amazon Associates tag) and a checked ASIN for every item are filled in `SHOP` in `app.js`. The link carries only product IDs and quantities, never user data.
+
+## Holes the cutter drills
+
+All holes are on the panel faces, so a CNC router with a drilling head can do them. Positions are from the front edge (x) and bottom edge (y).
+
+| Hole | Panel | Size |
+|---|---|---|
+| Shelf pins | Sides and dividers | 5mm x 10mm deep (through on dividers), 37mm from front and back |
+| Joint screws | Sides, where top and bottom meet | 4mm through, countersink outside, 50mm from each end, one per 150mm |
+| Cam bolts (flat-pack joining) | Sides | 5mm x 11mm deep |
+| Cam housings | Tops and bottoms | 15mm x 13mm deep, 34mm from each end |
+| Divider screws | Tops and bottoms | 4mm through, on the divider centre line |
+| Connector screws | Box sides | 5mm through, matching on both boxes |
+| Hinge cups | Doors | 35mm x 13mm deep |
+
+Not in the DXF: the 8mm edge holes for cam bolts (need horizontal boring; the order email asks), hinge plate pilot holes, and pocket holes.
