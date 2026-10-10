@@ -696,3 +696,6 @@ dialog.ask{width:min(620px,100%)}
 .lines.hw .sup-act a{font-size:12px;padding:4px 10px}
 .help.why{display:flex;gap:6px;align-items:flex-start;margin-top:6px}
 .help.why i{flex:none;margin-top:2px}
+.hero-compare{cursor:ew-resize}
+.hero-compare .compare-range{pointer-events:none}
+.hero-compare:has(.compare-range:focus-visible) .compare-handle span,.hero-compare.dragging .compare-handle span{outline:3px solid var(--accent,#E8643A);outline-offset:2px}

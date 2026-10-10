@@ -1040,6 +1040,23 @@ function setCompare(root, pct) {
   root.style.setProperty('--cmp', pct + '%');
 }
 
+// Drag or tap anywhere on a before/after image to move the divider. Works with touch, pen and mouse.
+// touch-action: pan-y in the CSS keeps vertical page scrolling; a sideways drag moves the slider.
+function dragCompare(root, onPct) {
+  let id = null, x0 = 0, moving = false;
+  const at = e => { const r = root.getBoundingClientRect(); onPct(Math.round(Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)))); };
+  root.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    id = e.pointerId; x0 = e.clientX; moving = e.pointerType === 'mouse';
+    root.setPointerCapture(id); root.classList.add('dragging');
+    if (moving) at(e);
+  });
+  // On touch, wait for a sideways move so a vertical scroll that starts on the image leaves the slider alone
+  root.addEventListener('pointermove', e => { if (e.pointerId !== id) return; if (!moving && Math.abs(e.clientX - x0) > 6) moving = true; if (moving) at(e); });
+  const end = tap => e => { if (e.pointerId !== id) return; if (tap && !moving) at(e); id = null; root.classList.remove('dragging'); };
+  root.addEventListener('pointerup', end(true)); root.addEventListener('pointercancel', end(false));
+}
+
 function makeEditable(root, box, cfg) {
   box.classList.add('editable');
   const handle = document.createElement('span');
@@ -2257,11 +2274,14 @@ function renderHome() {
   compute();
   const range = $('#heroSlider');
   const set = v => setCompare(root, 100 - Number(v));
-  range.addEventListener('input', () => set(range.value));
+  let touched = false;
+  range.addEventListener('input', () => { touched = true; set(range.value); });
+  dragCompare(root, pct => { touched = true; range.value = String(100 - pct); set(range.value); });
   set(0);
   if (!reduceMotion()) {
     const t0 = performance.now();
     const step = now => {
+      if (touched) return;
       const k = Math.min(1, (now - t0 - 500) / 1400);
       if (k >= 0) { const e = 1 - Math.pow(1 - k, 3); range.value = String(Math.round(e * 58)); set(range.value); }
       if (k < 1) requestAnimationFrame(step);
