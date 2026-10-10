@@ -691,3 +691,5 @@ dialog.ask{width:min(620px,100%)}
 .cap-no{color:#C8371D;border-color:#C8371D}
 .sup-act{display:flex;flex-wrap:wrap;gap:6px}
 .sup-act a{text-decoration:none}
+.lines.hw .sup-act{font-family:inherit;white-space:normal;margin-top:6px}
+.lines.hw .sup-act a{font-size:12px;padding:4px 10px}

@@ -1991,6 +1991,61 @@ function orderNeeds() {
   const edging = panels.some(p => p.edge);
   return { panels, holes, angles, edging, pieces: panels.reduce((a, p) => a + p.qty, 0) };
 }
+// What each fitting is called in shops and the pack size it usually comes in.
+// Amazon and Screwfix links are searches, so they never point at a dead listing.
+// To turn on the one-click Amazon basket, add an Associates tag and a checked ASIN per item.
+const AMAZON_TAG = '';
+const SHOP = [
+  [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: '' }],
+  [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: '' }],
+  [/wood screws/i, { q: 'wood screws 4x40mm', pack: 200, asin: '' }],
+  [/pocket-hole screws/i, { q: 'pocket hole screws 32mm', pack: 100, asin: '' }],
+  [/pocket-hole jig/i, { q: 'pocket hole jig', pack: 1, asin: '' }],
+  [/glue/i, { q: 'PVA wood glue', pack: 1, asin: '' }],
+  [/cam lock/i, { q: 'cam lock fittings 15mm with bolts', pack: 20, asin: '' }],
+  [/dowel/i, { q: 'wooden dowels 8x30mm', pack: 100, asin: '' }],
+  [/panel pins/i, { q: 'panel pins 25mm', pack: 300, asin: '' }],
+  [/connector screws/i, { q: 'cabinet connector screws', pack: 20, asin: '' }],
+  [/packers/i, { q: 'plastic packers assorted', pack: 1, asin: '' }],
+  [/angle brackets/i, { q: 'angle brackets 40mm', pack: 20, asin: '' }],
+  [/anti-tip/i, { q: 'furniture anti tip wall brackets', pack: 2, asin: '' }],
+  [/wall fixing brackets/i, { q: 'furniture wall fixing brackets', pack: 10, asin: '' }],
+  [/hanging brackets/i, { q: 'wall cabinet hanging brackets', pack: 2, asin: '' }],
+  [/knob/i, { q: 'cupboard door knobs', pack: 1, asin: '' }],
+  [/handle/i, { q: 'cabinet handles', pack: 1, asin: '' }],
+  [/drawer runners/i, { q: 'drawer runners 400mm soft close pair', pack: 1, asin: '' }],
+  [/plinth clips/i, { q: 'kitchen plinth clips', pack: 10, asin: '' }],
+  [/legs/i, { q: 'adjustable cabinet legs', pack: 4, asin: '' }],
+  [/rail end/i, { q: 'wardrobe rail end sockets', pack: 2, asin: '' }]
+];
+function shopItem(f) {
+  const hit = SHOP.find(([re]) => re.test(f.name)), spec = hit ? hit[1] : { q: f.name.replace(/\(.*?\)/g, ''), pack: 1, asin: '' };
+  const packs = Math.max(1, Math.ceil(f.total_qty / spec.pack));
+  return { ...f, ...spec, packs, spare: packs * spec.pack - f.total_qty };
+}
+const amazonSearch = q => 'https://www.amazon.co.uk/s?k=' + encodeURIComponent(q) + (AMAZON_TAG ? '&tag=' + encodeURIComponent(AMAZON_TAG) : '');
+const screwfixSearch = q => 'https://www.screwfix.com/search?search=' + encodeURIComponent(q);
+// One link that puts every item in the user's Amazon basket. Only product IDs and quantities go in it, no user data.
+function amazonBasket(items) {
+  const ok = items.filter(i => /^[A-Z0-9]{10}$/.test(i.asin));
+  if (!AMAZON_TAG || ok.length !== items.length) return '';
+  return 'https://www.amazon.co.uk/gp/aws/cart/add.html?AssociateTag=' + encodeURIComponent(AMAZON_TAG) + ok.map((i, n) => `&ASIN.${n + 1}=${i.asin}&Quantity.${n + 1}=${i.packs}`).join('');
+}
+function shoppingList() {
+  return R.fittings.map(shopItem).map(i => `${i.packs} x ${i.name}${i.pack > 1 ? ` (pack of ${i.pack})` : ''}: need ${i.total_qty}`).join('\n');
+}
+function hardwareCard() {
+  const items = R.fittings.map(shopItem), basket = amazonBasket(items);
+  return `<div class="card">
+    <h3><i class="ph ph-wrench" aria-hidden="true"></i>Hardware pack</h3>
+    <p class="sub">Cutters supply boards only. Buy these yourself while the panels are being cut. Quantities are rounded up to whole packs.</p>
+    ${basket ? `<a class="btn btn-primary" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add all to Amazon basket</a>` : ''}
+    <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
+    <ul class="lines hw">${items.map(i => `<li><span>${esc(i.name)}<small>Need ${i.total_qty}. ${i.pack > 1 ? `Buy ${i.packs} pack${i.packs > 1 ? 's' : ''} of ${i.pack}${i.spare ? `, ${i.spare} spare` : ''}` : `Buy ${i.packs}`}${i.note ? '. ' + esc(i.note) : ''}</small>
+      <span class="sup-act"><a class="chip" href="${amazonSearch(i.q)}" target="_blank" rel="noopener noreferrer">Amazon</a><a class="chip" href="${screwfixSearch(i.q)}" target="_blank" rel="noopener noreferrer">Screwfix</a></span></span><span>${gbp(i.total_cost)}</span></li>`).join('')}</ul>
+    <p class="fine">Pick branded fittings. Shelf pins must be rated 12kg or more each. Prices are estimates for the amount you use.</p>
+  </div>`;
+}
 function cutterCard() {
   if (!isCabinet(S.template)) return `<div class="card"><h3><i class="ph ph-storefront" aria-hidden="true"></i>Where to buy</h3><p class="sub">Timber merchants deliver C16 and boards cut to length. Take the timber list to your nearest merchant.</p></div>`;
   const need = orderNeeds(), pc = (S.postcode || '').trim().toUpperCase(), area = (pc.match(/^([A-Z]{1,2})\d/) || [])[1];
@@ -2042,10 +2097,7 @@ function renderOrderPage() {
           <ul class="lines">${lines.map(([a, b, p]) => `<li><span>${esc(a)}<small>${esc(b)}</small></span><span>${gbp(p)}</span></li>`).join('')}</ul>
           ${S.template !== 'pitchedroof' && isCabinet(S.template) ? `<div class="price-in"><label for="f-priceSheet">Price per sheet (edit to match your quote)</label><input id="f-priceSheet" class="input" type="number" min="0" step="0.5" value="${R.sheetPrice}" data-field="priceSheet"></div>` : ''}
         </div>
-        <div class="card">
-          <h3><i class="ph ph-wrench" aria-hidden="true"></i>Hardware pack</h3>
-          <ul class="lines">${R.fittings.map(f => `<li><span>${esc(f.name)}<small>${f.total_qty} pcs</small></span><span>${gbp(f.total_cost)}</span></li>`).join('')}</ul>
-        </div>
+        ${hardwareCard()}
         <div class="card">
           <h3><i class="ph ph-truck" aria-hidden="true"></i>Delivery</h3>
           <div class="field" style-mt>
@@ -2758,6 +2810,7 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
+  'copy-shopping': async () => { try { await navigator.clipboard.writeText(shoppingList()); toast('Shopping list copied'); } catch { toast('Could not copy. Select the list and copy it instead.'); } },
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
   step: el => {
     const k = el.dataset.k, lim = k === 'boxes' ? [1, 8] : LIMITS[k];

@@ -30,3 +30,9 @@ One row per physical panel (quantities are expanded). Columns:
 1. A price from the files without a manual quote (an API, a price list we can apply, or a fixed rate per sheet, cut, hole and metre of edging).
 2. Cut, drilled and edged panels delivered in 3 to 4 working days, labelled with the part names above.
 3. The hardware pack (screws, connectors, pins, hinges, brackets) shipped with the panels.
+
+## Hardware
+
+Cutters supply boards only, so the order page lists the hardware separately. Each item is rounded up to a typical pack size and has Amazon and Screwfix search links. "Copy shopping list" copies the whole list.
+
+A one-click "Add all to Amazon basket" button appears once `AMAZON_TAG` (an Amazon Associates tag) and a checked ASIN for every item are filled in `SHOP` in `app.js`. The link carries only product IDs and quantities, never user data.
