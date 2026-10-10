@@ -713,3 +713,8 @@ dialog.ask{width:min(620px,100%)}
 .ordered-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}
 .cutters > .btn-primary[data-action="mark-ordered"]{margin-top:12px}
 .hw-card{scroll-margin-top:calc(var(--nav-h) + 72px)}
+.tape{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;font-weight:600;color:var(--warn)}
+.tape i{font-size:14px}
+.tape .link-btn{font-size:12px;padding:2px 0}
+.tape.ok{color:var(--ok)}
+.field.needs-tape .input{border-color:color-mix(in srgb,var(--warn) 55%,var(--line-2))}

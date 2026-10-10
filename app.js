@@ -105,6 +105,12 @@ const FIELDS = {
   pitchedroof: [['w', 'Building length', 'Along the ridge'], ['d', 'Span', 'Wall plate to wall plate'], ['h', 'Rafter depth', 'e.g. 100, 125, 150'], ['pitch', 'Roof pitch', 'Degrees'], ['spacing', 'Rafter centres', 'Usually 400']]
 };
 const fieldsFor = id => FIELDS[id] || (isCabinet(id) ? FIELDS.cabinet : FIELDS.studwall);
+// Sizes a cutter works from. A photo or AR reading is only a guess, so each one must be checked with a tape
+// (typed in, or confirmed) before the order pack goes out.
+const TAPE_KEYS = ['w', 'h', 'low', 'd'];
+const tapeKeys = () => isCabinet(S.template) ? fieldsFor(S.template).map(f => f[0]).filter(k => TAPE_KEYS.includes(k)) : [];
+const unTaped = () => tapeKeys().filter(k => !S.taped.includes(k));
+const tapeLabel = k => (fieldsFor(S.template).find(f => f[0] === k) || [k, k])[1].toLowerCase();
 const LIMITS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], spacing: [200, 1200], pitch: [5, 70], thickness: [3, 100], kerf: [0, 10], sheetW: [300, 3700], sheetH: [300, 2200] };
 
 const MATERIALS = {
@@ -163,7 +169,7 @@ function freshState(template = 'eaves') {
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
     compartments: d.bays || 1, boxes: 'auto', site: defaultSite(template), hand: 'right', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
-    unit: 'mm', done: [], ordered: false
+    unit: 'mm', done: [], ordered: false, taped: [], est: {}
   };
 }
 
@@ -174,7 +180,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered', 'taped', 'est'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -202,7 +208,9 @@ function sanitizeProject(p) {
     postcode: String(p.postcode || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 8),
     unit: p.unit === 'in' ? 'in' : 'mm',
     done: Array.isArray(p.done) ? p.done.filter(n => Number.isInteger(n) && n >= 0 && n < 40) : [],
-    ordered: p.ordered === true
+    ordered: p.ordered === true,
+    taped: Array.isArray(p.taped) ? p.taped.filter(k => TAPE_KEYS.includes(k)) : [],
+    est: Object.fromEntries(TAPE_KEYS.filter(k => p.est && Number.isFinite(p.est[k])).map(k => [k, num(p.est[k], ...LIMITS[k], 0)]))
   });
   out.overrides = {};
   if (p.overrides && typeof p.overrides === 'object') {
@@ -1199,7 +1207,7 @@ function renderControls() {
       </div>
       <div class="group">
         <h2 class="group-title">Measurements</h2>
-        <p class="group-sub">In millimetres. Measure in two or three places and use the smallest.</p>
+        <p class="group-sub">${tapeKeys().length ? 'Cutters work to the millimetre, so check every size with a tape measure. A photo can only guess. ' : ''}In millimetres. Measure in two or three places and use the smallest.${tapeKeys().length ? ` <strong>${tapeKeys().length - unTaped().length} of ${tapeKeys().length} checked.</strong>` : ''}</p>
         <div class="fields">${fieldsFor(S.template).map(([k, label, help]) => numField(k, label, help, k === 'pitch' ? 'deg' : 'mm')).join('')}</div>
         ${S.template === 'understairs' ? `<div class="field full"><span class="lbl" id="handLbl">Tall end</span><div class="seg" role="group" aria-labelledby="handLbl"><button type="button" data-action="hand" data-value="left" aria-pressed="${S.hand === 'left'}">On the left</button><button type="button" data-action="hand" data-value="right" aria-pressed="${S.hand !== 'left'}">On the right</button></div><span class="help">Stand facing the space. Which end is under the top of the stairs?</span></div><div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The stairs slope at <strong>${stairGeom().angDeg} deg</strong>. Each upright, the top and the doors are cut to follow it.</span></div><div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Keep a gas meter, fuse box or stopcock under the stairs easy to reach. If the stairs are your escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control.</span></div>` : ''}
         ${S.template === 'eaves' ? `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Roof angle works out at <strong>${eavesGeom().angDeg} deg</strong>. The side panels are cut to follow it.</span></div>` : ''}
@@ -1299,7 +1307,11 @@ function layoutPreview() {
 
 function numField(k, label, help, unit) {
   const lim = LIMITS[k] || [0, 99999];
-  return `<div class="field"><label for="f-${k}">${esc(label)}</label><div class="input-unit"><input id="f-${k}" class="input num" type="number" inputmode="numeric" min="${lim[0]}" max="${lim[1]}" value="${S[k]}" data-field="${k}"><span>${unit}</span></div><span class="help" data-help="${k}">${esc(help)}${inchHelp(k)}</span><span class="err" data-err="${k}" hidden></span></div>`;
+  const tape = tapeKeys().includes(k), ok = S.taped.includes(k), est = S.est[k];
+  const status = !tape ? '' : ok
+    ? `<span class="tape ok"><i class="ph ph-check" aria-hidden="true"></i>Checked with a tape</span>`
+    : `<span class="tape"><i class="ph ph-ruler" aria-hidden="true"></i>${est ? 'Photo guess. Measure to check' : 'Not measured yet'}<button type="button" class="link-btn" data-action="tape-ok" data-k="${k}">${est ? 'Matches my tape' : 'This is my measurement'}</button></span>`;
+  return `<div class="field${tape && !ok ? ' needs-tape' : ''}"><label for="f-${k}">${esc(label)}</label><div class="input-unit"><input id="f-${k}" class="input num" type="number" inputmode="numeric" min="${lim[0]}" max="${lim[1]}" value="${S[k]}" data-field="${k}"><span>${unit}</span></div>${status}<span class="help" data-help="${k}">${esc(help)}${inchHelp(k)}</span><span class="err" data-err="${k}" hidden></span></div>`;
 }
 
 function photoBlock() {
@@ -2069,6 +2081,7 @@ function cutterCard() {
   const badge = (sup, k, label) => `<span class="cap cap-${sup[k]}"><i class="ph ph-${sup[k] === 'yes' ? 'check' : sup[k] === 'no' ? 'x' : 'question'}" aria-hidden="true"></i>${esc(label)}${sup[k] === 'ask' ? ': ask' : ''}</span>`;
   const mail = sup => {
     const body = [`Hello ${sup.name},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
+      unTaped().length ? 'Note: some sizes are still estimates and will be confirmed before cutting.' : 'All sizes measured with a tape.', '',
       `Material: ${MATERIALS[S.material].name} ${S.thickness}mm${R.sheets.ply3 ? ', plus 3mm backs' : ''}`, `Pieces: ${need.pieces} (about ${R.nMain} sheets)`,
       need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes (DXF layers starting DRILL_, named by diameter and depth, measured from the front or hinge edge).` : '',
       need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
@@ -2106,6 +2119,7 @@ function renderOrderPage() {
   const pcErr = S.postcode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(S.postcode.trim());
   return `<div class="page">
     <div class="page-head"><div><h2>Order your materials</h2><p>Send the order pack to a cutting service. They cut, drill, edge and deliver every panel, ready to build like flat-pack.</p></div></div>
+    ${unTaped().length ? `<div class="callout warn"><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>Check your sizes with a tape before you order.</strong> Not yet checked: ${unTaped().map(tapeLabel).join(', ')}. Panels are cut to these numbers and cannot be recut for free.</span><button type="button" class="chip" data-action="goto" data-step="0">Check sizes</button></div>` : ''}
     ${safetyChecks().some(c => c.status === 'fail') ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span><strong>A safety check failed.</strong> Go back to Design and fix it before you order.</span><button type="button" class="chip" data-action="goto" data-step="1">Fix it</button></div>` : ''}
     <div class="order">
       <div>
@@ -2543,7 +2557,7 @@ function cmRedo() {
 }
 function cmDone() {
   const m = CM.measurements;
-  Object.keys(m).forEach(k => { const lim = LIMITS[k]; if (lim) S[k] = clamp(m[k], lim[0], lim[1]); });
+  Object.keys(m).forEach(k => { const lim = LIMITS[k]; if (lim) { S[k] = clamp(m[k], lim[0], lim[1]); if (TAPE_KEYS.includes(k)) { S.est[k] = S[k]; S.taped = S.taped.filter(x => x !== k); } } });
   if (S.template === 'eaves' && S.low >= S.h) S.low = Math.round(S.h * 0.6);
   // Anchor the design where the user measured. u units are fractions of photo width.
   S.fracPerMM = CM.k;
@@ -2555,7 +2569,7 @@ function cmDone() {
   cmClose();
   saveDraft();
   render();
-  toast('Sizes added from your photo');
+  toast('Sizes guessed from your photo. Check each one with a tape.');
 }
 
 // ───────────────────────── AR (Android WebXR) ─────────────────────────
@@ -2649,7 +2663,7 @@ function arUndo() {
   $('#arInstructions').textContent = AR.points.length ? 'Tap a surface to place the end point' : 'Tap a surface to place the start point';
 }
 function arDone() {
-  Object.entries(AR.measurements).forEach(([k, v]) => { const lim = LIMITS[k]; if (lim) S[k] = clamp(v, lim[0], lim[1]); });
+  Object.entries(AR.measurements).forEach(([k, v]) => { const lim = LIMITS[k]; if (lim) { S[k] = clamp(v, lim[0], lim[1]); if (TAPE_KEYS.includes(k)) { S.est[k] = S[k]; S.taped = S.taped.filter(x => x !== k); } } });
   endARSession(); saveDraft(); render();
 }
 function endARSession() { if (AR.session) AR.session.end().catch(() => {}); else onARSessionEnd(); }
@@ -2847,6 +2861,7 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
+  'tape-ok': el => { const k = el.dataset.k; if (TAPE_KEYS.includes(k) && !S.taped.includes(k)) S.taped.push(k); delete S.est[k]; saveDraft(); render(); },
   'mark-ordered': () => {
     S.ordered = !S.ordered; saveDraft(); render();
     if (S.ordered) { toast('Panels ordered. Now the hardware.'); requestAnimationFrame(() => $('#hwCard')?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' })); }
@@ -2941,6 +2956,7 @@ document.addEventListener('input', e => {
     if (err) { err.textContent = msg; err.hidden = !msg; }
     if (msg) return;
     S[k] = k === 'shelves' ? Math.round(v) : v;
+    if (TAPE_KEYS.includes(k) && !S.taped.includes(k)) { S.taped.push(k); delete S.est[k]; const f = el.closest('.field'); if (f) { f.classList.remove('needs-tape'); const t = f.querySelector('.tape'); if (t) t.outerHTML = '<span class="tape ok"><i class="ph ph-check" aria-hidden="true"></i>Checked with a tape</span>'; } }
     if (k === 'priceSheet') { clearTimeout(liveTimer); liveTimer = setTimeout(() => { compute(); renderBar(); saveDraft(); const p = $('.summary'); if (p) render(); }, 500); return; }
     liveUpdate();
   }
