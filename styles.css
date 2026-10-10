@@ -722,3 +722,12 @@ dialog.ask{width:min(620px,100%)}
 .hero-compare{cursor:ew-resize}
 .hero-compare .compare-range{pointer-events:none}
 .hero-compare:has(.compare-range:focus-visible) .compare-handle span,.hero-compare.dragging .compare-handle span{outline:3px solid var(--accent,#E8643A);outline-offset:2px}
+.pick-card{border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:10px;margin-top:12px;background:var(--surface)}
+.pick-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.pick-head strong{font-family:var(--display);font-size:20px;letter-spacing:-.02em}
+.pick-steps{margin:0;padding-left:22px;display:grid;gap:12px}
+.pick-steps li{padding-left:4px}
+.pick-steps li > span{display:block;color:var(--ink-2);margin-bottom:6px}
+.pick-steps li::marker{font-family:var(--mono);font-weight:600;color:var(--accent-ink)}
+.more-cutters{margin-top:12px}
+.more-cutters summary{cursor:pointer;font-weight:600;color:var(--accent-ink);padding:6px 0}
