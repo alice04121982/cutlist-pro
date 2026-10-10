@@ -1,4 +1,4 @@
-/* CutList Pro
+/* Made to Fit
    Everything runs in the browser. Photos never leave the device.
    No inline handlers: all interaction goes through delegated listeners so a strict CSP can apply. */
 'use strict';
@@ -1638,7 +1638,7 @@ function renderBuildPage() {
 
 // ───────────────────────── Assembly manual (IKEA style) ─────────────────────────
 // Fixed "paper" palette so the manual looks the same on screen, in dark mode and in print.
-const MP = { ink: '#15181B', done: '#E4E2DC', wood: '#E9D9BC', add: '#FF8A5C', line: '#15181B', paper: '#FBFBFA' };
+const MP = { ink: '#15181B', done: '#E4E2DC', wood: '#E9D9BC', add: '#FFD23F', line: '#15181B', paper: '#FBFBFA' };
 
 // 3D solids for each named part, in mm. x right, y up, z from the front (0) to the back (D).
 function partSolids(opt = {}) {
@@ -2224,7 +2224,7 @@ function heroScene(after, d) {
   const a = 100 * Math.PI / 180, fx = ox0 + dw * Math.cos(a), fz = FZ - dw * Math.sin(a);
   s += poly([[ox0, plinth + 4, FZ], [ox0, FH - 12, FZ], [fx, FH - 12, fz], [fx, plinth + 4, fz]], sageDark, ' stroke="#7F8B7A" stroke-width="1.5"');
   // Measurements
-  const chip = (x, y, z, txt, dx = 0, dy = 0) => { const [px, py] = P(x, y, z); return `<g transform="translate(${(px + dx).toFixed(1)} ${(py + dy).toFixed(1)})"><rect x="-44" y="-14" width="88" height="28" rx="14" fill="#FF5B1F"/><text x="0" y="5" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" fill="#15181B">${txt}</text></g>`; };
+  const chip = (x, y, z, txt, dx = 0, dy = 0) => { const [px, py] = P(x, y, z); return `<g transform="translate(${(px + dx).toFixed(1)} ${(py + dy).toFixed(1)})"><rect x="-44" y="-14" width="88" height="28" rx="5" fill="#FFD23F"/><text x="0" y="5" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" font-weight="600" fill="#0E1726">${txt}</text></g>`; };
   s += chip(L * 0.8, FH, FZ, fmt(L), 0, -26) + chip(L, FH / 2, FZ, fmt(FH), -54, 0);
   return s + '</svg>';
 }
@@ -2330,7 +2330,7 @@ function exportCNC() {
   const mat = MATERIALS[S.material];
   const panels = R.parts.filter(p => p.stock === 'sheet' || p.stock === 'ply3' || p.stock === 'ply6');
   if (!panels.length) { exportCSV(); return; }
-  let csv = '# CNC Cut List Export - CutList Pro\n';
+  let csv = '# CNC Cut List Export - Made to Fit\n';
   csv += '# Project: ' + safeName(S.name) + '\n# Material: ' + mat.name + ' (' + S.thickness + 'mm)\n# Date: ' + new Date().toISOString().split('T')[0] + '\n# All dimensions in mm. Grain direction: L=Length\n#\n';
   csv += 'Part Name,Length (mm),Width (mm),Qty,Material,Thickness (mm),Grain,Edge L1,Edge L2,Edge W1,Edge W2,Scribed,Holes,Notes\n';
   panels.forEach(p => {
@@ -2392,7 +2392,7 @@ function printSheet() {
   R.fittings.forEach(f => { h += `<tr><td>${esc(f.name)}</td><td>${f.total_qty}</td><td>${gbp(f.total_cost)}</td></tr>`; });
   h += '</table><h2>Build steps</h2><ol>';
   steps.forEach(s => { h += `<li><strong>${esc(s.title)}.</strong> ${esc(s.body.join(' '))}${s.warn ? ' <em>' + esc(s.warn) + '</em>' : ''}</li>`; });
-  h += `</ol><div class="meta">Made with CutList Pro. Prices are estimates. Check every measurement before cutting.</div>`;
+  h += `</ol><div class="meta">Made with Made to Fit. Prices are estimates. Check every measurement before cutting.</div>`;
   $('#printSheet').innerHTML = h;
   window.print();
 }
@@ -2428,7 +2428,7 @@ function cmDrawImage() {
 }
 function cmRedrawAll() {
   cmDrawImage();
-  if (CM.ref) { CM.ref.forEach(p => cmAddDot(p, 'ref')); cmDrawLine(CM.ref[0], CM.ref[1], '#FF5B1F', CM.refSizeMM.toFixed(0) + 'mm reference'); }
+  if (CM.ref) { CM.ref.forEach(p => cmAddDot(p, 'ref')); cmDrawLine(CM.ref[0], CM.ref[1], '#FFD23F', CM.refSizeMM.toFixed(0) + 'mm reference'); }
   Object.entries(CM.pts).forEach(([k, p]) => { cmAddDot(p[0], 'a'); cmAddDot(p[1], 'b'); cmDrawLine(p[0], p[1], '#2E9E62', CM.measurements[k] + 'mm'); });
   CM.points.forEach((p, i) => cmAddDot(p, CM.phase === 'calibrate' ? 'ref' : (i ? 'b' : 'a')));
 }
@@ -2443,7 +2443,7 @@ function cmTap(e) {
       if (du < 0.01) { CM.points = []; cmRedrawAll(); toast('Those points are too close. Try again.'); cmUpdateUI(); return; }
       CM.k = du / CM.refSizeMM; // photo-width units per mm
       CM.ref = CM.points.slice();
-      cmDrawLine(CM.ref[0], CM.ref[1], '#FF5B1F', CM.refSizeMM.toFixed(0) + 'mm reference');
+      cmDrawLine(CM.ref[0], CM.ref[1], '#FFD23F', CM.refSizeMM.toFixed(0) + 'mm reference');
       CM.phase = 'measure'; CM.points = [];
     }
   } else if (CM.phase === 'measure') {

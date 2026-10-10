@@ -1,4 +1,4 @@
-// CutList Pro design assistant.
+// Made to Fit design assistant.
 // Turns a plain-English request ("make it five compartments, no doors") into a small set of
 // design changes. The API key lives only in the server environment (ANTHROPIC_API_KEY).
 // Everything returned here is validated again in the browser before it touches the design.
@@ -37,7 +37,7 @@ const SCHEMA = {
   additionalProperties: false
 };
 
-const SYSTEM = `You help people adjust a DIY furniture or building design in the CutList Pro app. The user describes what is wrong or what they want, and you return changes to the design settings.
+const SYSTEM = `You help people adjust a DIY furniture or building design in the Made to Fit app. The user describes what is wrong or what they want, and you return changes to the design settings.
 
 Settings (all sizes in millimetres):
 - template: eaves (under-eaves unit with an angled top), understairs (cupboard under a staircase: tall at one end, short at the other), wardrobe, shelving, kitchenbase, kitchenwall, studwall, partition, floorjoists, flatroof, pitchedroof.
