@@ -97,7 +97,7 @@ button,input,select{font:inherit;color:inherit}
 .nav-links a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink-2)}
 .nav-links a:hover{color:var(--ink)}
 @media(min-width:900px){.nav-links{display:flex}}
-.nav-actions{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
+.nav-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
 @media(max-width:380px){.brand{gap:8px}.brand-name{font-size:16px !important}}
 @media(max-width:420px){.nav-in{gap:10px}.brand-name{font-size:18px}.nav-actions{gap:6px}.nav-actions .btn-sm{padding-left:12px;padding-right:12px}}
 .nav-actions .btn-ghost span{display:none}
@@ -661,3 +661,17 @@ dialog.ask{width:min(620px,100%)}
 /* ---------- Hero 3D scene ---------- */
 .hero-compare{aspect-ratio:3/2}
 .hero-scene,.hero-scene svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* ---------- Layout steppers ---------- */
+.steppers{display:grid;gap:16px;margin-top:16px}
+@media(min-width:560px){.steppers{grid-template-columns:1fr 1fr}}
+.count-field{display:grid;gap:6px}
+.count-field .lbl{font-weight:700;font-size:14px}
+.count-step{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line-2);border-radius:var(--pill);padding:4px;background:var(--surface);max-width:240px}
+.count-step button{width:48px;height:48px;border-radius:50%;border:0;background:var(--surface-2);color:var(--ink);display:grid;place-items:center;cursor:pointer;font-size:20px}
+.count-step button:hover{background:var(--surface-3)}
+.count-step button:disabled{opacity:.35;cursor:not-allowed}
+.count-step output{font-family:var(--mono);font-size:22px;font-weight:700;min-width:3ch;text-align:center}
+.layout-preview{display:flex;align-items:center;gap:12px;color:var(--ink);grid-column:1/-1}
+.layout-preview span{font-size:14px;color:var(--ink-2)}
+@media(max-width:420px){.bs-about{display:none}}
