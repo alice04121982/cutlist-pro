@@ -1994,30 +1994,33 @@ function orderNeeds() {
 }
 // What each fitting is called in shops and the pack size it usually comes in.
 // Amazon and Screwfix links are searches, so they never point at a dead listing.
-// To turn on the one-click Amazon basket, add an Associates tag and a checked ASIN per item.
+// ASINs fill the one-click Amazon basket. They were picked from amazon.co.uk search results on
+// 10 October 2026 and NOT yet opened by hand: check each listing (right part, pack size, decent seller)
+// before launch. Wall fixing brackets and handles have none yet (the adhesive anti-tip pads found are not
+// a safe wall fixing); those stay on their search links. Add the Associates tag to earn commission.
 const AMAZON_TAG = '';
 const SHOP = [
-  [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: '' }],
-  [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: '' }],
-  [/wood screws/i, { q: 'wood screws 4x40mm', pack: 200, asin: '' }],
-  [/pocket-hole screws/i, { q: 'pocket hole screws 32mm', pack: 100, asin: '' }],
-  [/pocket-hole jig/i, { q: 'pocket hole jig', pack: 1, asin: '' }],
-  [/glue/i, { q: 'PVA wood glue', pack: 1, asin: '' }],
-  [/cam lock/i, { q: 'cam lock fittings 15mm with bolts', pack: 20, asin: '' }],
-  [/dowel/i, { q: 'wooden dowels 8x30mm', pack: 100, asin: '' }],
-  [/panel pins/i, { q: 'panel pins 25mm', pack: 300, asin: '' }],
-  [/connector screws/i, { q: 'cabinet connector screws', pack: 20, asin: '' }],
-  [/packers/i, { q: 'plastic packers assorted', pack: 1, asin: '' }],
-  [/angle brackets/i, { q: 'angle brackets 40mm', pack: 20, asin: '' }],
-  [/anti-tip/i, { q: 'furniture anti tip wall brackets', pack: 2, asin: '' }],
+  [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: 'B015H9OY28' }],
+  [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: 'B0711TZ4Q1' }],
+  [/wood screws/i, { q: 'wood screws 4x40mm', pack: 200, asin: 'B0CPJQ8428' }],
+  [/pocket-hole screws/i, { q: 'pocket hole screws 32mm', pack: 100, asin: 'B08HQQXSKH' }],
+  [/pocket-hole jig/i, { q: 'pocket hole jig', pack: 1, asin: 'B001DYFISG' }],
+  [/glue/i, { q: 'PVA wood glue', pack: 1, asin: 'B00OQDJM5G' }],
+  [/cam lock/i, { q: 'cam lock fittings 15mm with bolts', pack: 20, asin: 'B08GKV4XBM' }],
+  [/dowel/i, { q: 'wooden dowels 8x30mm', pack: 100, asin: 'B074D9NGNY' }],
+  [/panel pins/i, { q: 'panel pins 25mm', pack: 500, asin: 'B09S3SKGTF' }],
+  [/connector screws/i, { q: 'cabinet connector screws', pack: 20, asin: 'B09PV8QR88' }],
+  [/packers/i, { q: 'plastic packers assorted', pack: 1, asin: 'B0DLWCDCSH' }],
+  [/angle brackets/i, { q: 'angle brackets 40mm', pack: 20, asin: 'B09XFCH6N6' }],
+  [/anti-tip/i, { q: 'furniture anti tip wall brackets', pack: 2, asin: 'B0BRXLJP77' }],
   [/wall fixing brackets/i, { q: 'furniture wall fixing brackets', pack: 10, asin: '' }],
-  [/hanging brackets/i, { q: 'wall cabinet hanging brackets', pack: 2, asin: '' }],
-  [/knob/i, { q: 'cupboard door knobs', pack: 1, asin: '' }],
+  [/hanging brackets/i, { q: 'wall cabinet hanging brackets', pack: 2, asin: 'B09YNDGQHJ' }],
+  [/knob/i, { q: 'cupboard door knobs', pack: 8, asin: 'B0GY8VD6VR' }],
   [/handle/i, { q: 'cabinet handles', pack: 1, asin: '' }],
-  [/drawer runners/i, { q: 'drawer runners 400mm soft close pair', pack: 1, asin: '' }],
-  [/plinth clips/i, { q: 'kitchen plinth clips', pack: 10, asin: '' }],
-  [/legs/i, { q: 'adjustable cabinet legs', pack: 4, asin: '' }],
-  [/rail end/i, { q: 'wardrobe rail end sockets', pack: 2, asin: '' }]
+  [/drawer runners/i, { q: 'drawer runners 400mm soft close pair', pack: 1, asin: 'B01N2RABT3' }],
+  [/plinth clips/i, { q: 'kitchen plinth clips', pack: 10, asin: 'B01H2SXCXE' }],
+  [/legs/i, { q: 'adjustable cabinet legs', pack: 4, asin: 'B0BMHYXZCG' }],
+  [/rail end/i, { q: 'wardrobe rail end sockets 25mm', pack: 4, asin: 'B0CF28MSTT' }]
 ];
 function shopItem(f) {
   const hit = SHOP.find(([re]) => re.test(f.name)), spec = hit ? hit[1] : { q: f.name.replace(/\(.*?\)/g, ''), pack: 1, asin: '' };
