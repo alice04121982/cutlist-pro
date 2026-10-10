@@ -1280,6 +1280,12 @@ function safetyChecks() {
       else out.push({ status: 'pass', id: 'pins', title: 'Shelf pins can take the load', text: `About ${pin.toFixed(1)}kg on each pin. Buy pins rated 12kg or more.` });
     }
   }
+  // A panel longer than the sheet cannot be cut in one piece, and a carcass that long is hard to get up stairs
+  const over = (R.sheets.main ? R.sheets.main.oversize : []).map(r => r.name);
+  if (over.length) {
+    const n = Math.ceil(S.w / (Math.max(S.sheetW, S.sheetH) - 100));
+    out.push({ status: 'fail', id: 'size', title: 'Some panels are longer than a sheet', text: `${[...new Set(over)].join(' and ')} would be ${fmt(Math.max(...R.parts.filter(p => over.includes(p.name)).map(p => Math.max(p.w, p.h))))} long, but a sheet is ${fmt(Math.max(S.sheetW, S.sheetH))}. A carpenter would build this as ${n} separate boxes side by side and screw them together. That also makes it easier to carry up the stairs.` });
+  }
   const back = R.parts.some(p => p.role === 'back');
   out.push(back
     ? { status: 'pass', id: 'back', title: 'Back panel stops it racking', text: 'Pin the back to every edge and divider so it holds the unit square.' }
@@ -1302,31 +1308,66 @@ function safetyHTML(compact = false) {
 }
 
 // ── Build guide ──
+// Shelf-pin hole rows for the drilling step: one row under each designed shelf, plus one 32mm above
+// and below so the shelf can be moved. Measured up from the bottom edge of the side panel.
+function pinRows() {
+  const th = S.thickness, base = S.template === 'kitchenbase' ? 100 : 0;
+  const shelves = R.parts.filter(p => p.role === 'shelf');
+  const ys = new Set();
+  shelves.forEach((p, i, arr) => {
+    const yc = p.yc ?? (th + ((S.h - base) - 2 * th) * (i + 1) / (arr.length + 1));
+    const y = Math.round(yc - th / 2 - 4);
+    [y - 32, y, y + 32].forEach(v => { if (v > th + 20 && v < S.h - base - th - 20) ys.add(v); });
+  });
+  return [...ys].sort((a, b) => a - b).map(y => ({ y, front: 37 }));
+}
+
 function buildSteps() {
   const t = S.template, cab = isCabinet(t);
   const names = r => R.parts.filter(p => p.role === r).map(p => p.name);
   const all = R.parts.map(p => p.name);
   const steps = [];
   if (cab) {
+    // Carpenter's order: check, prepare every panel flat, build the carcass, square it with the back
+    // while it is still out in the room, then fit it, then the loose parts.
     const doors = R.parts.find(p => p.role === 'door');
     const f = Math.max(2, Math.ceil(S.d / 150));
-    steps.push({ title: 'Check your delivery', parts: all, tools: ['Tape measure', 'Pencil'], body: ['Lay every panel out flat and match it to the cut list.', 'Measure a few. Tell the supplier now if anything is off.', 'Write the part name on a hidden edge in pencil.'] });
+    const eaves = t === 'eaves', hasDiv = R.parts.some(p => p.role === 'divider'), shelves = R.parts.filter(p => p.role === 'shelf');
+    const topName = eaves ? 'sloped top' : t === 'kitchenbase' ? 'top rails' : 'top';
+    const pilot = S.joinery === 'screws' ? 'Drill 3mm pilot holes and countersink them. ' : '';
+    steps.push({ title: 'Check your delivery', parts: all, tools: ['Tape measure', 'Pencil'], body: ['Lay every panel out flat and match it to the cut list.', 'Measure a few. Tell the supplier now if anything is off.', 'Pencil the part name on a hidden edge, and a small triangle on the inside face pointing to the front edge, so nothing goes in back to front.'] });
+    steps.push({ title: 'Check the space', parts: eaves ? ['Left Side', 'Right Side'] : [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', eaves ? 'Sliding bevel' : 'Pencil'], body: eaves
+      ? [`Measure the front height, back height and depth at both ends and in the middle. Lofts are rarely even. Your design is ${Math.round(S.h)}mm at the front and ${Math.round(S.low)}mm at the back.`, 'Offer one side panel up against the slope at each end. If the angle is off, fix it now, not after assembly.', 'Find the knee wall studs and the rafters and mark them on masking tape. Scan for cables and pipes.', 'Check the floor with a level so you know where you will need packers.']
+      : ['Check the floor and wall with a level so you know where you will need packers.', 'Find the wall studs and mark them on masking tape.', 'Scan for cables and pipes. Avoid lines straight up, down and across from sockets and switches.'],
+      warn: eaves ? 'Keep air moving in the eaves. Leave a gap of about 25mm behind the unit and do not squash or cover the insulation or vents.' : null });
     if (R.parts.some(p => p.scribed)) steps.push({ title: 'Scribe to your walls', parts: R.parts.filter(p => p.scribed).map(p => p.name), tools: ['Pencil', 'Block plane or jigsaw'], body: ['Hold the panel against the wall where it will go.', 'Run a pencil along the wall on a 2mm block to copy its shape onto the panel.', 'Plane or cut down to the line, angled slightly back.'] });
-    if (t === 'eaves') steps.push({ title: 'Check the roof angle', parts: ['Left Side', 'Right Side', 'Sloped Top'], tools: ['Sliding bevel', 'Circular saw'], body: [`The side panels should rise from ${Math.round(S.low)}mm at the back to ${Math.round(S.h)}mm at the front.`, `Offer one side up against the slope. If the angle is off, re-mark it before cutting the other.`, `Bevel the front and back edges of the sloped top at ${eavesGeom().angDeg} degrees, or ask the cutter to.`], warn: 'Leave a ventilation gap behind the back panel. Blocking airflow into the eaves can cause condensation.' });
-    if (doors) steps.push({ title: 'Drill the hinge holes', parts: ['Door'], tools: ['Drill', '35mm Forstner bit', 'Depth stop'], body: [`On the inside face of each door, mark hinge centres ${doors.hinges.map(h => h.y + 'mm').join(', ')} from the top.`, 'Each centre sits 22.5mm in from the hinge edge.', 'Drill 13mm deep. Test on an offcut first.'] });
+    const drill = [];
+    if (shelves.length) {
+      const pins = pinRows();
+      drill.push(`Lay each side${hasDiv ? ' and divider' : ''} flat, inside face up, and drill 5mm shelf-pin holes 10mm deep with a depth stop. Use a jig or a strip of pegboard so every panel matches.`);
+      drill.push(`Hole centres, measured up from the bottom edge: ${pins.map(r => r.y + 'mm').join(', ')}. Set them ${pins[0].front}mm in from the front edge and the same from the back of the shelf.`);
+      if (hasDiv) drill.push('On the dividers, drill right through. One hole then holds a pin on each side.');
+    }
+    if (doors) drill.push(`On the inside face of each door, drill 35mm hinge cups 13mm deep, ${doors.hinges.map(h => h.y + 'mm').join(', ')} from the top and 22.5mm in from the hinge edge. Test on an offcut first.`);
+    if (drill.length) steps.push({ title: 'Drill everything while it is flat', parts: [...names('side'), ...names('divider'), ...(doors ? ['Door'] : [])], tools: ['Drill', '5mm bit', 'Depth stop', ...(shelves.length ? ['Shelf-pin jig'] : []), ...(doors ? ['35mm Forstner bit'] : [])], body: drill, warn: 'It is far easier and more accurate to drill now than inside a finished box.' });
     const join = S.joinery === 'screws'
-      ? ['Drill 3mm pilot holes through the sides, then countersink them.', `Glue the joint, then drive ${f} screws (4x40mm) through each side into the top and bottom.`, 'Do the bottom first, then the top.']
+      ? ['Work on a flat floor with the unit lying on its back, so you can reach both the top and the bottom. Lay the bottom between the two sides, flush at the front.', `${pilot}Glue the joint and drive ${f} screws (4x40mm) through each side into the bottom.`]
       : S.joinery === 'pocket'
-        ? ['Set your pocket-hole jig for 18mm board.', `Drill ${f} pocket holes on the underside of the bottom and the top face of the top.`, 'Clamp each joint flush, glue, then drive 32mm pocket screws.']
-        : ['Push glued dowels into the side panels.', 'Fit the cam bolts, then slide the top and bottom on.', 'Turn each cam a quarter turn until tight. Do not over-tighten.'];
-    steps.push({ title: 'Build the box', parts: [...names('side'), ...names('top'), ...names('bottom')], tools: S.joinery === 'pocket' ? ['Drill', 'Pocket-hole jig', 'Clamps'] : S.joinery === 'cam' ? ['Screwdriver', 'Rubber mallet'] : ['Drill', '3mm bit', 'Countersink', 'Clamps'], body: join });
-    if (R.parts.some(p => p.role === 'divider')) { const bi = bayInfo(); steps.push({ title: 'Fit the dividers', parts: names('divider'), tools: ['Tape measure', 'Drill', 'Clamps'], body: [`Mark the divider positions on the top and bottom: each compartment is ${bi.bayW}mm wide inside.`, 'Slide each divider in from the front and clamp it on its marks, square to the front edge.', `Fix through the top and bottom with ${f} screws at each end.`] }); }
-    if (R.parts.some(p => p.role === 'back')) steps.push({ title: 'Square it and fit the back', parts: ['Back Panel'], tools: ['Tape measure', 'Hammer'], body: ['Measure both diagonals. When they match, the box is square.', 'Pin the back on with 25mm panel pins every 150mm.', 'The back holds it square, so pin it before moving the unit.'] });
-    if (t === 'kitchenbase') steps.push({ title: 'Make the drawer', parts: names('drawer'), tools: ['Drill', 'Clamps'], body: ['Glue and screw the sides to the back.', 'Slide the 6mm base in and pin it from below.', 'Fit the runners to the drawer and cabinet, then hang the front with 2mm gaps.'] });
-    if (R.parts.some(p => p.role === 'shelf') || t === 'wardrobe') steps.push({ title: t === 'wardrobe' ? 'Fit shelves and rail' : 'Fit the shelves', parts: [...names('shelf'), ...names('rail')], tools: ['Drill', '5mm bit', 'Shelf-pin jig'], body: ['Drill 5mm shelf-pin holes 10mm deep, 37mm in from the front and back.', 'Use a jig or a strip of pegboard so both sides match.', t === 'wardrobe' ? 'Screw the rail sockets 70mm below the top, then drop the rail in.' : 'Push in the pins and drop the shelves on.'] });
+        ? ['Set your pocket-hole jig for 18mm board and drill pocket holes on the underside of the bottom.', `Clamp each side flush at the front, glue, then drive ${f} 32mm pocket screws per joint.`]
+        : ['Push glued dowels into the side panels.', 'Fit the cam bolts, slide the bottom on and turn each cam a quarter turn. Do not over-tighten.'];
+    steps.push({ title: 'Build the base', parts: [...names('side'), ...names('bottom')], tools: S.joinery === 'pocket' ? ['Drill', 'Pocket-hole jig', 'Clamps'] : S.joinery === 'cam' ? ['Screwdriver', 'Rubber mallet'] : ['Drill', '3mm bit', 'Countersink', 'Clamps'], body: join });
+    if (hasDiv) { const bi = bayInfo(); steps.push({ title: 'Stand the dividers', parts: names('divider'), tools: ['Tape measure', 'Square', 'Drill'], body: [`Mark the divider positions on the bottom. Each compartment is ${bi.bayW}mm wide inside.`, 'Cut a spacer from an offcut to that width. Use it to set each divider square and parallel.', `${pilot}Screw through the underside of the bottom into each divider, ${f} screws each.`] }); }
+    steps.push({ title: eaves ? 'Fit the sloped top' : t === 'kitchenbase' ? 'Fit the top rails' : 'Fit the top', parts: names('top'), tools: ['Drill', 'Clamps'], body: [eaves ? `Check the front and back edges are bevelled at ${eavesGeom().angDeg} degrees.` : 'Lay the top on, flush at the front.', `${pilot}Glue and screw it down into the sides${hasDiv ? ' and every divider' : ''}, ${f} screws per joint.`] });
+    if (R.parts.some(p => p.role === 'back')) steps.push({ title: 'Square it and fit the back', parts: ['Back Panel'], tools: ['Tape measure', 'Hammer'], body: ['Turn the unit over so it lies face down on a blanket.', 'Measure both diagonals. Push the corners until they match: then the box is square.', `Run glue along every edge${hasDiv ? ' and divider' : ''}, lay the back on and pin it every 150mm with 25mm panel pins.`], warn: eaves ? 'Do this now, before it goes in. Once the unit is under the eaves you cannot reach the back.' : 'The back holds the unit square. Fit it before you stand the unit up or move it.' });
+    if (t === 'kitchenbase') steps.push({ title: 'Make the drawer', parts: names('drawer'), tools: ['Drill', 'Clamps'], body: ['Glue and screw the sides to the back.', 'Slide the 6mm base in and pin it from below.', 'Fit the runners to the drawer and the cabinet.'] });
     if (t === 'kitchenbase') steps.push({ title: 'Legs and plinth', parts: ['Plinth'], tools: ['Spirit level'], body: ['Screw the legs to the underside, one near each corner.', 'Level the unit by twisting the legs.', 'Clip the plinth to the front legs.'] });
-    steps.push({ title: 'Fix it in place', parts: names('side'), tools: ['Stud and cable detector', 'Spirit level', 'Drill'], body: ['Check the wall for pipes and cables before you drill. Avoid lines straight up, down and across from sockets and switches.', 'Level the unit, packing under it if needed.', t === 'eaves' ? 'Screw angle brackets to the floor and the knee wall studs.' : 'Fix it to studs or with wall plugs that suit the wall.'], warn: (t === 'wardrobe' || (t === 'shelving' && S.h > 1000)) ? 'Tall units can tip forward. Always fix them to the wall.' : null });
-    if (doors) steps.push({ title: 'Hang and adjust the doors', parts: ['Door'], tools: ['Screwdriver'], body: ['Screw the hinge cups into the holes, then clip them onto the mounting plates.', 'Use the adjusting screws to get even 2 to 3mm gaps.', 'Fit the handles last.'] });
+    steps.push({ title: eaves ? 'Slide it in and fix it' : 'Fix it in place', parts: names('side'), tools: ['Spirit level', 'Packers', 'Drill', 'Stud and cable detector'], twoPeople: true,
+      body: eaves
+        ? ['With two people, carry the unit in and slide it back under the slope, keeping the 25mm air gap behind it.', 'Level it front to back and side to side with packers under the bottom.', 'Inside the unit, screw angle brackets to the floor. Screw through the top back edge into the knee wall studs you marked.', 'Fill the gaps to the walls and slope with a scribe strip or decorators caulk.']
+        : ['Level the unit, packing under it if needed.', 'Fix it to the studs you marked, or with wall plugs that suit the wall.', 'Fill any gap to the wall with a scribe strip or caulk.'],
+      warn: (t === 'wardrobe' || (t === 'shelving' && S.h > 1000)) ? 'Tall units can tip forward. Always fix them to the wall.' : null });
+    if (shelves.length || t === 'wardrobe') steps.push({ title: t === 'wardrobe' ? 'Fit shelves and rail' : 'Fit the shelves', parts: [...names('shelf'), ...names('rail')], tools: ['Screwdriver'], body: ['Push four pins into the holes for each shelf and rest the shelf on them.', t === 'wardrobe' ? 'Screw the rail sockets 70mm below the top, then drop the rail in.' : 'Check each shelf sits flat and does not rock.'] });
+    if (doors) steps.push({ title: 'Hang and adjust the doors', parts: ['Door'], tools: ['Screwdriver'], body: ['Screw the hinge cups into their holes and the mounting plates inside the unit.', 'Clip the doors on and use the adjusting screws to get even 2 to 3mm gaps.', 'Fit the handles last.'] });
   } else {
     const structural = STRUCTURAL.has(t);
     steps.push({ title: 'Check your timber', parts: all, tools: ['Tape measure', 'Pencil'], body: ['Check the grade stamp says C16 or better.', 'Sight down each length and put bowed ones aside for short pieces.', 'Cut list pieces are ready to mark from the stock lengths.'], warn: structural ? 'Structural work needs Building Regulations approval and an engineer to confirm timber sizes before you start.' : null });
@@ -1584,19 +1625,22 @@ function manualSteps() {
   const join = k => S.joinery === 'cam' ? [['cam lock', f * k], ['dowels', f * k]] : S.joinery === 'pocket' ? [['pocket-hole screws', f * k]] : [['wood screws', f * k]];
   const topName = t === 'eaves' ? 'Sloped Top' : t === 'kitchenbase' ? 'Top Rail' : 'Top';
   const steps = [];
-  steps.push({ add: ['Bottom'], ex: { Bottom: [W * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Fix the bottom to the left side, flush at the front.' });
-  steps.push({ add: [topName], ex: { [topName]: [W * 0.35, H * 0.3, 0] }, hw: join(1), note: t === 'eaves' ? 'The angled top follows the slope of the side.' : 'Fix the top to the left side, flush at the front.' });
-  steps.push({ add: ['Right Side'], ex: { 'Right Side': [W * 0.45, 0, 0] }, hw: join(2), note: 'Fit the right side to the top and bottom.', twoPeople: H > 1500 });
+  const eaves = t === 'eaves';
+  // Same order as a carpenter: base, right side, dividers onto the base, top down onto them,
+  // back on while it is still out in the room, then into place, then the loose parts.
+  steps.push({ add: ['Bottom'], ex: { Bottom: [W * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Work on a flat floor with the unit on its back. Fix the bottom to the left side, flush at the front.' });
+  steps.push({ add: ['Right Side'], ex: { 'Right Side': [W * 0.45, 0, 0] }, hw: join(1), note: 'Fix the right side to the bottom.', twoPeople: H > 1500 });
   const dividers = R.parts.find(p => p.name === 'Divider');
-  if (dividers) steps.push({ add: ['Divider'], ex: { Divider: [0, 0, -D * 1.05] }, hw: join(2 * dividers.qty), note: `Slide the dividers in from the front. Space them ${bayInfo().bayW}mm apart, then fix through the top and bottom.` });
-  if (has('Back Panel')) steps.push({ add: ['Back Panel'], ex: { 'Back Panel': [0, 0, D * 1.1] }, hw: [['panel pins', 40]], note: 'Measure corner to corner both ways. When they match, the box is square. Pin the back on every 150mm.', check: true });
+  if (dividers) steps.push({ add: ['Divider'], ex: { Divider: [0, H * 0.9, 0] }, hw: join(dividers.qty), note: `Stand the dividers on the bottom, ${bayInfo().bayW}mm apart. Use a spacer cut to that width to keep them square, then screw through the underside of the bottom.` });
+  steps.push({ add: [topName], ex: { [topName]: [0, H * 0.6, 0] }, hw: join(2 + (dividers ? dividers.qty : 0)), note: eaves ? 'Lay the sloped top on and screw it down into the sides and every divider.' : 'Lay the top on, flush at the front, and screw it down.' });
+  if (has('Back Panel')) steps.push({ add: ['Back Panel'], ex: { 'Back Panel': [0, 0, D * 1.1] }, hw: [['panel pins', 40], ['glue', 0]], note: eaves ? 'Turn the unit face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back on now, before it goes under the eaves.' : 'Turn the unit face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back every 150mm.', check: true });
   if (has('Plinth')) steps.push({ add: ['Plinth'], ex: { Plinth: [0, -H * 0.1, -D * 0.7] }, hw: [['legs', 4], ['plinth clips', 4]], note: 'Screw on the legs. Level the unit, then clip the plinth onto the front legs.' });
+  const wallHw = eaves ? [['angle brackets', 6]] : t === 'wardrobe' ? [['anti-tip', 2]] : t === 'kitchenwall' ? [['wall hanging', 2]] : t === 'shelving' ? [['wall fixing', 4]] : [];
+  steps.push({ add: [], wall: true, hw: wallHw, note: eaves ? 'Slide it back under the slope, leaving a 25mm air gap behind. Level it with packers, then screw brackets to the floor and into the knee wall studs.' : 'Level it, then fix it to the wall studs.', twoPeople: true });
   const shelves = names('shelf');
-  if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, 0, -D * 1.05]])), hw: [['shelf pins', 4 * shelves.length]], note: 'Push the shelf pins into the holes, then rest each shelf on four pins.' });
+  if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, 0, -D * 1.05]])), hw: [['shelf pins', 4 * shelves.length]], note: 'Push the pins into the holes you drilled, then rest each shelf on four pins.' });
   if (has('Hanging Rail')) steps.push({ add: ['Hanging Rail'], ex: { 'Hanging Rail': [0, 0, -D * 0.9] }, hw: [['rail end sockets', 2]], note: 'Screw the sockets to the sides, then drop the rail in.' });
   if (has('Drawer Front')) steps.push({ add: ['Drawer Front'], ex: { 'Drawer Front': [0, 0, -D * 0.8] }, hw: [['runners', 1]], note: 'Build the drawer box from its sides, back and base. Fit the runners, then slide it in.' });
-  const wallHw = t === 'eaves' ? [['angle brackets', 6]] : t === 'wardrobe' ? [['anti-tip', 2]] : t === 'kitchenwall' ? [['wall hanging', 2]] : t === 'shelving' ? [['wall fixing', 4]] : [];
-  steps.push({ add: [], wall: true, hw: wallHw, note: t === 'eaves' ? 'Check for pipes and cables, then fix it to the floor and the knee wall. Leave an air gap behind for ventilation.' : 'Check for pipes and cables, then fix it to the wall.', twoPeople: H > 1200 || W > 1500 });
   if (has('Door')) {
     const nd = R.parts.find(p => p.name === 'Door').qty;
     steps.push({ add: ['Door'], ex: { Door: [0, 0, -D * 0.7] }, hw: [['hinges', R.parts.find(p => p.name === 'Door').hinges.length * nd], ['knob', nd], ['handles', nd]], note: 'Clip each hinge onto its plate. Turn the adjusting screws until the gaps are even.', twoPeople: H > 1500 });
@@ -1611,6 +1655,24 @@ function hwCallouts(hwList, find) {
     const a = hwArt(f.name);
     return `<div class="m-call">${a.art}<div><b>${qty ? qty + 'x' : ''}</b><span>${f.id}</span></div></div>`;
   }).join('');
+}
+
+// Manual page: one side panel lying flat with every shelf-pin hole marked and dimensioned
+function pinHoleSVG() {
+  const rows = pinRows(), shelf = R.parts.find(p => p.role === 'shelf');
+  if (!rows.length || !shelf) return '';
+  const eaves = S.template === 'eaves', D = eaves ? eavesGeom().run : S.d, H = S.h - (S.template === 'kitchenbase' ? 100 : 0), L = eaves ? S.low : H;
+  const sc = Math.min(300 / D, 330 / H), pad = 60, w = D * sc, h = H * sc;
+  const X = x => pad + x * sc, Y = y => pad + h - y * sc;
+  const ink = MP.ink, back = Math.min(D, shelf.h + (S.scribe ? 2 : 0)) - 37;
+  let g = `<polygon points="${X(0)},${Y(0)} ${X(D)},${Y(0)} ${X(D)},${Y(L)} ${X(0)},${Y(H)}" fill="${MP.wood}" stroke="${ink}" stroke-width="1.6"/>`;
+  g += `<text x="${X(0) - 8}" y="${Y(H / 2)}" font-size="12" text-anchor="end" fill="${ink}" font-family="General Sans, sans-serif">front</text>`;
+  rows.forEach(r => {
+    [37, back].forEach(x => { g += `<circle cx="${X(x)}" cy="${Y(r.y)}" r="4" fill="#fff" stroke="${ink}" stroke-width="1.4"/>`; });
+    g += `<line x1="${X(D) + 10}" y1="${Y(r.y)}" x2="${X(D) + 18}" y2="${Y(r.y)}" stroke="${ink}"/><text x="${X(D) + 22}" y="${Y(r.y) + 4}" font-size="12" fill="${ink}" font-family="JetBrains Mono, monospace">${r.y}</text>`;
+  });
+  g += `<text x="${X(37)}" y="${Y(0) + 20}" font-size="12" text-anchor="middle" fill="${ink}" font-family="JetBrains Mono, monospace">37</text>`;
+  return `<svg viewBox="0 0 ${w + pad * 2 + 40} ${h + pad * 2}" class="m-iso" role="img" aria-label="Side panel lying flat with the shelf-pin holes marked">${g}</svg>`;
 }
 
 function renderManual(print = false) {
@@ -1639,6 +1701,9 @@ function renderManual(print = false) {
   // Safety
   const sc = safetyChecks().filter(c => c.status !== 'pass');
   if (sc.length) pages.push(page(`<h4 class="m-h">Before you start</h4><ul class="m-safety">${sc.map(c => `<li><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><b>${esc(c.title)}</b><span>${esc(c.text)}</span></div></li>`).join('')}</ul>`));
+  // Drill first, while every panel is flat
+  const holes = pinHoleSVG(), hasDiv = R.parts.some(p => p.role === 'divider');
+  if (holes) pages.push(page(`<h4 class="m-h">Drill first</h4><div class="m-calls">${hwCallouts([['shelf pins', 0]], hw.find)}</div>${holes}<p class="m-note">Lay each side${hasDiv ? ' and divider' : ''} flat, inside face up. Drill 5mm holes 10mm deep at these heights, measured up from the bottom edge.${hasDiv ? ' Drill right through the dividers so one hole holds a pin on each side.' : ''}</p>`));
   // Assembly
   let built = ['Left Side'];
   steps.forEach((st, i) => {
