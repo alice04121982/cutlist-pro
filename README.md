@@ -14,6 +14,10 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 
 Templates: under-eaves cupboard, wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 
+## Built as boxes
+
+Long furniture is split automatically into separate boxes no wider than 1200mm, the way kitchen units are made: each box is a complete carcass (two sides, top, bottom, back) that fits on one sheet and up the stairs. Boxes are joined in place with cabinet connector screws. The number of boxes can be set by hand. The cut list, fittings (screws per joint, connectors, panel pins per back, brackets, packers), drawings and the picture manual all follow the boxes: build one box, make N, join them, fix to the wall.
+
 ## Safety checks
 
 Every furniture design is checked as you edit it: shelf sag over time (beam formula with Eurocode 5 creep), shelf strength, load per shelf pin, back panel against racking, and wall fixing. Failing checks offer a one-tap fix (more compartments, thicker board, plywood). The rules, figures and sources are in [docs/SAFETY.md](docs/SAFETY.md) for professional review. Building work (walls, joists, roofs) is not checked and shows a stop notice.
