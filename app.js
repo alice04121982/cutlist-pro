@@ -163,7 +163,7 @@ function freshState(template = 'eaves') {
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
     compartments: d.bays || 1, boxes: 'auto', site: defaultSite(template), hand: 'right', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
-    unit: 'mm', done: []
+    unit: 'mm', done: [], ordered: false
   };
 }
 
@@ -174,7 +174,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -201,7 +201,8 @@ function sanitizeProject(p) {
     delivery: DELIVERY.some(d => d.id === p.delivery) ? p.delivery : 'standard',
     postcode: String(p.postcode || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 8),
     unit: p.unit === 'in' ? 'in' : 'mm',
-    done: Array.isArray(p.done) ? p.done.filter(n => Number.isInteger(n) && n >= 0 && n < 40) : []
+    done: Array.isArray(p.done) ? p.done.filter(n => Number.isInteger(n) && n >= 0 && n < 40) : [],
+    ordered: p.ordered === true
   });
   out.overrides = {};
   if (p.overrides && typeof p.overrides === 'object') {
@@ -2025,22 +2026,30 @@ function shopItem(f) {
 }
 const amazonSearch = q => 'https://www.amazon.co.uk/s?k=' + encodeURIComponent(q) + (AMAZON_TAG ? '&tag=' + encodeURIComponent(AMAZON_TAG) : '');
 const screwfixSearch = q => 'https://www.screwfix.com/search?search=' + encodeURIComponent(q);
-// One link that puts every item in the user's Amazon basket. Only product IDs and quantities go in it, no user data.
+// One link that puts every item with a product ID in the user's Amazon basket. Only product IDs and
+// quantities go in it, no user data. The Associates tag is added when set; items without an ID are listed
+// beside the button so they can be bought from the search links.
+const hasAsin = i => /^[A-Z0-9]{10}$/.test(i.asin);
 function amazonBasket(items) {
-  const ok = items.filter(i => /^[A-Z0-9]{10}$/.test(i.asin));
-  if (!AMAZON_TAG || ok.length !== items.length) return '';
-  return 'https://www.amazon.co.uk/gp/aws/cart/add.html?AssociateTag=' + encodeURIComponent(AMAZON_TAG) + ok.map((i, n) => `&ASIN.${n + 1}=${i.asin}&Quantity.${n + 1}=${i.packs}`).join('');
+  const ok = items.filter(hasAsin);
+  if (!ok.length) return '';
+  return 'https://www.amazon.co.uk/gp/aws/cart/add.html?' + (AMAZON_TAG ? 'AssociateTag=' + encodeURIComponent(AMAZON_TAG) + '&' : '') + ok.map((i, n) => `ASIN.${n + 1}=${i.asin}&Quantity.${n + 1}=${i.packs}`).join('&');
 }
 function shoppingList() {
   return R.fittings.map(shopItem).map(i => `${i.packs} x ${i.name}${i.pack > 1 ? ` (pack of ${i.pack})` : ''}: need ${i.total_qty}`).join('\n');
 }
 function hardwareCard() {
-  const items = R.fittings.map(shopItem), basket = amazonBasket(items);
-  return `<div class="card">
-    <h3><i class="ph ph-wrench" aria-hidden="true"></i>Hardware pack</h3>
-    <p class="sub">Cutters supply boards only. Buy these yourself while the panels are being cut. Quantities are rounded up to whole packs.</p>
-    ${basket ? `<a class="btn btn-primary" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add all to Amazon basket</a>` : ''}
-    <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
+  const items = R.fittings.map(shopItem), basket = amazonBasket(items), missing = items.filter(i => !hasAsin(i));
+  const cab = isCabinet(S.template), next = cab && S.ordered;
+  return `<div class="card hw-card${next ? ' is-next' : ''}" id="hwCard">
+    ${cab ? `<p class="step-tag">${next ? 'Next' : 'Step 2'}</p>` : ''}
+    <h3><i class="ph ph-wrench" aria-hidden="true"></i>${next ? 'Now order your hardware' : 'Hardware pack'}</h3>
+    <p class="sub">${next ? 'Your panels are on their way. Order the fittings now so everything arrives together.' : 'Cutters supply boards only. Order these once your panels are ordered.'} Quantities are rounded up to whole packs.</p>
+    <div class="hw-buy">
+      ${basket ? `<a class="btn ${next || !cab ? 'btn-primary' : 'btn-ghost'}" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add ${missing.length ? 'these' : 'all'} to Amazon basket<span class="sr-only"> (opens Amazon in a new tab)</span></a>` : ''}
+      <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
+    </div>
+    ${basket && missing.length ? `<p class="fine">Not in the Amazon basket yet: ${missing.map(i => esc(i.name)).join(', ')}. Use the links below for those.</p>` : ''}
     <p class="sub hw-collect"><i class="ph ph-storefront" aria-hidden="true"></i><span>Want to start today? Copy the list and collect from your nearest Screwfix. <a href="https://www.screwfix.com/stores" target="_blank" rel="noopener noreferrer">Find a Screwfix</a></span></p>
     <ul class="lines hw">${items.map(i => `<li><span>${esc(i.name)}<small>Need ${i.total_qty}. ${i.pack > 1 ? `Buy ${i.packs} pack${i.packs > 1 ? 's' : ''} of ${i.pack}${i.spare ? `, ${i.spare} spare` : ''}` : `Buy ${i.packs}`}${i.note ? '. ' + esc(i.note) : ''}</small>
       <span class="sup-act"><a class="chip" href="${amazonSearch(i.q)}" target="_blank" rel="noopener noreferrer">Amazon</a><a class="chip" href="${screwfixSearch(i.q)}" target="_blank" rel="noopener noreferrer">Screwfix</a></span></span><span>${gbp(i.total_cost)}</span></li>`).join('')}</ul>
@@ -2063,6 +2072,7 @@ function cutterCard() {
     return `mailto:${sup.email || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
   };
   return `<div class="card cutters">
+    <p class="step-tag">Step 1</p>
     <h3><i class="ph ph-storefront" aria-hidden="true"></i>Send to a cutter</h3>
     <p class="sub">Your order pack has every panel, its shape, its edging and every hole to drill. ${req.length ? 'This design needs: ' + req.map(r => r[2]).join(', ') + '.' : ''}</p>
     <button type="button" class="btn btn-primary" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download the order pack</button>
@@ -2074,6 +2084,9 @@ function cutterCard() {
       ${req.length ? `<div class="caps">${req.map(([k, , , label]) => badge(sup, k, label)).join('')}</div>` : ''}
       <div class="sup-act"><a class="chip" href="${sup.url}" target="_blank" rel="noopener noreferrer"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Open site</a>${sup.area === 'store' ? '' : `<a class="chip" href="${mail(sup)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>${sup.email ? 'Email order' : 'Draft email'}</a>`}</div>
     </li>`).join('')}</ul>
+    ${S.ordered
+      ? `<div class="ordered-row"><span class="cap cap-yes"><i class="ph ph-check" aria-hidden="true"></i>Panels ordered</span><button type="button" class="link-btn" data-action="mark-ordered">Not ordered yet</button></div>`
+      : `<button type="button" class="btn btn-primary" data-action="mark-ordered"><i class="ph ph-check-circle" aria-hidden="true"></i>I've ordered my panels</button><span class="help">Then we'll help you order the hardware.</span>`}
     <p class="fine">Details from each company's website, October 2026. "Ask" means they do not say. Your quote and their terms are final.</p>
   </div>`;
 }
@@ -2098,7 +2111,7 @@ function renderOrderPage() {
           <ul class="lines">${lines.map(([a, b, p]) => `<li><span>${esc(a)}<small>${esc(b)}</small></span><span>${gbp(p)}</span></li>`).join('')}</ul>
           ${S.template !== 'pitchedroof' && isCabinet(S.template) ? `<div class="price-in"><label for="f-priceSheet">Price per sheet (edit to match your quote)</label><input id="f-priceSheet" class="input" type="number" min="0" step="0.5" value="${R.sheetPrice}" data-field="priceSheet"></div>` : ''}
         </div>
-        ${hardwareCard()}
+        ${isCabinet(S.template) ? '' : hardwareCard()}
         <div class="card">
           <h3><i class="ph ph-truck" aria-hidden="true"></i>Delivery</h3>
           <div class="field" style-mt>
@@ -2110,6 +2123,7 @@ function renderOrderPage() {
           <div class="opts" role="radiogroup" aria-label="Delivery">${DELIVERY.map(d => `<label class="opt"><input type="radio" name="delivery" value="${d.id}" data-field="delivery"${S.delivery === d.id ? ' checked' : ''}><span><span class="t">${d.t}</span><br><span class="s">${d.s}</span></span><span class="p">${d.p ? gbp0(d.p) : 'Free'}</span></label>`).join('')}</div>
         </div>
         ${cutterCard()}
+        ${isCabinet(S.template) ? hardwareCard() : ''}
       </div>
       <aside class="card summary" aria-label="Order summary">
         <h3>Summary</h3>
@@ -2830,6 +2844,10 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
+  'mark-ordered': () => {
+    S.ordered = !S.ordered; saveDraft(); render();
+    if (S.ordered) { toast('Panels ordered. Now the hardware.'); requestAnimationFrame(() => $('#hwCard')?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' })); }
+  },
   'copy-shopping': async () => { try { await navigator.clipboard.writeText(shoppingList()); toast('Shopping list copied'); } catch { toast('Could not copy. Select the list and copy it instead.'); } },
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
   step: el => {

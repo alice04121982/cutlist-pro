@@ -706,3 +706,10 @@ dialog.ask{width:min(620px,100%)}
 .hw-collect{display:flex;gap:10px;align-items:flex-start;margin-top:4px}
 .hw-collect i{font-size:20px;color:var(--accent);margin-top:2px;flex:none}
 .hw-collect a{color:var(--accent-ink);font-weight:600;text-underline-offset:3px}
+.step-tag{font:600 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.hw-card.is-next{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.hw-card.is-next .step-tag{color:var(--accent-ink)}
+.hw-buy{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.ordered-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}
+.cutters > .btn-primary[data-action="mark-ordered"]{margin-top:12px}
+.hw-card{scroll-margin-top:calc(var(--nav-h) + 72px)}
