@@ -1938,12 +1938,14 @@ function pinHoleSVG() {
   const X = x => pad + x * sc, Y = y => pad + h - y * sc;
   const ink = MP.ink, back = Math.min(D, shelf.h + (S.scribe ? 2 : 0)) - 37;
   let g = `<polygon points="${X(0)},${Y(0)} ${X(D)},${Y(0)} ${X(D)},${Y(L)} ${X(0)},${Y(H)}" fill="${MP.wood}" stroke="${ink}" stroke-width="1.6"/>`;
-  g += `<text x="${X(0) - 8}" y="${Y(H / 2)}" font-size="12" text-anchor="end" fill="${ink}" font-family="General Sans, sans-serif">front</text>`;
+  g += `<text x="${X(0) - 10}" y="${Y(H / 2)}" font-size="12" text-anchor="middle" fill="${ink}" font-family="General Sans, sans-serif" transform="rotate(-90 ${X(0) - 10} ${Y(H / 2)})">front edge</text>`;
   rows.forEach(r => {
     [37, back].forEach(x => { g += `<circle cx="${X(x)}" cy="${Y(r.y)}" r="4" fill="#fff" stroke="${ink}" stroke-width="1.4"/>`; });
     g += `<line x1="${X(D) + 10}" y1="${Y(r.y)}" x2="${X(D) + 18}" y2="${Y(r.y)}" stroke="${ink}"/><text x="${X(D) + 22}" y="${Y(r.y) + 4}" font-size="12" fill="${ink}" font-family="JetBrains Mono, monospace">${r.y}</text>`;
   });
-  g += `<text x="${X(37)}" y="${Y(0) + 20}" font-size="12" text-anchor="middle" fill="${ink}" font-family="JetBrains Mono, monospace">37</text>`;
+  const lbl = (x, y, t, a = 'middle', f = 'General Sans, sans-serif') => `<text x="${x}" y="${y}" font-size="12" text-anchor="${a}" fill="${ink}" font-family="${f}">${t}</text>`;
+  g += lbl(X(37), Y(0) + 20, '37', 'middle', 'JetBrains Mono, monospace') + lbl(X(back), Y(0) + 20, '37 from back', 'middle', 'JetBrains Mono, monospace');
+  g += lbl(X(D / 2), Y(0) + 38, 'bottom edge') + lbl(X(D) + 22, Y(rows[rows.length - 1].y) - 18, 'mm up', 'start');
   return `<svg viewBox="0 0 ${w + pad * 2 + 40} ${h + pad * 2}" class="m-iso" role="img" aria-label="Side panel lying flat with the shelf-pin holes marked">${g}</svg>`;
 }
 
@@ -1975,7 +1977,7 @@ function renderManual(print = false) {
   if (sc.length) pages.push(page(`<h4 class="m-h">Before you start</h4><ul class="m-safety">${sc.map(c => `<li><i class="ph ph-${SAFETY_ICON[c.status]}" aria-hidden="true"></i><div><b>${esc(c.title)}</b><span>${esc(c.text)}</span></div></li>`).join('')}</ul>`));
   // Drill first, while every panel is flat
   const holes = pinHoleSVG(), hasDiv = R.parts.some(p => p.role === 'divider');
-  if (holes) pages.push(page(`<h4 class="m-h">Drill first</h4><div class="m-calls">${hwCallouts([['shelf pins', 0]], hw.find)}</div>${holes}<p class="m-note">Lay each side${hasDiv ? ' and divider' : ''} flat, inside face up. Drill 5mm holes 10mm deep at these heights, measured up from the bottom edge.${hasDiv ? ' Drill right through the dividers so one hole holds a pin on each side.' : ''}</p>`));
+  if (holes) pages.push(page(`<h4 class="m-h">Drill first</h4><div class="m-calls">${hwCallouts([['shelf pins', 0]], hw.find)}</div>${holes}<p class="m-note">Lay each side${hasDiv ? ' and divider' : ''} flat, inside face up. Each number is a height in mm from the <b>bottom edge</b> of the panel to the centre of the hole. Drill two holes at each height: 37mm in from the front edge and 37mm in from the back edge. Three heights per shelf, 32mm apart, let you move the shelf up or down. Drill 5mm wide and 10mm deep (tape on the drill bit marks the depth).${hasDiv ? ' Drill right through the dividers so one hole holds a pin on each side.' : ''}</p>`));
   // Assembly. Multi-box units: the first steps show one box on its own, then a step joins them all.
   const Lay = layout(), oneBox = Lay.n > 1 ? partSolids({ box: 0 }) : null;
   let built = ['Left Side'];
@@ -2673,7 +2675,7 @@ function askSuggestions() {
 }
 
 function renderAsk() {
-  $('#askLog').innerHTML = ASK.log.map(m => `<div class="msg ${m.role === 'user' ? 'user' : 'bot'}${m.wait ? ' wait' : ''}">${esc(m.text)}${m.diff && m.diff.length ? `<div class="tags">${m.diff.map(d => `<span class="tag acc">${esc(d)}</span>`).join('')}</div>` : ''}</div>`).join('');
+  $('#askLog').innerHTML = ASK.log.map((m, i) => `<div class="msg ${m.role === 'user' ? 'user' : 'bot'}${m.wait ? ' wait' : ''}">${esc(m.text)}${m.diff && m.diff.length ? `<div class="tags">${m.diff.map(d => `<span class="tag acc">${esc(d)}</span>`).join('')}${m.undo ? `<button type="button" class="chip" data-action="ask-undo" data-i="${i}"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>Undo</button>` : ''}</div>` : ''}</div>`).join('');
   $('#askSugg').innerHTML = ASK.log.length ? '' : askSuggestions().map(t => `<button type="button" class="chip" data-action="ask-suggest" data-text="${esc(t)}">${esc(t)}</button>`).join('');
   const log = $('#askLog'); log.scrollTop = log.scrollHeight;
 }
@@ -2703,7 +2705,8 @@ function applyChanges(ch) {
     if (ch[k] === undefined || ch[k] === null) continue;
     const v = Number(ch[k]); const lim = LIMITS[k];
     if (!Number.isFinite(v) || !lim) continue;
-    const nv = Math.round(clamp(v, lim[0], lim[1]));
+    if (v < lim[0] || v > lim[1]) { diff.skipped = (diff.skipped || []).concat(`${FIELD_LABEL[k]} ${fmtVal(k, Math.round(v))} is outside ${fmtVal(k, lim[0])} to ${fmtVal(k, lim[1])}`); continue; }
+    const nv = Math.round(v);
     if (nv !== S[k]) { diff.push(`${FIELD_LABEL[k]}: ${fmtVal(k, nv)}`); S[k] = nv; }
   }
   if (S.template === 'eaves' && S.low >= S.h) { S.low = Math.round(S.h * 0.6); diff.push(`Back height: ${fmtVal('low', S.low)}`); }
@@ -2718,6 +2721,19 @@ function applyChanges(ch) {
   if (typeof ch.scribe === 'boolean' && ch.scribe !== S.scribe) { S.scribe = ch.scribe; diff.push(`Scribe edges: ${ch.scribe ? 'on' : 'off'}`); }
   if (diff.length) { saveDraft(); render(); }
   return diff;
+}
+
+// Questions get an answer, never a change. Without the AI, a few common ones are answered here.
+const isQuestion = t => /\?\s*$/.test(t) || /^\s*(what|why|how|where|which|when|who|can|could|should|do|does|is|are|will|would)\b/i.test(t);
+function answerLocally(text) {
+  const t = text.toLowerCase();
+  if (/height|hole|pin|drill/.test(t)) {
+    const rows = R ? pinRows() : [];
+    return `Those numbers are where to drill the shelf-pin holes on each side panel, in mm, measured from the bottom edge of the panel up to the centre of the hole. Each row has two holes, 37mm in from the front edge and 37mm in from the back edge. There are 3 rows per shelf, 32mm apart, so you can move the shelf up or down a little.${rows.length ? ` Your rows: ${rows.map(r => r.y).join(', ')}mm.` : ''}`;
+  }
+  if (/box side|8 side|eight side|why .*sides/.test(t)) return 'Each box has its own two sides, so where two boxes meet there are two sides screwed together. Splitting into boxes keeps every panel short enough to carry in. The note under "Built as separate boxes" on the Design step has the details.';
+  if (/back panel|back on/.test(t)) return 'Pin the 3mm back on each box while it is lying face down, before you lift it into place. A fixed back stops the box racking.';
+  return '';
 }
 
 // Offline fallback: understands the common requests without any AI.
@@ -2770,12 +2786,16 @@ async function askSend(text) {
     else if (r.status === 429) reply = 'Lots of requests right now. Give it a minute and try again.';
     else offline = true;
   } catch { offline = true; }
-  if (offline) { changes = parseLocally(text); }
+  const question = isQuestion(text);
+  if (offline) changes = question ? null : parseLocally(text);
   ASK.log.pop();
+  const before = JSON.stringify(Object.fromEntries([...ASK_FIELDS, 'scribe', 'priceSheet', 'overrides'].map(k => [k, S[k]])));
   const diff = applyChanges(changes);
-  if (offline) reply = diff.length ? 'Done.' : "I couldn't work that out. Try something like \"5 compartments\", \"no doors\", \"2 shelves\" or \"1.5m wide\".";
+  if (offline && question) reply = answerLocally(text) || 'I can only make changes to the design right now, not answer questions. Try something like "2 shelves" or "1.5m wide".';
+  else if (offline) reply = diff.length ? 'Done.' : diff.skipped ? '' : "I couldn't work that out. Try something like \"5 compartments\", \"no doors\", \"2 shelves\" or \"1.5m wide\".";
   else if (!reply) reply = diff.length ? 'Done.' : 'Nothing to change there.';
-  ASK.log.push({ role: 'bot', text: reply, diff });
+  if (diff.skipped) reply = (reply ? reply + ' ' : '') + 'Not changed: ' + diff.skipped.join('; ') + '.';
+  ASK.log.push({ role: 'bot', text: reply, diff, undo: diff.length ? before : null });
   ASK.busy = false;
   renderAsk();
 }
@@ -2837,6 +2857,14 @@ const ACTIONS = {
   print: () => printSheet(),
   'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
   'copy-shopping': async () => { try { await navigator.clipboard.writeText(shoppingList()); toast('Shopping list copied'); } catch { toast('Could not copy. Select the list and copy it instead.'); } },
+  'ask-undo': el => {
+    const m = ASK.log[Number(el.dataset.i)];
+    if (!m || !m.undo) return;
+    const prev = JSON.parse(m.undo);
+    if (prev.template !== S.template) startTemplate(prev.template, { keepOverlay: true });
+    Object.assign(S, prev); m.undo = null; m.diff = []; m.text += ' (Undone.)';
+    saveDraft(); render(); renderAsk();
+  },
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
   step: el => {
     const k = el.dataset.k, lim = k === 'boxes' ? [1, 8] : LIMITS[k];
