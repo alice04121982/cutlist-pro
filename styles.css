@@ -97,7 +97,9 @@ button,input,select{font:inherit;color:inherit}
 .nav-links a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink-2)}
 .nav-links a:hover{color:var(--ink)}
 @media(min-width:900px){.nav-links{display:flex}}
-.nav-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.nav-actions{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
+@media(max-width:380px){.brand{gap:8px}.brand-name{font-size:16px !important}}
+@media(max-width:420px){.nav-in{gap:10px}.brand-name{font-size:18px}.nav-actions{gap:6px}.nav-actions .btn-sm{padding-left:12px;padding-right:12px}}
 .nav-actions .btn-ghost span{display:none}
 @media(min-width:640px){.nav-actions .btn-ghost span{display:inline}}
 .nav-project{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;max-width:420px}
@@ -655,3 +657,7 @@ dialog.ask{width:min(620px,100%)}
 .m-safety i{font-size:26px;color:#15181B;flex:none}
 .m-safety b{display:block;color:#15181B}
 .m-safety span{color:#454B51}
+
+/* ---------- Hero 3D scene ---------- */
+.hero-compare{aspect-ratio:3/2}
+.hero-scene,.hero-scene svg{position:absolute;inset:0;width:100%;height:100%;display:block}

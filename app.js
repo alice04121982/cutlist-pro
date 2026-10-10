@@ -1671,6 +1671,95 @@ function afterPage() {
   $$('[style-mt]', $('#pageCol')).forEach(el => { el.style.marginTop = '16px'; el.removeAttribute('style-mt'); });
 }
 
+
+// ───────────────────────── Hero scene ─────────────────────────
+// A loft room drawn in true perspective from one fixed camera, so "before" and "after" line up exactly.
+// Units are mm. x across the room, y up, z away from the camera. The knee wall is at z = KZ, roof pitch 45 deg.
+function heroScene(after, d) {
+  const VW = 1200, VH = 800, F = 1100, CX = 600, CY = 330, CAM = { x: 1500, y: 1350 };
+  const L = d.w, KZ = 5000, KH = d.low, RIDGE = 2600;
+  const P = (x, y, z) => [CX + F * (x - CAM.x) / z, CY - F * (y - CAM.y) / z];
+  const pts = a => a.map(v => P(...v).map(n => n.toFixed(1)).join(',')).join(' ');
+  const poly = (a, fill, extra = '') => `<polygon points="${pts(a)}" fill="${fill}"${extra}/>`;
+  const slopeZ = y => KZ - (y - KH); // 45 deg roof
+  const zr = slopeZ(RIDGE);
+  let s = `<svg viewBox="0 0 ${VW} ${VH}" class="hero-svg" role="img" aria-label="${after ? 'The loft with built-in cupboards under the eaves' : 'An empty loft with boxes stacked under the eaves'}" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="hsSlope${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBFAF7"/><stop offset="1" stop-color="#E9E6E0"/></linearGradient>
+    <linearGradient id="hsFloor${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9A57A"/><stop offset="1" stop-color="#DDBE93"/></linearGradient>
+    <linearGradient id="hsGlass${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FC3DD"/><stop offset="1" stop-color="#E4EEF4"/></linearGradient>
+    <linearGradient id="hsIn${+after}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3F3A"/><stop offset="1" stop-color="#5B625A"/></linearGradient>
+  </defs>
+  <rect width="${VW}" height="${VH}" fill="#F3F1EC"/>`;
+  const zn = 1200; // near plane for walls that run off screen
+  // Floor and boards
+  s += poly([[0, 0, zn], [L, 0, zn], [L, 0, KZ], [0, 0, KZ]], `url(#hsFloor${+after})`);
+  for (let x = 0; x <= L; x += 160) s += `<line x1="${P(x, 0, zn)[0].toFixed(1)}" y1="${P(x, 0, zn)[1].toFixed(1)}" x2="${P(x, 0, KZ)[0].toFixed(1)}" y2="${P(x, 0, KZ)[1].toFixed(1)}" stroke="#B48F63" stroke-width="1" opacity=".55"/>`;
+  // Gable walls, knee wall, slope, flat ceiling
+  s += poly([[0, 0, zn], [0, 0, KZ], [0, KH, KZ], [0, RIDGE, zr], [0, RIDGE, zn]], '#E2DED7');
+  s += poly([[L, 0, zn], [L, 0, KZ], [L, KH, KZ], [L, RIDGE, zr], [L, RIDGE, zn]], '#E9E6E0');
+  s += poly([[0, 0, KZ], [L, 0, KZ], [L, KH, KZ], [0, KH, KZ]], '#ECE9E3');
+  s += poly([[0, KH, KZ], [L, KH, KZ], [L, RIDGE, zr], [0, RIDGE, zr]], `url(#hsSlope${+after})`);
+  s += poly([[0, RIDGE, zr], [L, RIDGE, zr], [L, RIDGE, zn], [0, RIDGE, zn]], '#F7F6F2');
+  // Skirting boards
+  s += poly([[0, 0, KZ], [L, 0, KZ], [L, 80, KZ], [0, 80, KZ]], '#F8F7F4', ' stroke="#D9D5CD" stroke-width="1"');
+  s += poly([[0, 0, zn], [0, 0, KZ], [0, 80, KZ], [0, 80, zn]], '#F4F2EE');
+  s += poly([[L, 0, zn], [L, 0, KZ], [L, 80, KZ], [L, 80, zn]], '#F6F4F0');
+  // Roof window in the slope, with a patch of light on the floor
+  const wx0 = L * 0.36, wx1 = L * 0.58, wy0 = 1500, wy1 = 2200;
+  const win = [[wx0, wy0, slopeZ(wy0)], [wx1, wy0, slopeZ(wy0)], [wx1, wy1, slopeZ(wy1)], [wx0, wy1, slopeZ(wy1)]];
+  s += poly(win, '#FFFFFF', ' stroke="#D3CFC7" stroke-width="2"');
+  const inset = 70, iw = [[wx0 + inset, wy0 + inset, slopeZ(wy0 + inset)], [wx1 - inset, wy0 + inset, slopeZ(wy0 + inset)], [wx1 - inset, wy1 - inset, slopeZ(wy1 - inset)], [wx0 + inset, wy1 - inset, slopeZ(wy1 - inset)]];
+  s += poly(iw, `url(#hsGlass${+after})`);
+  // Boxes: faces drawn back to front
+  const box = (x0, x1, y0, y1, z0, z1, c) => {
+    let o = '';
+    if (CAM.x < x0) o += poly([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], shadeHex(c, 0.86));
+    if (CAM.x > x1) o += poly([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], shadeHex(c, 0.86));
+    if (CAM.y > y1) o += poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], shadeHex(c, 1.08));
+    return o + poly([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], c, ' stroke="rgba(0,0,0,.12)" stroke-width="1"');
+  };
+  if (!after) {
+    s += box(200, 800, 0, 420, 4500, 4980, '#C8A574') + box(300, 700, 420, 700, 4600, 4950, '#D5B484');
+    s += box(1000, 1350, 0, 260, 4550, 4900, '#BFA07A');
+    s += box(L - 1100, L - 450, 0, 380, 4520, 4990, '#C9A877') + box(L - 380, L - 120, 0, 600, 4700, 4990, '#9AA59B');
+    return s + '</svg>';
+  }
+  // Built-in cupboards: front face at z = FZ, top follows the slope back to the knee wall
+  const FZ = KZ - d.d, FH = d.h, n = d.bays, dw = L / n, plinth = 80;
+  const sage = '#C3CDBD', sageDark = '#AEB9A8';
+  s += poly([[0, FH, FZ], [L, FH, FZ], [L, KH, KZ], [0, KH, KZ]], '#F1EFEA');
+  s += poly([[0, 0, FZ], [L, 0, FZ], [L, FH, FZ], [0, FH, FZ]], sage);
+  s += poly([[0, 0, FZ], [L, 0, FZ], [L, plinth, FZ], [0, plinth, FZ]], '#8E9989');
+  s += `<line x1="${P(0, FH, FZ)[0].toFixed(1)}" y1="${P(0, FH, FZ)[1].toFixed(1)}" x2="${P(L, FH, FZ)[0].toFixed(1)}" y2="${P(L, FH, FZ)[1].toFixed(1)}" stroke="#9AA595" stroke-width="2"/>`;
+  const openIdx = 1;
+  for (let i = 1; i < n; i++) { const x = i * dw; s += `<line x1="${P(x, plinth, FZ)[0].toFixed(1)}" y1="${P(x, plinth, FZ)[1].toFixed(1)}" x2="${P(x, FH - 10, FZ)[0].toFixed(1)}" y2="${P(x, FH - 10, FZ)[1].toFixed(1)}" stroke="#7F8B7A" stroke-width="2"/>`; }
+  // Open compartment: interior clipped to the door opening
+  const ox0 = openIdx * dw, ox1 = ox0 + dw;
+  s += `<clipPath id="hsOpen"><polygon points="${pts([[ox0, plinth, FZ], [ox1, plinth, FZ], [ox1, FH - 10, FZ], [ox0, FH - 10, FZ]])}"/></clipPath><g clip-path="url(#hsOpen)">`;
+  s += poly([[ox0 - 50, -50, FZ], [ox1 + 50, -50, FZ], [ox1 + 50, FH + 50, FZ], [ox0 - 50, FH + 50, FZ]], `url(#hsIn${+after})`);
+  const sy = Math.round(FH * 0.5), sd = FZ + d.d - 40;
+  s += poly([[ox0, sy, FZ], [ox1, sy, FZ], [ox1, sy, sd], [ox0, sy, sd]], '#E2C79C');
+  s += poly([[ox0, sy - 18, FZ], [ox1, sy - 18, FZ], [ox1, sy, FZ], [ox0, sy, FZ]], '#C9AC7E');
+  s += box(ox0 + 60, ox0 + 110, sy, sy + 230, 4700, 4900, '#B5533A') + box(ox0 + 115, ox0 + 160, sy, sy + 260, 4700, 4900, '#3F5A73') + box(ox0 + 165, ox0 + 205, sy, sy + 210, 4700, 4900, '#E0B54E');
+  s += box(ox0 + 320, ox1 - 80, sy, sy + 160, 4600, 4880, '#E9E4DA');
+  s += box(ox0 + 80, ox1 - 120, plinth, plinth + 260, 4500, 4850, '#B99366');
+  s += '</g>';
+  // Handles on the closed doors, at the meeting edges
+  for (let i = 0; i < n; i++) {
+    if (i === openIdx) continue;
+    const hx = i % 2 === 0 ? (i + 1) * dw - 60 : i * dw + 60;
+    s += poly([[hx - 8, FH * 0.55, FZ - 5], [hx + 8, FH * 0.55, FZ - 5], [hx + 8, FH * 0.75, FZ - 5], [hx - 8, FH * 0.75, FZ - 5]], '#B48A4A');
+  }
+  // The open door, hinged on its left edge and swung past square towards the room
+  const a = 100 * Math.PI / 180, fx = ox0 + dw * Math.cos(a), fz = FZ - dw * Math.sin(a);
+  s += poly([[ox0, plinth + 4, FZ], [ox0, FH - 12, FZ], [fx, FH - 12, fz], [fx, plinth + 4, fz]], sageDark, ' stroke="#7F8B7A" stroke-width="1.5"');
+  // Measurements
+  const chip = (x, y, z, txt, dx = 0, dy = 0) => { const [px, py] = P(x, y, z); return `<g transform="translate(${(px + dx).toFixed(1)} ${(py + dy).toFixed(1)})"><rect x="-44" y="-14" width="88" height="28" rx="14" fill="#FF5B1F"/><text x="0" y="5" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" fill="#15181B">${txt}</text></g>`; };
+  s += chip(L * 0.8, FH, FZ, fmt(L), 0, -26) + chip(L, FH / 2, FZ, fmt(FH), -54, 0);
+  return s + '</svg>';
+}
+
 // ───────────────────────── Home ─────────────────────────
 let heroBuilt = false;
 function renderHome() {
@@ -1679,14 +1768,13 @@ function renderHome() {
   if (draft && draft.name) { card.hidden = false; $('#resumeName').textContent = String(draft.name).slice(0, 60); } else card.hidden = true;
   if (heroBuilt) return;
   heroBuilt = true;
-  // Demo: a three-bay plywood shelf unit drawn onto the sample photo
-  const demo = { template: 'shelving', w: 1500, h: 1000, d: 300, shelves: 1, compartments: 3, thickness: 18, material: 'plywood', doors: 0, joinery: 'screws', scribe: true, overrides: {} };
+  // Demo: five-compartment under-eaves cupboards in a loft, shown in a drawn 3D room
+  const demo = { template: 'eaves', w: 3600, h: 1300, d: 600, low: 700, shelves: 1, compartments: 5, thickness: 18, material: 'plywood', doors: 5, joinery: 'screws', scribe: true, load: 'books', overrides: {} };
   const saved = {}; Object.keys(demo).forEach(k => { saved[k] = S[k]; S[k] = demo[k]; });
   compute();
-  const box = $('#heroOverlay');
-  box.innerHTML = elevationSVG('solid') + `<span class="ov-dim ov-dim-w">${fmt(S.w)}</span><span class="ov-dim ov-dim-h">${fmt(S.h)}</span>`;
   const root = $('#heroCompare');
-  placeOverlay(box, { wf: () => 0.38, aspect: () => 1.5, imgW: 1600, imgH: 1067, pos: () => ({ x: 0.565, yb: 0.6 }) });
+  $('#heroBefore').innerHTML = heroScene(false, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments });
+  $('#heroOverlay').innerHTML = heroScene(true, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments });
   $('#heroStats').innerHTML = `<li><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>${fmt(S.w)} x ${fmt(S.h)}</strong> measured from the photo</span></li>`
     + `<li><i class="ph ph-scissors" aria-hidden="true"></i><span><strong>${R.pieceCount} cuts</strong> from ${R.nMain} ${R.nMain === 1 ? 'sheet' : 'sheets'} of plywood</span></li>`
     + `<li><i class="ph ph-truck" aria-hidden="true"></i><span><strong>About ${gbp0(R.total)}</strong> cut and delivered</span></li>`;

@@ -39,7 +39,7 @@ Without a key, or if the AI is unreachable, a built-in phrase parser handles the
 - Light and dark themes follow the system, with a manual toggle.
 - Icons: Phosphor (regular).
 
-UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider), Cal AI and Quizlet capture tips, IKEA camera framing, IKEA and LARQ step-by-step setup, Stripe split configurator with live preview, Instacart and Amazon checkout summaries.
+UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider, shown on a drawn 3D loft), Cal AI and Quizlet capture tips, IKEA camera framing, IKEA and LARQ step-by-step setup, Stripe split configurator with live preview, Instacart and Amazon checkout summaries.
 
 ## Privacy and security
 
@@ -59,6 +59,6 @@ Permissions-Policy: camera=(self), geolocation=(), microphone=(), xr-spatial-tra
 
 ## Credits
 
-Hero photo by Алан Албегов, design tile photo by Andrea Davis, both on Unsplash.
+The home page loft scene is drawn in code (`heroScene()` in `app.js`). Design tile photo by Andrea Davis on Unsplash.
 
 Prices are estimates. Always check measurements before you order.
