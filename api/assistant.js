@@ -7,7 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic();
 const MODEL = 'claude-opus-5-5';
 
-const TEMPLATES = ['eaves', 'wardrobe', 'shelving', 'kitchenbase', 'kitchenwall', 'studwall', 'partition', 'floorjoists', 'flatroof', 'pitchedroof'];
+const TEMPLATES = ['eaves', 'understairs', 'wardrobe', 'shelving', 'kitchenbase', 'kitchenwall', 'studwall', 'partition', 'floorjoists', 'flatroof', 'pitchedroof'];
 const NUM_FIELDS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], thickness: [3, 100], spacing: [200, 1200], pitch: [5, 70] };
 const MAX_MESSAGE = 600;
 const MAX_HISTORY = 6;
@@ -40,9 +40,9 @@ const SCHEMA = {
 const SYSTEM = `You help people adjust a DIY furniture or building design in the CutList Pro app. The user describes what is wrong or what they want, and you return changes to the design settings.
 
 Settings (all sizes in millimetres):
-- template: eaves (under-eaves unit with an angled top), wardrobe, shelving, kitchenbase, kitchenwall, studwall, partition, floorjoists, flatroof, pitchedroof.
-- w: overall width. h: overall height (for eaves, the front height). d: depth. low: for eaves only, the back height at the knee wall, always less than h.
-- compartments: number of side-by-side bays made with upright dividers, 1 to 8. Works for eaves, shelving, wardrobe and kitchenwall.
+- template: eaves (under-eaves unit with an angled top), understairs (cupboard under a staircase: tall at one end, short at the other), wardrobe, shelving, kitchenbase, kitchenwall, studwall, partition, floorjoists, flatroof, pitchedroof.
+- w: overall width. h: overall height (for eaves, the front height). d: depth. low: for eaves, the back height at the knee wall; for understairs, the height at the short end. Always less than h.
+- compartments: number of side-by-side bays made with upright dividers, 1 to 8. Works for eaves, understairs, shelving, wardrobe and kitchenwall.
 - shelves: shelves in each compartment, 0 to 20.
 - doors: "auto" (suggested), or "0" for open shelving, or a number of doors up to "8".
 - joinery: screws (easiest), pocket (hidden pocket screws), cam (flat-pack cam and dowel).
