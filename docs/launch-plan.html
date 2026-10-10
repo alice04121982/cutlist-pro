@@ -1,0 +1,141 @@
+<title>Made to Fit Launch Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a working checklist, one column, phases in order; tick boxes are remembered on this device. */
+:root{
+  --bg:#F4F6F8; --card:#FFFFFF; --ink:#0E1726; --ink-2:#3F4A5C; --ink-3:#5B6678; --line:#DCE1E8;
+  --blue:#1E4FD8; --coral:#F47A5E; --on-coral:#0E1726; --ok:#1F7A4D;
+  --display:"Outfit","Helvetica Neue",Arial,sans-serif; --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0B1220;--card:#121B2C;--ink:#E8EDF5;--ink-2:#B4BED0;--ink-3:#8E9AB0;--line:#22304A;--blue:#6B95FF;--coral:#FF8F73;--on-coral:#0B1220;--ok:#4CC38A;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0B1220;--card:#121B2C;--ink:#E8EDF5;--ink-2:#B4BED0;--ink-3:#8E9AB0;--line:#22304A;--blue:#6B95FF;--coral:#FF8F73;--on-coral:#0B1220;--ok:#4CC38A;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);padding-inline:clamp(16px,4vw,40px);padding-block:36px 72px}
+.wrap{max-width:860px;margin:0 auto;display:grid;gap:40px}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:clamp(32px,5vw,48px);line-height:1.05}
+h2{font-size:clamp(22px,3vw,28px)}
+h3{font-size:17px}
+p{margin:0;max-width:65ch;color:var(--ink-2)}
+p strong{color:var(--ink)}
+a{color:var(--blue);text-underline-offset:3px}
+.mono{font-family:var(--mono);font-size:.92em}
+.head{display:grid;gap:12px}
+.live{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.live b{font-family:var(--mono);font-weight:600;color:var(--ink);word-break:break-all}
+.copy{font:600 13px var(--body);border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:6px 10px;cursor:pointer}
+.copy:focus-visible,.task input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.phase{display:grid;gap:14px}
+.when{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.phase.now .when{color:var(--blue)}
+.tasks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.task{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.task input{width:20px;height:20px;margin-top:2px;accent-color:var(--blue)}
+.task .t{display:grid;gap:4px;min-width:0}
+.task label{font-weight:600;cursor:pointer}
+.task.done label{text-decoration:line-through;color:var(--ink-3)}
+.task .d{font-size:14.5px}
+.answer{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--coral);border-radius:10px;padding:18px 20px;display:grid;gap:10px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14.5px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 11.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;white-space:nowrap}
+td{color:var(--ink-2)}
+.pick{font:600 11px var(--mono);background:var(--coral);color:var(--on-coral);padding:2px 7px;border-radius:4px;margin-left:6px;white-space:nowrap}
+.progress{font:600 13px var(--mono);color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+<header class="head">
+  <h1>Made to Fit launch plan</h1>
+  <p>From your own eaves order this week to paying customers. Tick things off as you go; ticks are remembered on this device. <span class="progress" id="progress"></span></p>
+  <div class="live"><span>Live app:</span> <b id="liveUrl">https://cutlist-pro-gamma.vercel.app</b> <button class="copy" type="button" id="copyBtn">Copy link</button></div>
+</header>
+
+<section class="answer" aria-labelledby="q1">
+  <h2 id="q1">Can step 5 send my design to the cutter automatically?</h2>
+  <p><strong>Not yet.</strong> Step 5 (Order) prepares everything: the cut list, the drawing with every angled cut and drill hole, the best-matched cutters for your postcode, and a ready-written quote email. You attach the two files, send the email, the cutter replies with a price, you pay them directly, and they deliver.</p>
+  <p>Fully automatic ordering ("press a button, panels arrive") needs a partner cutter who accepts orders from Made to Fit, either through an upload link or an API. That is what the partner emails in phase 3 set up. Your own test order is how you learn what to ask for.</p>
+</section>
+
+<section class="phase now" aria-labelledby="p1">
+  <span class="when">This week</span>
+  <h2 id="p1">1. Order your own eaves cupboards</h2>
+  <ul class="tasks">
+    <li class="task"><input type="checkbox" id="t1"><div class="t"><label for="t1">Design it in the app</label><span class="d">Open the live app on your phone, choose Under-eaves cupboard, add a photo with a bank card on the wall, and measure on the photo.</span></div></li>
+    <li class="task"><input type="checkbox" id="t2"><div class="t"><label for="t2">Check every size with a tape</label><span class="d">Width, front height, back height and depth. Type the tape number in, or tap "Matches my tape". Measure in two or three places and use the smallest.</span></div></li>
+    <li class="task"><input type="checkbox" id="t3"><div class="t"><label for="t3">Download the order pack</label><span class="d">On step 5, "Download the order pack" saves two files: the cut list (CSV) and the drawing (DXF).</span></div></li>
+    <li class="task"><input type="checkbox" id="t4"><div class="t"><label for="t4">Ask two cutters for a quote</label><span class="d">CNC Creations (best for angled eaves panels) and Cutwrights (to compare). Use "Draft email" and attach both files yourself. Ask: can you cut from this DXF, label the parts, price delivered to my postcode, and lead time?</span></div></li>
+    <li class="task"><input type="checkbox" id="t5"><div class="t"><label for="t5">Order, then tick "I've ordered my panels"</label><span class="d">The app then moves you to the hardware: "Add all to Amazon basket", or copy the list for Screwfix.</span></div></li>
+    <li class="task"><input type="checkbox" id="t6"><div class="t"><label for="t6">Build it and write down every snag</label><span class="d">Did the parts match the picture manual? Anything mislabelled, missing or hard? Note the real cost against the app's estimate. This becomes your partner pitch and your first case study.</span></div></li>
+  </ul>
+</section>
+
+<section class="phase" aria-labelledby="pc">
+  <h2 id="pc">Cutting services to contact</h2>
+  <p>All are already listed in the app's step 5. Start with the first two for your own order; contact the first three about partnering.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Service</th><th>Website</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>CNC Creations<span class="pick">Your order</span></td><td class="mono"><a href="https://cnccreations.co.uk">cnccreations.co.uk</a></td><td>Takes one-off orders from homeowners, cuts angled shapes, drills. Can adjust your files.</td></tr>
+      <tr><td>Cutwrights<span class="pick">Compare</span></td><td class="mono"><a href="https://www.cutwrights.com">cutwrights.com</a></td><td>Online quote in under a minute; cutting, edging, CNC drilling; own delivery. Ask if they accept a DXF.</td></tr>
+      <tr><td>Perfect Panels</td><td class="mono"><a href="https://perfectpanels.online">perfectpanels.online</a></td><td>London. Cut, edge-banded and delivered; CNC drilling and shaped panels.</td></tr>
+      <tr><td>Chop Shop CNC</td><td class="mono"><a href="https://chopshopcnc.com/home">chopshopcnc.com</a></td><td>UK-wide, upload CAD files, delivered to your door. General CNC rather than furniture.</td></tr>
+      <tr><td>CutMy</td><td class="mono"><a href="https://www.cutmy.co.uk">cutmy.co.uk</a></td><td>CNC cut to plus or minus 1mm, custom shapes.</td></tr>
+      <tr><td>MDF Direct</td><td class="mono"><a href="https://mdfdirect.co.uk">mdfdirect.co.uk</a></td><td>Upload a cut list, quote in minutes. MDF only.</td></tr>
+      <tr><td>JustMDF</td><td class="mono"><a href="https://justmdf.co.uk">justmdf.co.uk</a></td><td>Email the cut list (sale@justmdf.co.uk); delivers nationwide, by pallet for big orders.</td></tr>
+      <tr><td>C Workshop</td><td class="mono"><a href="https://cworkshop.co.uk/services/cnc-cutting/">cworkshop.co.uk</a></td><td>London, Herts and Kent; 24 to 48 hour fast service; hinge and shelf-pin drilling.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="phase" aria-labelledby="p2">
+  <span class="when">Weeks 1 to 2</span>
+  <h2 id="p2">2. Set up the business basics</h2>
+  <ul class="tasks">
+    <li class="task"><input type="checkbox" id="t7"><div class="t"><label for="t7">Backorder madetofit.co.uk and madetofit.uk</label><span class="d">Both expired and are due to be released around mid November. A reminder is set for 14 November.</span></div></li>
+    <li class="task"><input type="checkbox" id="t8"><div class="t"><label for="t8">Register madetofit.app on Cloudflare</label><span class="d">Available now; a fallback and a second address.</span></div></li>
+    <li class="task"><input type="checkbox" id="t9"><div class="t"><label for="t9">Set up hello@ email</label><span class="d">Google Workspace on the domain (Cloudflare Email Routing is the free start). Send the address so it can go into the app and order pack.</span></div></li>
+    <li class="task"><input type="checkbox" id="t10"><div class="t"><label for="t10">Amazon tracking ID and product check</label><span class="d">Add Made to Fit to your Associates account, create a tracking ID, and open each of the 19 basket products to confirm the part and pack size.</span></div></li>
+  </ul>
+</section>
+
+<section class="phase" aria-labelledby="p3">
+  <span class="when">Weeks 2 to 4</span>
+  <h2 id="p3">3. Line up a cutting partner</h2>
+  <ul class="tasks">
+    <li class="task"><input type="checkbox" id="t11"><div class="t"><label for="t11">Email CNC Creations, Cutwrights and Perfect Panels</label><span class="d">Use your test order as the example and send the order pack brief (docs/ORDER-PACK.md). Ask for: a price list or upload link so the app can show prices, a referral fee or trade price, labelled parts, a set lead time, and who pays for mistakes.</span></div></li>
+    <li class="task"><input type="checkbox" id="t12"><div class="t"><label for="t12">Agree terms with at least two</label><span class="d">Fill in the blanks in the business plan deck with their real numbers.</span></div></li>
+  </ul>
+</section>
+
+<section class="phase" aria-labelledby="p4">
+  <span class="when">Months 2 to 3</span>
+  <h2 id="p4">4. First customers</h2>
+  <ul class="tasks">
+    <li class="task"><input type="checkbox" id="t13"><div class="t"><label for="t13">Add "Order through Made to Fit"</label><span class="d">A tracked route to your partner cutters so referrals are counted. Built once a partner says yes.</span></div></li>
+    <li class="task"><input type="checkbox" id="t14"><div class="t"><label for="t14">Privacy policy, terms and DIY disclaimer</label><span class="d">Needed before taking orders or running ads, including the Amazon Associates disclosure.</span></div></li>
+    <li class="task"><input type="checkbox" id="t15"><div class="t"><label for="t15">File the trade mark</label><span class="d">"Made to Fit" in classes 20, 35 and a narrow 42; not 9. Quick attorney check first.</span></div></li>
+    <li class="task"><input type="checkbox" id="t16"><div class="t"><label for="t16">Get 10 real orders</label><span class="d">Loft conversion and DIY groups, your own build photos. Ask each customer what nearly stopped them.</span></div></li>
+  </ul>
+</section>
+
+<section class="phase" aria-labelledby="p5">
+  <span class="when">After 20 to 50 orders</span>
+  <h2 id="p5">5. Take the payment yourself</h2>
+  <p>One price at checkout for panels, hardware and delivery; the cutter fulfils at trade price and you keep the margin. Then more cutters by region, a fitter network, the Made to Fit hardware pack and an iPhone room-scanning app.</p>
+</section>
+</div>
+
+<script>
+const boxes=[...document.querySelectorAll('.task input')];
+const KEY='mtf-plan-v1';
+let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+const update=()=>{const n=boxes.filter(b=>b.checked).length;document.getElementById('progress').textContent=n+' of '+boxes.length+' done.';boxes.forEach(b=>b.closest('.task').classList.toggle('done',b.checked));};
+boxes.forEach(b=>{b.checked=!!saved[b.id];b.addEventListener('change',()=>{saved[b.id]=b.checked;try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(e){};update();});});
+update();
+document.getElementById('copyBtn').addEventListener('click',async e=>{const u=document.getElementById('liveUrl').textContent;try{await navigator.clipboard.writeText(u);e.target.textContent='Copied';}catch(err){const r=document.createRange();r.selectNodeContents(document.getElementById('liveUrl'));const s=getSelection();s.removeAllRanges();s.addRange(r);e.target.textContent='Selected';}});
+</script>
