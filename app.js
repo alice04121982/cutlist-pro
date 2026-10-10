@@ -2111,7 +2111,8 @@ function cutterCard() {
   const serves = sup => sup.area === 'uk' || sup.area === 'store' || (area && Array.isArray(sup.area) && sup.area.includes(area));
   const req = [['angles', need.angles, 'Angled cuts', 'Angled cuts'], ['drilling', need.holes > 0, `${need.holes} holes`, 'Drilling'], ['edging', need.edging, 'Edge banding', 'Edge banding']].filter(r => r[1]);
   const score = sup => req.reduce((a, [k]) => a + (sup[k] === 'yes' ? 0 : sup[k] === 'ask' ? 1 : 10), 0) + (serves(sup) ? 0 : 20);
-  const list = SUPPLIERS.filter(sup => serves(sup) || !area).sort((x, y) => score(x) - score(y));
+  const yeses = sup => req.filter(([k]) => sup[k] === 'yes').length;
+  const list = SUPPLIERS.filter(sup => serves(sup) || !area).sort((x, y) => score(x) - score(y) || yeses(y) - yeses(x));
   const badge = (sup, k, label) => `<span class="cap cap-${sup[k]}"><i class="ph ph-${sup[k] === 'yes' ? 'check' : sup[k] === 'no' ? 'x' : 'question'}" aria-hidden="true"></i>${esc(label)}${sup[k] === 'ask' ? ': ask' : ''}</span>`;
   const mail = sup => {
     const body = [`Hello ${sup.name},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
@@ -2122,24 +2123,34 @@ function cutterCard() {
       need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
     return `mailto:${sup.email || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
   };
-  return `<div class="card cutters">
-    <p class="step-tag">Step 1</p>
-    <h3><i class="ph ph-storefront" aria-hidden="true"></i>Send to a cutter</h3>
-    <p class="sub">Your order pack has every panel, its shape, its edging and every hole to drill. ${req.length ? 'This design needs: ' + req.map(r => r[2]).join(', ') + '.' : ''}</p>
-    <button type="button" class="btn btn-primary" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download the order pack</button>
-    <span class="help">Two files: a cut list spreadsheet (CSV) and a drawing (DXF) with shapes and holes.</span>
-    ${postcodeField()}
-    ${area ? `<p class="sub">Showing services that deliver to ${esc(area)}.</p>` : ''}
-    <ul class="sup-list">${list.map(sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
+  const top = list.find(sup => sup.area !== 'store') || list[0], rest = list.filter(sup => sup !== top);
+  const why = top ? [serves(top) && area ? `delivers to ${area}` : top.area === 'uk' ? 'delivers UK-wide' : '', ...req.filter(([k]) => top[k] === 'yes').map(r => r[3].toLowerCase())].filter(Boolean) : [];
+  const supItem = sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
       <div class="sup-head"><strong>${esc(sup.name)}</strong>${score(sup) === 0 ? '<span class="cap cap-yes">Good match</span>' : ''}</div>
       <div class="sup-meta">${esc(sup.howTo)}. ${sup.lead !== 'Ask' ? esc(sup.lead) + '. ' : ''}${esc(sup.note)}</div>
       ${req.length ? `<div class="caps">${req.map(([k, , , label]) => badge(sup, k, label)).join('')}</div>` : ''}
       <div class="sup-act"><a class="chip" href="${sup.url}" target="_blank" rel="noopener noreferrer"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Open site</a>${sup.area === 'store' ? '' : `<a class="chip" href="${mail(sup)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>${sup.email ? 'Email order' : 'Draft email'}</a>`}</div>
-    </li>`).join('')}</ul>
+    </li>`;
+  return `<div class="card cutters">
+    <p class="step-tag">Step 1</p>
+    <h3><i class="ph ph-storefront" aria-hidden="true"></i>Get your panels cut</h3>
+    ${postcodeField()}
+    ${top ? `<div class="pick-card">
+      <div class="pick-head"><span class="cap cap-yes"><i class="ph ph-star" aria-hidden="true"></i>Our pick for this design</span><strong>${esc(top.name)}</strong></div>
+      <p class="sub">${why.length ? 'Why: ' + esc(why.join(', ')) + '. ' : ''}${esc(top.note)} Expect roughly ${gbp0(R.costs.panels)} for the panels before their delivery charge.</p>
+      <ol class="pick-steps">
+        <li><span>Download your order pack: the cut list and the drawing with every cut and hole.</span><button type="button" class="btn btn-ghost btn-sm" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download order pack</button></li>
+        <li>${top.email
+          ? `<span>Send it to ${esc(top.name)}. The email is written for you; attach the two files.</span><a class="btn btn-primary btn-sm" href="${mail(top)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Email ${esc(top.name)}</a>`
+          : `<span>${esc(top.name)}: ${esc(top.howTo.toLowerCase())}. Enter the sizes from your cut list on their website, or send them the written email with the two files attached.</span><span class="row-btns"><a class="btn btn-primary btn-sm" href="${top.url}" target="_blank" rel="noopener noreferrer"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Open ${esc(top.name)}</a>${top.area === 'store' ? '' : `<a class="btn btn-ghost btn-sm" href="${mail(top)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Draft email</a>`}</span>`}</li>
+        <li><span>They reply with the exact price and delivery date. Pay them, then tick below.</span></li>
+      </ol>
+    </div>` : ''}
+    ${rest.length ? `<details class="more-cutters"><summary>Compare with ${rest.length} other cutter${rest.length > 1 ? 's' : ''}</summary><ul class="sup-list">${rest.map(supItem).join('')}</ul></details>` : ''}
     ${S.ordered
       ? `<div class="ordered-row"><span class="cap cap-yes"><i class="ph ph-check" aria-hidden="true"></i>Panels ordered</span><button type="button" class="link-btn" data-action="mark-ordered">Not ordered yet</button></div>`
       : `<button type="button" class="btn btn-primary" data-action="mark-ordered"><i class="ph ph-check-circle" aria-hidden="true"></i>I've ordered my panels</button><span class="help">Then we'll help you order the hardware.</span>`}
-    <p class="fine">Details from each company's website, October 2026. "Ask" means they do not say. Your quote and their terms are final.</p>
+    <p class="fine">Cutters price each job by quote until a Made to Fit partner offers fixed prices. Details from each company's website, October 2026.</p>
   </div>`;
 }
 
