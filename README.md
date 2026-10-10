@@ -10,7 +10,7 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 2. **Design**: material, doors, compartments (upright dividers), shelves per compartment, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
 3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
 4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
-5. **Order**: itemised estimate, delivery options, CNC cut file for UK cutting services.
+5. **Order**: itemised estimate, an order pack (cut list CSV plus a DXF with true shapes and every hole to drill), and "Send to a cutter": UK cutting services matched to your postcode and to what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md).
 
 Templates: under-eaves cupboard, under-stairs cupboard (tall end left or right, every upright, top and door cut to the stair angle), wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 

@@ -128,12 +128,19 @@ const DELIVERY = [
   { id: 'express', t: 'Express delivery', s: 'Usually 2 to 3 working days', p: 45 },
   { id: 'collect', t: 'Collect from supplier', s: 'Pick up when it is ready', p: 0 }
 ];
+// UK cutting services, from their own websites (checked October 2026). 'yes' = they say they do it,
+// 'ask' = not stated, 'no' = they say they do not. area: 'uk', or postcode areas they serve.
+const LONDON = ['E', 'EC', 'N', 'NW', 'SE', 'SW', 'W', 'WC', 'BR', 'CR', 'DA', 'EN', 'HA', 'IG', 'KT', 'RM', 'SM', 'TW', 'UB', 'WD', 'AL', 'SG', 'CM', 'ME', 'TN'];
 const SUPPLIERS = [
-  ['Cutwrights', 'https://www.cutwrights.com', 'MDF, melamine, plywood. Online quotes.'],
-  ['Cutlist.co.uk', 'https://cutlist.co.uk', 'Trade panel cutting and edging.'],
-  ['Cut To Size', 'https://www.cuttosize.co.uk', 'Panels, edging, shaker doors.'],
-  ['CNC Creations', 'https://cnccreations.co.uk', 'MDF, plywood, melamine. 3 to 7 day delivery.'],
-  ['Timbersource', 'https://www.timbersource.co.uk', 'Hardwood and softwood cutting.']
+  { name: 'Cutwrights', url: 'https://www.cutwrights.com', area: 'uk', howTo: 'Online quote in under a minute', lead: 'Ask', angles: 'ask', drilling: 'yes', edging: 'yes', note: 'Cutting, edging and drilling service. Check delivery to your postcode.' },
+  { name: 'CNC Creations', url: 'https://cnccreations.co.uk', area: 'uk', howTo: 'Send your files, they can adjust them', lead: '1 to 7 working days (cut to size)', angles: 'yes', drilling: 'yes', edging: 'ask', note: 'Takes one-off orders from private customers. Cuts to shape.' },
+  { name: 'Chop Shop CNC', url: 'https://chopshopcnc.com', area: 'uk', howTo: 'Upload the DXF, most jobs priced instantly', lead: 'Made within 5 working days', angles: 'yes', drilling: 'ask', edging: 'ask', note: 'Delivers anywhere in the UK.' },
+  { name: 'CutMy', url: 'https://www.cutmy.co.uk', area: 'uk', howTo: 'Order online, custom shapes from a sketch', lead: 'Ask', angles: 'yes', drilling: 'ask', edging: 'ask', note: 'CNC cut to plus or minus 1mm.' },
+  { name: 'MDF Direct', url: 'https://mdfdirect.co.uk', area: 'uk', howTo: 'Upload your cut list, quote in minutes', lead: 'Ask', angles: 'ask', drilling: 'ask', edging: 'ask', note: 'MDF specialist.' },
+  { name: 'JustMDF', url: 'https://justmdf.co.uk', email: 'sale@justmdf.co.uk', area: 'uk', howTo: 'Email your cut list', lead: 'Ask', angles: 'ask', drilling: 'ask', edging: 'ask', note: 'Delivers nationwide, by pallet for big orders.' },
+  { name: 'C Workshop', url: 'https://cworkshop.co.uk/services/cnc-cutting/', area: LONDON, howTo: 'Cutting list or CAD file', lead: '24 to 48 hours on the fast service', angles: 'yes', drilling: 'yes', edging: 'ask', note: 'Hinge and shelf-pin drilling. Branches in Welham Green and Swanley.' },
+  { name: 'Panelven Boardcut', url: 'https://boardcut.co.uk', area: ['SO', 'PO', 'GU', 'RG', 'BH', 'SP'], howTo: 'Fill in their spreadsheet, quote in 24 hours', lead: 'Ask', angles: 'ask', drilling: 'ask', edging: 'ask', note: 'Hampshire.' },
+  { name: 'B&Q in-store cutting', url: 'https://www.diy.com/services/timber-cutting', area: 'store', howTo: 'Take the cut list to the store', lead: 'While you wait', angles: 'no', drilling: 'no', edging: 'no', note: 'Straight cuts only on boards bought there. First 5 cuts free, then 50p.' }
 ];
 const JOINERY = {
   screws: { name: 'Glue and screws', short: 'Screws', note: 'Easiest. Screw heads show on the outside faces.' },
@@ -1976,6 +1983,45 @@ function renderManual(print = false) {
 }
 
 // ── Order ──
+// What this design asks of a cutter, and which services can do it near you
+function orderNeeds() {
+  const panels = R.parts.filter(p => p.stock === 'sheet' || p.stock === 'ply3' || p.stock === 'ply6');
+  const holes = panels.reduce((a, p) => a + panelHoles(p).length * p.qty, 0);
+  const angles = panels.some(p => p.shape || /Bevel/.test(p.note || ''));
+  const edging = panels.some(p => p.edge);
+  return { panels, holes, angles, edging, pieces: panels.reduce((a, p) => a + p.qty, 0) };
+}
+function cutterCard() {
+  if (!isCabinet(S.template)) return `<div class="card"><h3><i class="ph ph-storefront" aria-hidden="true"></i>Where to buy</h3><p class="sub">Timber merchants deliver C16 and boards cut to length. Take the timber list to your nearest merchant.</p></div>`;
+  const need = orderNeeds(), pc = (S.postcode || '').trim().toUpperCase(), area = (pc.match(/^([A-Z]{1,2})\d/) || [])[1];
+  const serves = sup => sup.area === 'uk' || sup.area === 'store' || (area && Array.isArray(sup.area) && sup.area.includes(area));
+  const req = [['angles', need.angles, 'Angled cuts', 'Angled cuts'], ['drilling', need.holes > 0, `${need.holes} holes`, 'Drilling'], ['edging', need.edging, 'Edge banding', 'Edge banding']].filter(r => r[1]);
+  const score = sup => req.reduce((a, [k]) => a + (sup[k] === 'yes' ? 0 : sup[k] === 'ask' ? 1 : 10), 0) + (serves(sup) ? 0 : 20);
+  const list = SUPPLIERS.filter(sup => serves(sup) || !area).sort((x, y) => score(x) - score(y));
+  const badge = (sup, k, label) => `<span class="cap cap-${sup[k]}"><i class="ph ph-${sup[k] === 'yes' ? 'check' : sup[k] === 'no' ? 'x' : 'question'}" aria-hidden="true"></i>${esc(label)}${sup[k] === 'ask' ? ': ask' : ''}</span>`;
+  const mail = sup => {
+    const body = [`Hello ${sup.name},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
+      `Material: ${MATERIALS[S.material].name} ${S.thickness}mm${R.sheets.ply3 ? ', plus 3mm backs' : ''}`, `Pieces: ${need.pieces} (about ${R.nMain} sheets)`,
+      need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes (DXF layers starting DRILL_, named by diameter and depth, measured from the front or hinge edge).` : '',
+      need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+    return `mailto:${sup.email || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
+  };
+  return `<div class="card cutters">
+    <h3><i class="ph ph-storefront" aria-hidden="true"></i>Send to a cutter</h3>
+    <p class="sub">Your order pack has every panel, its shape, its edging and every hole to drill. ${req.length ? 'This design needs: ' + req.map(r => r[2]).join(', ') + '.' : ''}</p>
+    <button type="button" class="btn btn-primary" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download the order pack</button>
+    <span class="help">Two files: a cut list spreadsheet (CSV) and a drawing (DXF) with shapes and holes.</span>
+    ${area ? `<p class="sub">Showing services that deliver to ${esc(area)}.</p>` : '<p class="sub">Add your postcode under Delivery to see who serves your area.</p>'}
+    <ul class="sup-list">${list.map(sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
+      <div class="sup-head"><strong>${esc(sup.name)}</strong>${score(sup) === 0 ? '<span class="cap cap-yes">Good match</span>' : ''}</div>
+      <div class="sup-meta">${esc(sup.howTo)}. ${sup.lead !== 'Ask' ? esc(sup.lead) + '. ' : ''}${esc(sup.note)}</div>
+      ${req.length ? `<div class="caps">${req.map(([k, , , label]) => badge(sup, k, label)).join('')}</div>` : ''}
+      <div class="sup-act"><a class="chip" href="${sup.url}" target="_blank" rel="noopener noreferrer"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Open site</a>${sup.area === 'store' ? '' : `<a class="chip" href="${mail(sup)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>${sup.email ? 'Email order' : 'Draft email'}</a>`}</div>
+    </li>`).join('')}</ul>
+    <p class="fine">Details from each company's website, October 2026. "Ask" means they do not say. Your quote and their terms are final.</p>
+  </div>`;
+}
+
 function renderOrderPage() {
   const c = R.costs;
   const lines = [];
@@ -1987,7 +2033,7 @@ function renderOrderPage() {
   R.rolls.forEach(p => lines.push(['Breathable membrane', `${p.rolls} roll${p.rolls > 1 ? 's' : ''}`, p.rolls * FELT_ROLL]));
   const pcErr = S.postcode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(S.postcode.trim());
   return `<div class="page">
-    <div class="page-head"><div><h2>Order your materials</h2><p>Send the cut file to a cutting service. They cut, edge and deliver the panels, ready to build.</p></div></div>
+    <div class="page-head"><div><h2>Order your materials</h2><p>Send the order pack to a cutting service. They cut, drill, edge and deliver every panel, ready to build like flat-pack.</p></div></div>
     ${safetyChecks().some(c => c.status === 'fail') ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span><strong>A safety check failed.</strong> Go back to Design and fix it before you order.</span><button type="button" class="chip" data-action="goto" data-step="1">Fix it</button></div>` : ''}
     <div class="order">
       <div>
@@ -2010,11 +2056,7 @@ function renderOrderPage() {
           </div>
           <div class="opts" role="radiogroup" aria-label="Delivery">${DELIVERY.map(d => `<label class="opt"><input type="radio" name="delivery" value="${d.id}" data-field="delivery"${S.delivery === d.id ? ' checked' : ''}><span><span class="t">${d.t}</span><br><span class="s">${d.s}</span></span><span class="p">${d.p ? gbp0(d.p) : 'Free'}</span></label>`).join('')}</div>
         </div>
-        <div class="card">
-          <h3><i class="ph ph-storefront" aria-hidden="true"></i>UK cutting services</h3>
-          <p class="sub">Upload the CNC file to any of these for a quote.</p>
-          <ul class="suppliers">${SUPPLIERS.map(([n, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener noreferrer"><span class="sn">${esc(n)} <i class="ph ph-arrow-square-out" aria-hidden="true"></i></span><span class="sd">${esc(d)}</span></a></li>`).join('')}</ul>
-        </div>
+        ${cutterCard()}
       </div>
       <aside class="card summary" aria-label="Order summary">
         <h3>Summary</h3>
@@ -2033,7 +2075,7 @@ function renderOrderPage() {
           <button type="button" class="chip" data-action="export-dxf"><i class="ph ph-file-text" aria-hidden="true"></i>DXF</button>
           <button type="button" class="chip" data-action="export-json"><i class="ph ph-file-text" aria-hidden="true"></i>JSON</button>
         </div>
-        <div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Ordering straight from CutList Pro is coming. For now, send the file to a cutting service.</span></div>
+        <div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Coming next: order and pay here, with cut, drilled and edged panels delivered in 3 to 4 working days. Until then, send the order pack to a cutter.</span></div>
       </aside>
     </div>
   </div>`;
@@ -2216,13 +2258,29 @@ function renderProjects() {
 }
 
 // ───────────────────────── Exports ─────────────────────────
+// Every hole a CNC cutter should drill, in the panel's own coordinates (mm): x from the front edge
+// (or the hinge edge on doors), y up from the bottom edge. Shelf-pin rows match the build guide.
+function panelHoles(p) {
+  const holes = [];
+  if (p.role === 'side' || p.role === 'divider') {
+    const shelves = R.parts.filter(q => q.role === 'shelf');
+    if (shelves.length) {
+      const depth = Math.max(...shelves.map(q => q.h)), back = Math.min(p.w - 37, depth - 37);
+      const through = p.role === 'divider';
+      pinRows().filter(r => r.y < p.h - 40).forEach(r => [37, back].forEach(x => holes.push({ x, y: r.y, dia: 5, depth: through ? S.thickness : 10, kind: through ? 'Shelf pin, drill through' : 'Shelf pin' })));
+    }
+  }
+  if (p.hinges) p.hinges.forEach(h => holes.push({ x: h.inset, y: p.h - h.y, dia: h.bore, depth: h.depth, kind: 'Hinge cup' }));
+  return holes;
+}
+
 function exportCNC() {
   const mat = MATERIALS[S.material];
   const panels = R.parts.filter(p => p.stock === 'sheet' || p.stock === 'ply3' || p.stock === 'ply6');
   if (!panels.length) { exportCSV(); return; }
   let csv = '# CNC Cut List Export - CutList Pro\n';
   csv += '# Project: ' + safeName(S.name) + '\n# Material: ' + mat.name + ' (' + S.thickness + 'mm)\n# Date: ' + new Date().toISOString().split('T')[0] + '\n# All dimensions in mm. Grain direction: L=Length\n#\n';
-  csv += 'Part Name,Length (mm),Width (mm),Qty,Material,Thickness (mm),Grain,Edge L1,Edge L2,Edge W1,Edge W2,Scribed,Notes\n';
+  csv += 'Part Name,Length (mm),Width (mm),Qty,Material,Thickness (mm),Grain,Edge L1,Edge L2,Edge W1,Edge W2,Scribed,Holes,Notes\n';
   panels.forEach(p => {
     const len = Math.max(p.w, p.h), wid = Math.min(p.w, p.h);
     const e = p.edge || 0; // 1 = front long edge, 4 = all edges
@@ -2230,10 +2288,11 @@ function exportCNC() {
     const m = p.stock === 'sheet' ? mat.name : THIN[p.stock].name;
     let notes = p.shape ? '' : (p.note || ''); // shaped parts get a machine-readable note below instead
     if (p.hinges) notes += (notes ? '; ' : '') + p.hinges.map(h => `DRILL ${h.bore}mm@${h.y}mmY/${h.inset}mmX/${h.depth}mmD`).join('; ');
+    const holes = panelHoles(p), holeText = holes.length ? `${holes.length} holes, see DXF layer DRILL` : '';
     if (p.shape) notes += (notes ? '; ' : '') + `ANGLED TOP ${p.shape.front}mm front to ${p.shape.back}mm back`;
     for (let i = 0; i < p.qty; i++) {
       const label = p.qty > 1 ? p.name + ' #' + (i + 1) : p.name;
-      csv += [csvCell(label), len, wid, 1, csvCell(m), thick, csvCell('L'), e >= 1 ? 1 : 0, e >= 4 ? 1 : 0, e >= 4 ? 1 : 0, e >= 4 ? 1 : 0, csvCell(p.scribed ? 'YES' : 'NO'), csvCell(notes)].join(',') + '\n';
+      csv += [csvCell(label), len, wid, 1, csvCell(m), thick, csvCell('L'), e >= 1 ? 1 : 0, e >= 4 ? 1 : 0, e >= 4 ? 1 : 0, e >= 4 ? 1 : 0, csvCell(p.scribed ? 'YES' : 'NO'), csvCell(holeText), csvCell(notes)].join(',') + '\n';
     }
   });
   csv += '\n# Summary\n# Total panels: ' + panels.reduce((s, p) => s + p.qty, 0) + '\n# Sheets needed: ' + R.nMain + '\n# Sheet size: ' + S.sheetW + 'x' + S.sheetH + 'mm\n';
@@ -2251,17 +2310,24 @@ function exportJSON() {
   downloadFile(safeName(S.name) + '.json', JSON.stringify(data, null, 2), 'application/json');
 }
 function exportDXF() {
-  let dxf = '0\nSECTION\n2\nENTITIES\n', yOff = 0;
-  R.parts.filter(p => p.stock !== 'roll').forEach(p => {
-    const layer = p.name.replace(/[^A-Za-z0-9_-]/g, '_');
-    for (let i = 0; i < Math.min(p.qty, 60); i++) {
-      const x = i * (p.w + 20);
-      const pts = p.shape ? [[x, yOff], [x + p.w, yOff], [x + p.w, yOff + p.shape.back], [x, yOff + p.shape.front]] : [[x, yOff], [x + p.w, yOff], [x + p.w, yOff + p.h], [x, yOff + p.h]];
-      pts.forEach((a, k) => { const b = pts[(k + 1) % pts.length]; dxf += `0\nLINE\n8\n${layer}\n10\n${a[0]}\n20\n${a[1]}\n30\n0\n11\n${b[0]}\n21\n${b[1]}\n31\n0\n`; });
-    }
-    yOff += p.h + 30;
+  // One outline per part, true shape, holes on layer DRILL_<dia>_<depth>, and a label with the quantity.
+  // Units mm, origin bottom-left of each part, x = front edge (hinge edge on doors).
+  const E = [];
+  const line = (layer, a, b) => E.push(`0\nLINE\n8\n${layer}\n10\n${a[0]}\n20\n${a[1]}\n30\n0\n11\n${b[0]}\n21\n${b[1]}\n31\n0`);
+  const circle = (layer, c, r) => E.push(`0\nCIRCLE\n8\n${layer}\n10\n${c[0]}\n20\n${c[1]}\n30\n0\n40\n${r}`);
+  const text = (layer, at, hgt, str) => E.push(`0\nTEXT\n8\n${layer}\n10\n${at[0]}\n20\n${at[1]}\n30\n0\n40\n${hgt}\n1\n${str.replace(/[\r\n]/g, ' ')}`);
+  let x = 0, y = 0, rowH = 0;
+  const maxRow = 6000;
+  R.parts.filter(p => p.stock === 'sheet' || p.stock === 'ply3' || p.stock === 'ply6').forEach(p => {
+    if (x > 0 && x + p.w > maxRow) { x = 0; y += rowH + 150; rowH = 0; }
+    const pts = p.shape ? [[0, 0], [p.w, 0], [p.w, p.shape.back], [0, p.shape.front]] : [[0, 0], [p.w, 0], [p.w, p.h], [0, p.h]];
+    pts.forEach((a, k) => line('CUT', [x + a[0], y + a[1]], [x + pts[(k + 1) % pts.length][0], y + pts[(k + 1) % pts.length][1]]));
+    panelHoles(p).forEach(h => circle(`DRILL_${h.dia}MM_${h.depth}DEEP`, [x + h.x, y + h.y], h.dia / 2));
+    const thick = p.stock === 'ply3' ? 3 : p.stock === 'ply6' ? 6 : S.thickness;
+    text('LABEL', [x, y - 40], 25, `${p.name} x${p.qty}  ${p.w} x ${p.h} x ${thick}mm${p.scribed ? '  SCRIBE' : ''}`);
+    x += p.w + 150; rowH = Math.max(rowH, p.h);
   });
-  dxf += '0\nENDSEC\n0\nEOF\n';
+  const dxf = `0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${E.join('\n')}\n0\nENDSEC\n0\nEOF\n`;
   downloadFile(safeName(S.name) + '.dxf', dxf, 'application/dxf');
 }
 
@@ -2691,6 +2757,7 @@ const ACTIONS = {
   'toggle-edit': () => { S.editParts = !S.editParts; render(); },
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
+  'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
   step: el => {
     const k = el.dataset.k, lim = k === 'boxes' ? [1, 8] : LIMITS[k];
