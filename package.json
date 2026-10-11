@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Static site plus one serverless function (api/assistant.js) for the design assistant.",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0"
+    "@ai-sdk/gateway": "^3.0.212",
+    "ai": "^6.0.303"
   }
 }

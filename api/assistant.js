@@ -1,11 +1,13 @@
 // Made to Fit design assistant.
 // Turns a plain-English request ("make it five compartments, no doors") into a small set of
-// design changes. The API key lives only in the server environment (ANTHROPIC_API_KEY).
+// design changes, or answers a building question. Calls Claude through Vercel AI Gateway, billed to the
+// Vercel account: on Vercel it signs in with the deployment's own OIDC token, so there is no API key to
+// store. AI_GATEWAY_API_KEY is only needed to run it outside Vercel.
 // Everything returned here is validated again in the browser before it touches the design.
-import Anthropic from '@anthropic-ai/sdk';
+import { generateObject, jsonSchema, NoObjectGeneratedError } from 'ai';
+import { gateway } from '@ai-sdk/gateway';
 
-const client = new Anthropic();
-const MODEL = 'claude-opus-5-5';
+const MODEL = 'anthropic/claude-sonnet-5.5';
 
 const TEMPLATES = ['eaves', 'understairs', 'wardrobe', 'shelving', 'kitchenbase', 'kitchenwall', 'studwall', 'partition', 'floorjoists', 'flatroof', 'pitchedroof'];
 const NUM_FIELDS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], thickness: [3, 100], spacing: [200, 1200], pitch: [5, 70] };
@@ -75,7 +77,7 @@ How the app builds things:
 - "Built-in", "fitted shelving", "cubbies with a plinth" mean build builtin (eaves only). "Carpenter frame" or "battens" mean build frame. "Boxes" or "flat-pack" mean build boxes.
 - Write the reply in plain British English, no dashes as punctuation. One or two sentences for a change, up to six for an answer.`;
 
-// Best-effort per-instance rate limit. Set a monthly spend limit in the Anthropic Console as the real cap.
+// Best-effort per-instance rate limit. Set a spend limit on AI Gateway in Vercel as the real cap.
 const hits = new Map();
 function rateLimited(ip) {
   const now = Date.now(), win = 10 * 60 * 1000, max = 20;
@@ -121,7 +123,7 @@ export default async function handler(req, res) {
   // Same-origin only: browsers always send Origin on cross-site POSTs
   const origin = req.headers.origin;
   if (origin && origin !== `https://${req.headers.host}` && origin !== `http://${req.headers.host}`) return res.status(403).json({ error: 'forbidden' });
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'not_configured' });
+  if (!process.env.VERCEL && !process.env.AI_GATEWAY_API_KEY) return res.status(503).json({ error: 'not_configured' });
 
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   if (rateLimited(ip)) return res.status(429).json({ error: 'rate_limited' });
@@ -147,26 +149,21 @@ export default async function handler(req, res) {
   else messages.push({ role: 'user', content: current });
 
   try {
-    const response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 4000,
+    const { object } = await generateObject({
+      model: gateway(MODEL),
       system: SYSTEM,
       messages,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
-      // On a safety decline, re-run on Anthropic's recommended fallback model instead of failing
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default'
+      schema: jsonSchema(SCHEMA),
+      maxOutputTokens: 1500
     });
-    if (response.stop_reason === 'refusal') return res.status(200).json({ reply: "Sorry, I can't help with that one. Try describing the change to the design.", changes: {} });
-    if (response.stop_reason === 'max_tokens') return res.status(502).json({ error: 'incomplete' });
-    const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
-    const parsed = safeParse(text);
-    if (!parsed || typeof parsed.reply !== 'string') return res.status(502).json({ error: 'bad_output' });
-    return res.status(200).json({ reply: parsed.reply.slice(0, MAX_REPLY), changes: cleanChanges(parsed.changes) });
+    if (!object || typeof object.reply !== 'string') return res.status(502).json({ error: 'bad_output' });
+    return res.status(200).json({ reply: object.reply.slice(0, MAX_REPLY), changes: cleanChanges(object.changes) });
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) return res.status(429).json({ error: 'busy' });
-    if (err instanceof Anthropic.APIError) return res.status(502).json({ error: 'upstream', status: err.status });
-    return res.status(500).json({ error: 'server' });
+    // A declined or malformed answer: say so in the chat rather than falling back to offline mode
+    if (NoObjectGeneratedError.isInstance(err)) return res.status(200).json({ reply: "Sorry, I can't help with that one. Try describing the change to the design, or ask about building it.", changes: {} });
+    const status = err?.statusCode ?? err?.status;
+    if (status === 429) return res.status(429).json({ error: 'busy' });
+    return res.status(502).json({ error: 'upstream' });
   }
 }
 
