@@ -70,6 +70,7 @@ const TEMPLATES = [
 const tplOf = id => TEMPLATES.find(t => t.id === id) || TEMPLATES[0];
 // Name for the current design, e.g. under-eaves without doors reads as shelving
 function designName() {
+  if (isBuiltIn()) return 'Built-in eaves shelving';
   if (S.template === 'eaves' && doorCount() === 0) return 'Under-eaves shelving';
   if (S.template === 'understairs' && doorCount() === 0) return 'Under-stairs shelving';
   if (S.template === 'wardrobe' && doorCount() === 0) return 'Open wardrobe';
@@ -200,7 +201,7 @@ function sanitizeProject(p) {
     spacing: num(pick('spacing', 'dimSpacing'), ...LIMITS.spacing, base.spacing), pitch: num(pick('pitch', 'dimPitch'), 0, 70, base.pitch),
     compartments: Math.round(num(p.compartments, 1, 8, 1)),
     site: SITES[p.site] ? p.site : base.site, hand: p.hand === 'left' ? 'left' : 'right',
-    build: p.build === 'boxes' ? 'boxes' : 'frame',
+    build: ['boxes', 'builtin'].includes(p.build) ? p.build : 'frame',
     boxes: p.boxes === undefined || p.boxes === 'auto' ? 'auto' : Math.round(num(p.boxes, 1, 8, 1)),
     doors: p.doors === 'auto' || p.doors === undefined ? 'auto' : Math.round(num(p.doors, 0, 8, 0)),
     joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false, load: LOADS[p.load] ? p.load : base.load,
@@ -260,7 +261,7 @@ function boxSideWhy(L) {
 }
 function maxBox() { return Math.min((SITES[S.site] || SITES.upstairs).carry, Math.max(S.sheetW, S.sheetH) - 40); }
 function layout() {
-  const framed = isFramed(), th = framed ? FR.sw : S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
+  const framed = isFramed(), th = framed ? (isBuiltIn() ? BI.fw : FR.sw) : S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
   let C = bayTpl ? clamp(Math.round(S.compartments || 1), 1, 8) : 1;
   const widthOf = (k, bay) => 2 * th + k * bay + (k - 1) * th;
   const plan = (n, c) => {
@@ -334,6 +335,7 @@ function bayInfo() {
 const bayX = b => layout().bays[b].x;
 
 function doorCount() {
+  if (isBuiltIn()) return 0; // open by design
   if (isFramed()) return S.doors === 0 ? 0 : layout().C; // one door per opening in the frame
   if (S.doors !== 'auto') return S.doors;
   const W = S.w, { bays } = bayInfo();
@@ -383,6 +385,7 @@ const HEX_F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [0, 3, 7,
 
 // Every member as a solid (x along the run, y up, z back from the door line) plus the cut list it makes.
 function frameModel() {
+  if (isBuiltIn()) return builtinModel();
   const t = S.template, eaves = t === 'eaves', W = S.w, H = S.h, th = S.thickness, s = S.scribe ? 2 : 0;
   const { sw, sd, bt, bh, ov, gap } = FR, L = layout(), back = S.d - s, C = L.C;
   const g = eaves ? eavesGeom() : stairGeom(), tan = eaves ? Math.tan(g.ang) : 0, cs = Math.cos(g.ang) || 1;
@@ -484,6 +487,100 @@ function frameModel() {
     });
   }
   return { solids, parts, doors, comps, divs, g, tv, sole, head };
+}
+
+// ── Built-in open shelving: the fitted cubby look a carpenter gives eaves storage ──
+// A low plinth frame on the floor with a base board on it, an end panel against each wall, dividers cut
+// to the slope, shelves screwed in flush at the front, and 18mm facing strips glued over every front edge
+// so it reads as one painted face. A plinth board and an optional bead finish the bottom.
+const BI = { fw: 40, ph: 89, rail: '38x89 CLS', bead: '18mm quadrant bead' };
+TIMBER_STOCK[BI.rail] = { len: 2400, price: 6.5 };
+TIMBER_STOCK[BI.bead] = { len: 2400, price: 3.5 };
+const isBuiltIn = () => S.template === 'eaves' && S.build === 'builtin';
+function builtinModel() {
+  const W = S.w, H = S.h, th = S.thickness, s = S.scribe ? 2 : 0, { bt, bh, gap } = FR, { fw, ph } = BI;
+  const L = layout(), back = S.d - s, C = L.C, g = eavesGeom(), tan = Math.tan(g.ang);
+  const ceil = (x, z) => H - z * tan, base = ph + th; // top of the base board
+  const solids = [], parts = [];
+  const hx = (part, role, x0, x1, z0, z1, bot, top) => {
+    const c = (x, z) => [[x, bot(x, z), z], [x, top(x, z), z]];
+    const [a, b, e, f] = [c(x0, z0), c(x1, z0), c(x0, z1), c(x1, z1)];
+    solids.push({ part, role, v: [a[0], b[0], b[1], a[1], e[0], f[0], f[1], e[1]], f: HEX_F });
+  };
+  const flat = y => () => y, under = drop => (x, z) => ceil(x, z) - drop;
+  const lin = o => parts.push({ stock: 'linear', qty: 1, ...o });
+  const sheet = o => parts.push({ stock: 'sheet', qty: 1, ...o });
+  const split = (len, max) => { const k = Math.max(1, Math.ceil(len / max)); return { k, each: Math.ceil(len / k) }; };
+  const z0 = th; // carcass front edges sit behind the 18mm facings
+
+  // Plinth frame: front and back rails on edge, noggins across every 600mm or so
+  const carry = Math.min((SITES[S.site] || SITES.upstairs).carry, Math.max(S.sheetW, S.sheetH) - 40); // so every piece goes up the stairs
+  const bb = split(W, carry), rails = split(W, 2400), nogLen = Math.round(back - z0 - 2 * 38);
+  // Noggins at each end, under every base board joint, and no more than about 600mm apart
+  const xs = [0, W - 38, ...Array.from({ length: bb.k - 1 }, (_, i) => bb.each * (i + 1) - 19)].sort((a, b) => a - b);
+  const fill = [];
+  for (let i = 0; i < xs.length - 1; i++) { const gaps = Math.ceil((xs[i + 1] - xs[i]) / 600); for (let k = 1; k < gaps; k++) fill.push(xs[i] + (xs[i + 1] - xs[i]) * k / gaps); }
+  xs.push(...fill);
+  const nog = xs.length;
+  hx('Plinth Rail', 'rail', 0, W, z0, z0 + 38, flat(0), flat(ph));
+  hx('Plinth Rail', 'rail', 0, W, back - 38, back, flat(0), flat(ph));
+  xs.forEach(x => hx('Plinth Noggin', 'rail', x, x + 38, z0 + 38, back - 38, flat(0), flat(ph)));
+  lin({ name: 'Plinth Rail', w: rails.each, h: ph, qty: 2 * rails.k, section: BI.rail, role: 'rail', note: 'On edge, front and back, screwed to the floor' });
+  lin({ name: 'Plinth Noggin', w: nogLen, h: ph, qty: nog, section: BI.rail, role: 'rail', note: 'Across between the rails, one under every board joint' });
+  // Base board on the plinth frame
+  hx('Base Board', 'base', 0, W, z0, back, flat(ph), flat(base));
+  sheet({ name: 'Base Board', w: bb.each, h: back - z0, qty: bb.k, role: 'base', note: bb.k > 1 ? `${bb.k} pieces, joined over a noggin` : 'Screwed down to the plinth frame' });
+
+  // Uprights: an end panel against each wall and a divider behind each inner facing, all cut to the slope
+  const inner = L.verticals.slice(1, -1), divs = inner.map(v => v.x + (fw - th) / 2), ends = [0, W - th];
+  const front = Math.round(ceil(0, z0) - gap - base), bk = Math.round(ceil(0, back) - gap - base);
+  ends.forEach(x => hx('End Panel', 'panel', x, x + th, z0, back, flat(base), under(gap)));
+  sheet({ name: 'End Panel', w: back - z0, h: front, qty: 2, role: 'panel', scribed: !!s, shape: { front, back: bk }, note: `Against each wall. Angled top: ${front} at the front, ${bk} at the back (${g.angDeg} deg)` });
+  divs.forEach(x0 => {
+    hx('Divider', 'divider', x0, x0 + th, z0, back, flat(base), under(gap));
+    hx('Floor Cleat', 'cleat', x0 + th, x0 + th + bt, z0, back, flat(base), flat(base + bh));
+    hx('Wall Cleat', 'cleat', x0 + th, x0 + th + bt, back - bh, back, flat(base + bh), (x, z) => ceil(x, z) - 50);
+  });
+  if (divs.length) {
+    sheet({ name: 'Divider', w: back - z0, h: front, qty: divs.length, role: 'divider', shape: { front, back: bk }, note: `Angled top: ${front} at the front, ${bk} at the back (${g.angDeg} deg)` });
+    lin({ name: 'Floor Cleat', w: back - z0, h: bh, qty: divs.length, section: FR.bat, role: 'cleat', note: 'On the base board beside each divider' });
+    lin({ name: 'Wall Cleat', w: Math.round(ceil(0, back) - 50 - bh - base), h: bh, qty: divs.length, section: FR.bat, role: 'cleat', note: 'On the knee wall beside each divider' });
+  }
+
+  // Shelves screwed in between the uprights, flush with their front edges
+  const comps = Array.from({ length: C }, (_, j) => ({ l: j ? divs[j - 1] + th : th, r: j < C - 1 ? divs[j] : W - th }));
+  const n = S.shelves, rows = [];
+  for (let i = 0; i < n; i++) {
+    const yc = base + (H - base) * (i + 1) / (n + 1), y0 = yc - th / 2;
+    const depth = Math.floor(Math.min(back, tan > 0 ? (H - y0 - th - 10) / tan : back) - z0);
+    if (depth < 150) continue;
+    rows.push(yc);
+    const sizes = new Map();
+    comps.forEach(c => { const w = Math.round(c.r - c.l - 1); sizes.set(w, (sizes.get(w) || 0) + 1); });
+    const keys = [...sizes.keys()].sort((a, b) => sizes.get(b) - sizes.get(a) || b - a);
+    keys.forEach(w => {
+      const atEnd = keys.length > 1 && (Math.round(comps[0].r - comps[0].l - 1) === w);
+      const name = (atEnd ? 'End Shelf ' : 'Shelf ') + (i + 1);
+      sheet({ name, w, h: depth, qty: sizes.get(w), role: 'shelf', yc, note: `${depth < back - z0 ? 'Shallower to clear the slope. ' : ''}Screwed in through the uprights, flush at the front` });
+      comps.filter(c => Math.round(c.r - c.l - 1) === w).forEach(c => hx(name, 'shelf', c.l, c.r, z0, z0 + depth, flat(y0), flat(y0 + th)));
+    });
+  }
+
+  // Facings: one painted face over every front edge
+  const top = (x, z) => ceil(x, z) - 2;
+  L.verticals.forEach(v => hx('Upright Facing', 'facing', v.x, v.x + fw, 0, th, flat(base), top));
+  sheet({ name: 'Upright Facing', w: fw, h: Math.round(H - 2 - base), qty: L.verticals.length, role: 'facing', note: `${th}mm strip over each upright's front edge. Top cut at ${g.angDeg} deg. Glued and pinned` });
+  if (rows.length) {
+    L.verticals.slice(0, -1).forEach((v, j) => rows.forEach(yc => hx('Shelf Facing', 'facing', v.x + fw, L.verticals[j + 1].x, 0, th, flat(yc - fw / 2), flat(yc + fw / 2))));
+    sheet({ name: 'Shelf Facing', w: L.bayW, h: fw, qty: C * rows.length, role: 'facing', note: 'Over each shelf front, between the upright facings. Glued and pinned' });
+  }
+  const pl = split(W, carry);
+  hx('Plinth', 'plinth', 0, W, 0, th, flat(0), flat(base));
+  sheet({ name: 'Plinth', w: pl.each, h: base, qty: pl.k, role: 'plinth', scribed: !!s, note: 'Front board over the plinth frame and base board edge. Scribe the bottom to the floor' });
+  hx('Plinth Bead', 'bead', 0, W, -18, 0, flat(0), flat(18));
+  const bd = split(W, 2400);
+  lin({ name: 'Plinth Bead', w: bd.each, h: 18, qty: bd.k, section: BI.bead, role: 'bead', note: 'Along the floor in front of the plinth. Hides any gap' });
+  return { solids, parts, doors: [], comps, divs, g, tv: 0, rows };
 }
 
 function generateParts() {
@@ -800,6 +897,7 @@ function calcFittings(parts) {
 
 // Fixings for the batten frame: frame screws into the floor, rafters and studs, small screws for the battens
 function frameFittings(parts, sum) {
+  if (isBuiltIn()) return builtinFittings(parts, sum);
   const len = role => parts.filter(p => p.role === role).reduce((a, p) => a + p.w * p.qty, 0);
   const studs = sum(p => p.role === 'stud'), divs = sum(p => p.role === 'divider'), cleats = sum(p => p.role === 'cleat'), bearers = sum(p => p.role === 'bearer');
   const endBearers = 2 * new Set(parts.filter(p => p.role === 'bearer').map(p => p.name)).size;
@@ -813,6 +911,22 @@ function frameFittings(parts, sum) {
   if (hinges) out.push({ name: 'Door knobs', total_qty: sum(p => p.role === 'door'), unit_cost: 2.8 });
   out.push({ name: 'Plastic packers (assorted)', total_qty: 1, unit_cost: 4, note: 'To pack the frame plumb on uneven floors and rafters' });
   return out.filter(f => f.total_qty > 0);
+}
+
+function builtinFittings(parts, sum) {
+  const len = role => parts.filter(p => p.role === role).reduce((a, p) => a + Math.max(p.w, p.h) * p.qty, 0);
+  const nog = sum(p => p.name === 'Plinth Noggin'), shelves = sum(p => p.role === 'shelf'), cleats = sum(p => p.role === 'cleat');
+  return [
+    // Rails to the floor every 600mm, noggins 2 each end, end panels 4 into each wall, 2 per cleat
+    { name: 'Timber screws 5x80mm', total_qty: 2 * (Math.ceil(S.w / 600) + 1) + 4 * nog + 8 + 2 * cleats + 10, unit_cost: 0.08, note: 'For the plinth frame, end panels and cleats' },
+    // Base board every 300mm along the rails and noggins, 3 per shelf end, 3 per cleat into its divider
+    { name: 'Wood screws 4x40mm', total_qty: 2 * Math.ceil(S.w / 300) + 3 * nog + 6 * shelves + 3 * cleats + 10, unit_cost: 0.05, note: 'For the base board, shelves and cleats' },
+    { name: 'Wall plugs 7mm (brown)', total_qty: 8, unit_cost: 0.05, note: 'For the end panels on masonry or plasterboard walls' },
+    { name: 'Panel pins 40mm', total_qty: Math.ceil((len('facing') + len('plinth') + len('bead')) / 150), unit_cost: 0.02, note: 'For the facings, plinth and bead' },
+    { name: 'Wood glue (PVA)', total_qty: 1, unit_cost: 6 },
+    { name: 'Decorators caulk (tube)', total_qty: 2, unit_cost: 3, note: 'For the gaps to the walls and slope' },
+    { name: 'Plastic packers (assorted)', total_qty: 1, unit_cost: 4, note: 'To level the plinth frame' }
+  ];
 }
 
 function compute() {
@@ -858,8 +972,8 @@ function hull(pts) {
   return half(p).concat(half(p.slice().reverse()));
 }
 // Front view of the batten frame: each solid's outline seen from the front, back members first
-const FRAME_ORDER = ['cleat', 'divider', 'bearer', 'shelf', 'plate', 'stud', 'door'];
-const FRAME_CLASS = { cleat: 'p', divider: 'bk', bearer: 'p', shelf: 'p2', plate: 'p', stud: 'p', door: 'dr' };
+const FRAME_ORDER = ['rail', 'cleat', 'divider', 'panel', 'base', 'bearer', 'shelf', 'plate', 'stud', 'plinth', 'facing', 'bead', 'door'];
+const FRAME_CLASS = { cleat: 'p', divider: 'bk', bearer: 'p', shelf: 'p2', plate: 'p', stud: 'p', door: 'dr', rail: 'p', panel: 'bk', base: 'p2', plinth: 'p', facing: 'p', bead: 'p' };
 function framedFront() {
   const m = frameModel(), H = S.h;
   return m.solids.slice().sort((a, b) => FRAME_ORDER.indexOf(a.role) - FRAME_ORDER.indexOf(b.role)).map(o => {
@@ -1028,7 +1142,7 @@ function elevationSVG(mode = 'elev', hl = null) {
     const k = hl && hl.size ? (hl.has(isFramed() ? 'Divider' : 'Left Side') ? ' hl' : ' fade') : '';
     if (isFramed()) {
       // Section through the first divider: plates and stud at the front, divider, cleats and shelves behind
-      const m = frameModel(), x1 = m.divs.length ? m.divs[0] : S.w / 2, ord = ['divider', 'cleat', 'bearer', 'shelf', 'plate', 'stud'];
+      const m = frameModel(), x1 = m.divs.length ? m.divs[0] : S.w / 2, ord = FRAME_ORDER.filter(r => r !== 'door');
       side = `<polygon class="bk" points="${ox},0 ${ox + D},${H - L} ${ox + D},${H} ${ox},${H}" opacity=".35" vector-effect="non-scaling-stroke"/>`;
       m.solids.filter(o => ord.includes(o.role) && o.v[0][0] <= x1 + 40).sort((a, b) => ord.indexOf(a.role) - ord.indexOf(b.role)).forEach(o => {
         const kk = hl && hl.size ? (hl.has(o.part) ? ' hl' : ' fade') : '';
@@ -1069,7 +1183,7 @@ function solids() {
   // Any 8-corner solid with box topology (a sloping slab, a door with an angled top)
   const hexa = (v, col) => out.push({ v, f: [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [0, 3, 7, 4], [1, 2, 6, 5]], col });
   if (isFramed()) {
-    const col = { divider: 'panel', shelf: 'shelf', door: 'panel' };
+    const col = { divider: 'panel', panel: 'panel', shelf: 'shelf', base: 'shelf', door: 'panel' };
     frameModel().solids.filter(o => o.role !== 'door').forEach(o => out.push({ v: o.v, f: o.f, col: col[o.role] || 'panel2' }));
   } else if (isCabinet(t)) {
     const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base, Lay = layout();
@@ -1415,8 +1529,8 @@ function renderControls() {
     col.innerHTML = cab ? `
       ${FRAME_TPL.has(S.template) ? `<div class="group">
         <h2 class="group-title">How it is built</h2>
-        <div class="seg" role="group" aria-label="How it is built"><button type="button" data-action="build" data-value="frame" aria-pressed="${framed}">Batten frame</button><button type="button" data-action="build" data-value="boxes" aria-pressed="${!framed}">Boxes</button></div>
-        <p class="group-sub">${framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
+        <div class="seg" role="group" aria-label="How it is built"><button type="button" data-action="build" data-value="frame" aria-pressed="${framed && !isBuiltIn()}">Batten frame</button>${S.template === 'eaves' ? `<button type="button" data-action="build" data-value="builtin" aria-pressed="${isBuiltIn()}">Built-in shelving</button>` : ''}<button type="button" data-action="build" data-value="boxes" aria-pressed="${!framed}">Boxes</button></div>
+        <p class="group-sub">${isBuiltIn() ? 'Open cubbies with a fitted look: a plinth along the bottom, shelves flush at the front and a painted facing over every edge. Built on site on a low timber frame.' : framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
       </div>` : ''}
       <div class="group">
         <h2 class="group-title">Material</h2>
@@ -1428,7 +1542,7 @@ function renderControls() {
       </div>
       <div class="group">
         <h2 class="group-title">Layout</h2>
-        ${framed ? `<div class="field full"><span class="lbl" id="frDoorsLbl">Doors</span><div class="seg" role="group" aria-labelledby="frDoorsLbl"><button type="button" data-action="style" data-value="doors" aria-pressed="${nd > 0}">A door on each opening</button><button type="button" data-action="style" data-value="open" aria-pressed="${nd === 0}">No doors</button></div><span class="help">${nd > 0 ? 'Each door overlays the studs and hangs on concealed hinges.' : 'Open shelves. The frame stays, so the shelves and dividers are still held square.'}</span></div>` : ''}
+        ${framed && !isBuiltIn() ? `<div class="field full"><span class="lbl" id="frDoorsLbl">Doors</span><div class="seg" role="group" aria-labelledby="frDoorsLbl"><button type="button" data-action="style" data-value="doors" aria-pressed="${nd > 0}">A door on each opening</button><button type="button" data-action="style" data-value="open" aria-pressed="${nd === 0}">No doors</button></div><span class="help">${nd > 0 ? 'Each door overlays the studs and hangs on concealed hinges.' : 'Open shelves. The frame stays, so the shelves and dividers are still held square.'}</span></div>` : ''}
         <div class="fields"${framed ? ' hidden' : ''}>
           <div class="field">
             <label for="f-doors">Doors</label>
@@ -1440,7 +1554,7 @@ function renderControls() {
         </div>
         <div class="steppers">
           ${BAY_TEMPLATES.has(S.template) ? stepper('compartments', 'Compartments side by side', 'Upright dividers split the unit into bays') : ''}
-          ${stepper('shelves', BAY_TEMPLATES.has(S.template) ? 'Shelves in each compartment' : 'Shelves', isFramed() ? 'Each one rests on two battens' : 'Not counting the top and bottom')}
+          ${stepper('shelves', BAY_TEMPLATES.has(S.template) ? 'Shelves in each compartment' : 'Shelves', isBuiltIn() ? 'Not counting the base. 1 shelf gives 2 rows of cubbies' : isFramed() ? 'Each one rests on two battens' : 'Not counting the top and bottom')}
           ${BAY_TEMPLATES.has(S.template) && !framed ? boxesControl() : ''}
           ${layoutPreview()}
         </div>
@@ -1692,7 +1806,8 @@ function safetyChecks() {
       else if (!c.looksOK) out.push({ status: 'warn', id: 'sag', title: 'Shelves will sag a little', text: `Safe, but you may see the widest shelf dip (${sagTxt}). More compartments or a thicker board would stop it.`, fixes: safetyFixes(worst.p.h, load) });
       else out.push({ status: 'pass', id: 'sag', title: 'Shelves are stiff and strong enough', text: `The widest shelf bends ${sagTxt}, within the ${(c.span / 200).toFixed(1)}mm limit.` });
       const pin = Math.max(...checks.map(x => x.c.perPin));
-      if (isFramed()) out.push({ status: 'pass', id: 'pins', title: 'Shelves sit on battens', text: 'Each shelf rests on a batten screwed along each end, so there are no shelf pins to overload.' });
+      if (isBuiltIn()) out.push({ status: 'pass', id: 'pins', title: 'Shelves are screwed in', text: 'Each shelf is screwed in through the uprights at both ends, so there are no shelf pins to overload.' });
+      else if (isFramed()) out.push({ status: 'pass', id: 'pins', title: 'Shelves sit on battens', text: 'Each shelf rests on a batten screwed along each end, so there are no shelf pins to overload.' });
       else if (pin > PIN_KG) out.push({ status: 'fail', id: 'pins', title: 'Too much weight for shelf pins', text: `Each pin would carry about ${Math.round(pin)}kg. Common pins are rated about 12kg. Screw the shelves in place${BAY_TEMPLATES.has(S.template) ? ' or add compartments' : ''}.` });
       else out.push({ status: 'pass', id: 'pins', title: 'Shelf pins can take the load', text: `About ${pin.toFixed(1)}kg on each pin. Buy pins rated 12kg or more.` });
     }
@@ -1706,11 +1821,13 @@ function safetyChecks() {
   const site = SITES[S.site] || SITES.upstairs, long = R.parts.filter(p => (p.stock === 'sheet' || p.stock === 'ply3') && Math.max(p.w, p.h) > site.carry && !over.includes(p.name));
   if (long.length) out.push({ status: 'warn', id: 'carry', title: 'Check the long panels will go in', text: `${[...new Set(long.map(p => p.name.replace(/ \d+$/, '')))].join(', ')} ${long.length > 1 ? 'are' : 'is'} up to ${fmt(Math.max(...long.map(p => Math.max(p.w, p.h))))} long. Panels over about ${fmt(site.carry)} are hard to get ${S.site === 'loft' ? 'up loft stairs or through a hatch' : S.site === 'upstairs' ? 'up stairs and round a landing' : 'in'}. Measure the tightest turn before you order.` });
   const back = R.parts.some(p => p.role === 'back');
-  if (isFramed()) out.push({ status: 'pass', id: 'back', title: 'The frame is fixed to the building', text: `Screwed to the floor and ${S.template === 'eaves' ? 'up into the rafters' : 'to the stair string'}, so it cannot rack or tip.` });
+  if (isBuiltIn()) out.push({ status: 'pass', id: 'back', title: 'Fixed to the building', text: 'The plinth frame is screwed to the floor, the end panels to the walls and each divider to cleats, so it cannot rack or tip.' });
+  else if (isFramed()) out.push({ status: 'pass', id: 'back', title: 'The frame is fixed to the building', text: `Screwed to the floor and ${S.template === 'eaves' ? 'up into the rafters' : 'to the stair string'}, so it cannot rack or tip.` });
   else out.push(back
     ? { status: 'pass', id: 'back', title: 'Back panel stops it racking', text: 'Pin the back to every edge and divider so it holds the unit square.' }
     : { status: 'fail', id: 'back', title: 'No back panel', text: 'Without a fixed back the unit can lean sideways and collapse.' });
-  if (isFramed()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: `Find the floor joists and ${S.template === 'eaves' ? 'rafters' : 'stair string'} with a detector and screw the plates into them, not just into boards or plasterboard.` });
+  if (isBuiltIn()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: 'Find the floor joists and wall studs with a detector and fix into them, or use wall plugs that suit the wall.' });
+  else if (isFramed()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: `Find the floor joists and ${S.template === 'eaves' ? 'rafters' : 'stair string'} with a detector and screw the plates into them, not just into boards or plasterboard.` });
   else out.push({ status: 'action', id: 'wall', title: S.template === 'eaves' ? 'Fix it to the floor and knee wall' : S.template === 'kitchenwall' ? 'Hang it on rated wall fixings' : 'Fix it to the wall', text: S.template === 'kitchenwall' ? 'Wall cupboards hang from the wall, so use fixings rated for your wall type and the full load.' : 'Furniture can tip forward, especially if a child climbs it. Always fix it, even if it feels steady.' });
   if (!isFramed() && S.joinery === 'screws' && (S.material === 'mdf' || S.material === 'melamine')) out.push({ status: 'warn', id: 'joints', title: 'Screws hold poorly in board edges', text: `${MATERIALS[S.material].name} edges split and strip easily. Drill pilot holes, keep screws well away from corners, or switch to cam and dowel fittings.` });
   if (S.material === 'osb') out.push({ status: 'warn', id: 'osb', title: 'OSB is a building board', text: 'It is rough, flexible across the strands and can shed splinters. Fine for a loft store, not for a child\'s room.' });
@@ -1764,7 +1881,52 @@ function frameText(m) {
     doors: 'Screw the hinge plates to the side of the studs, 37mm back from the front. Clip each door on and turn the adjusting screws until the gaps are even.'
   };
 }
+// ── Built-in shelving build guide ──
+function builtinText(m) {
+  const L = layout();
+  return {
+    plinth: 'Lay the two plinth rails on edge, one along the line of the front and one against the knee wall. Fit the noggins between them, level the frame with packers and screw it to the floor.',
+    base: 'Lay the base board on the frame, flush with the front rail, and screw it down along every rail and noggin.',
+    ends: `Scribe each end panel to its wall, then screw it on, into the wall studs or with plugs. Check it is plumb and its front edge is flush with the base board.`,
+    divs: `Screw a floor cleat and a wall cleat for each divider. Space the dividers so each opening will be ${L.bayW}mm wide once the facings are on, then screw them to the cleats.`,
+    shelves: 'Mark the shelf height on every upright with a level. Slide each shelf in flush at the front and screw through the uprights into its ends, 3 screws each end. Stagger them on the dividers so they miss each other.',
+    facings: `Glue and pin the upright facings over every front edge, tops cut at ${m.g.angDeg} degrees to meet the slope. Then the shelf facings between them, and the plinth board along the bottom.`,
+    bead: 'Pin the bead along the floor in front of the plinth. Fill the pin holes, caulk every gap to the walls and slope, then paint.'
+  };
+}
+function builtinManualSteps() {
+  const m = frameModel(), tx = builtinText(m), D = S.d, H = S.h;
+  const has = n => m.solids.some(o => o.part === n), names = role => frameNames(m, role);
+  const q = n => R.parts.filter(p => p.name === n).reduce((a, p) => a + p.qty, 0), qr = role => R.parts.filter(p => p.role === role).reduce((a, p) => a + p.qty, 0);
+  const ex = (list, v) => Object.fromEntries(list.map(n => [n, v]));
+  const steps = [];
+  steps.push({ add: ['Plinth Rail', 'Plinth Noggin'], ex: ex(['Plinth Rail', 'Plinth Noggin'], [0, H * 0.25, 0]), hw: [['timber screws', 2 * (Math.ceil(S.w / 600) + 1) + 4 * q('Plinth Noggin')], ['packers', 0]], wall: true, note: tx.plinth });
+  steps.push({ add: ['Base Board'], ex: ex(['Base Board'], [0, H * 0.3, 0]), hw: [['wood screws', 2 * Math.ceil(S.w / 300) + 3 * q('Plinth Noggin')]], note: tx.base });
+  steps.push({ add: ['End Panel'], ex: ex(['End Panel'], [0, 0, -D * 0.8]), hw: [['timber screws', 8], ['wall plugs', 8]], wall: true, twoPeople: H > 1500, note: tx.ends });
+  if (has('Divider')) steps.push({ add: ['Divider', 'Floor Cleat', 'Wall Cleat'], ex: { ...ex(['Divider'], [0, 0, -D * 0.9]), ...ex(['Floor Cleat', 'Wall Cleat'], [0, 0, D * 0.5]) }, hw: [['timber screws', 2 * qr('cleat')], ['wood screws', 3 * qr('cleat')]], note: tx.divs });
+  const shelves = names('shelf');
+  if (shelves.length) steps.push({ add: shelves, ex: ex(shelves, [0, 0, -D * 1.1]), hw: [['wood screws', 6 * qr('shelf')]], note: tx.shelves });
+  const facings = ['Upright Facing', 'Shelf Facing', 'Plinth'].filter(has);
+  steps.push({ add: facings, ex: ex(facings, [0, 0, -D * 0.7]), hw: [['glue', 0], ['panel pins', 0]], note: tx.facings });
+  steps.push({ add: ['Plinth Bead'], ex: ex(['Plinth Bead'], [0, 0, -D * 0.5]), hw: [['panel pins', 0], ['caulk', 0]], note: tx.bead });
+  return steps;
+}
+function builtinBuildSteps() {
+  const m = frameModel(), tx = builtinText(m), names = role => frameNames(m, role);
+  const timber = R.linear.map(g => `${g.count} x ${fmtLen(g.stock)} of ${g.section}`).join(' and ');
+  const steps = [];
+  steps.push({ title: 'Check your delivery and buy the timber', parts: R.parts.filter(p => p.stock === 'sheet').map(p => p.name), tools: ['Tape measure', 'Pencil'], body: ['Lay every panel and strip out flat and match it to the cut list. Tell the supplier now if anything is off.', `Buy the timber from any builders merchant or DIY store: ${timber}.`, 'Pencil the part name on a hidden edge of each panel.'] });
+  steps.push({ title: 'Check the space', parts: [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', 'Sliding bevel'], body: [`Measure the front height, back height and depth at both ends and in the middle. Your design is ${Math.round(S.h)}mm at the front and ${Math.round(S.low)}mm at the back.`, `Set a sliding bevel to the slope (about ${m.g.angDeg} degrees) and check it at each end.`, 'Find the floor joists and wall studs and mark them on masking tape. Scan for cables and pipes.'], warn: 'Do not squash or cover the insulation or vents behind the knee wall.' });
+  steps.push({ title: 'Build the plinth', parts: ['Plinth Rail', 'Plinth Noggin', 'Base Board'], tools: ['Saw', 'Spirit level', 'Drill', 'Packers'], body: [tx.plinth, tx.base, 'Get this level now: every shelf above takes its line from it.'] });
+  steps.push({ title: 'Fit the end panels', parts: ['End Panel'], tools: ['Pencil', 'Block plane or jigsaw', 'Drill', 'Spirit level'], twoPeople: true, body: [tx.ends] });
+  if (names('divider').length) steps.push({ title: 'Fit the dividers', parts: ['Divider', 'Floor Cleat', 'Wall Cleat'], tools: ['Drill', 'Spirit level', 'Square'], body: [tx.divs, 'Cut a spacer from an offcut to the opening width and use it to set each divider square and parallel.'] });
+  if (names('shelf').length) steps.push({ title: 'Fit the shelves', parts: names('shelf'), tools: ['Drill', 'Spirit level', 'Clamps'], body: [tx.shelves] });
+  steps.push({ title: 'Fit the facings and plinth', parts: ['Upright Facing', 'Shelf Facing', 'Plinth'], tools: ['Saw', 'Hammer', 'Clamps'], body: [tx.facings, 'Wipe off any glue that squeezes out before it dries.'] });
+  steps.push({ title: 'Bead, fill and paint', parts: ['Plinth Bead'], tools: ['Hammer', 'Caulk gun', 'Paint brush'], body: [tx.bead] });
+  return steps;
+}
 function frameManualSteps() {
+  if (isBuiltIn()) return builtinManualSteps();
   const m = frameModel(), c = frameCounts(m), tx = frameText(m), D = S.d, H = S.h;
   const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer'), doors = frameNames(m, 'door');
   const ex = (list, v) => Object.fromEntries(list.map(n => [n, v]));
@@ -1778,6 +1940,7 @@ function frameManualSteps() {
   return steps;
 }
 function frameBuildSteps() {
+  if (isBuiltIn()) return builtinBuildSteps();
   const m = frameModel(), tx = frameText(m), eaves = S.template === 'eaves', doors = R.parts.find(p => p.role === 'door');
   const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer');
   const timber = R.linear.map(g => `${g.count} x ${fmtLen(g.stock)} of ${g.section}`).join(' and ');
@@ -2286,7 +2449,9 @@ const SHOP = [
   [/glue/i, { q: 'PVA wood glue', pack: 1, asin: 'B00OQDJM5G' }],
   [/cam lock/i, { q: 'cam lock fittings 15mm with bolts', pack: 20, asin: 'B08GKV4XBM' }],
   [/dowel/i, { q: 'wooden dowels 8x30mm', pack: 100, asin: 'B074D9NGNY' }],
+  [/panel pins 40/i, { q: 'panel pins 40mm', pack: 500, asin: '' }],
   [/panel pins/i, { q: 'panel pins 25mm', pack: 500, asin: 'B09S3SKGTF' }],
+  [/caulk/i, { q: 'decorators caulk white', pack: 1, asin: '' }],
   [/connector screws/i, { q: 'cabinet connector screws', pack: 20, asin: 'B09PV8QR88' }],
   [/packers/i, { q: 'plastic packers assorted', pack: 1, asin: 'B0DLWCDCSH' }],
   [/angle brackets/i, { q: 'angle brackets 40mm', pack: 20, asin: 'B09XFCH6N6' }],
@@ -3151,12 +3316,13 @@ const ACTIONS = {
   unit: el => { S.unit = el.dataset.value === 'in' ? 'in' : 'mm'; saveDraft(); render(); },
   style: el => {
     // 'auto' gives the template's usual door count; shelving defaults to none, so force 2 there
+    if (el.dataset.value !== 'open' && isBuiltIn()) S.build = 'frame';
     if (el.dataset.value === 'open') S.doors = 0;
     else S.doors = S.template === 'shelving' ? 2 : 'auto';
     if (el.dataset.value === 'open' && S.template === 'eaves' && S.shelves < 2) S.shelves = 2;
     saveDraft(); render();
   },
-  build: el => { S.build = el.dataset.value === 'boxes' ? 'boxes' : 'frame'; S.overrides = {}; saveDraft(); render(); },
+  build: el => { S.build = ['boxes', 'builtin'].includes(el.dataset.value) ? el.dataset.value : 'frame'; S.overrides = {}; saveDraft(); render(); },
   joinery: el => { S.joinery = JOINERY[el.dataset.value] ? el.dataset.value : 'screws'; saveDraft(); render(); },
   theme: () => {
     const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
