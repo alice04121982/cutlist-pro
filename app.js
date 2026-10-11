@@ -2433,11 +2433,15 @@ function orderNeeds() {
 }
 // What each fitting is called in shops and the pack size it usually comes in.
 // Amazon and Screwfix links are searches, so they never point at a dead listing.
-// ASINs fill the one-click Amazon basket. They were picked from amazon.co.uk search results on
+// Rule: always pick the listing Amazon marks "Amazon's Choice" for the search, as it is usually the cheapest
+// well-reviewed option. ASINs fill the one-click Amazon basket. They were picked from amazon.co.uk search results on
 // 10 October 2026 and NOT yet opened by hand: check each listing (right part, pack size, decent seller)
 // before launch. Wall fixing brackets and handles have none yet (the adhesive anti-tip pads found are not
 // a safe wall fixing); those stay on their search links. Add the Associates tag to earn commission.
-const AMAZON_TAG = '';
+// Amazon's add-to-basket page needs a tracking ID: without AssociateTag it opens an empty basket (seen on
+// phone and desktop, September and October 2026). Until Made to Fit has its own ID, this uses the owner's
+// existing Associates ID. Replace it with the Made to Fit one once it is set up in Associates Central.
+const AMAZON_TAG = 'stayprepared2-21';
 const SHOP = [
   [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: 'B015H9OY28' }],
   [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: 'B0711TZ4Q1' }],
@@ -2472,14 +2476,15 @@ function shopItem(f) {
 }
 const amazonSearch = q => 'https://www.amazon.co.uk/s?k=' + encodeURIComponent(q) + (AMAZON_TAG ? '&tag=' + encodeURIComponent(AMAZON_TAG) : '');
 const screwfixSearch = q => 'https://www.screwfix.com/search?search=' + encodeURIComponent(q);
-// One link that puts every item with a product ID in the user's Amazon basket. Only product IDs and
-// quantities go in it, no user data. The Associates tag is added when set; items without an ID are listed
+// Amazon's documented "Add to Cart form", submitted with GET. A plain link fails on phones with the Amazon
+// app: the app takes the link, opens the basket and drops the items. A form submission stays in the browser.
+// Only product IDs, quantities and the tracking ID go in it, no user data. Items without an ID are listed
 // beside the button so they can be bought from the search links.
 const hasAsin = i => /^[A-Z0-9]{10}$/.test(i.asin);
 function amazonBasket(items) {
   const ok = items.filter(hasAsin);
   if (!ok.length) return '';
-  return 'https://www.amazon.co.uk/gp/aws/cart/add.html?' + (AMAZON_TAG ? 'AssociateTag=' + encodeURIComponent(AMAZON_TAG) + '&' : '') + ok.map((i, n) => `ASIN.${n + 1}=${i.asin}&Quantity.${n + 1}=${i.packs}`).join('&');
+  return (AMAZON_TAG ? `<input type="hidden" name="AssociateTag" value="${esc(AMAZON_TAG)}">` : '') + ok.map((i, n) => `<input type="hidden" name="ASIN.${n + 1}" value="${esc(i.asin)}"><input type="hidden" name="Quantity.${n + 1}" value="${Math.max(1, i.packs)}">`).join('');
 }
 function shoppingList() {
   return R.fittings.map(shopItem).map(i => `${i.packs} x ${i.name}${i.pack > 1 ? ` (pack of ${i.pack})` : ''}: need ${i.total_qty}`).join('\n');
@@ -2492,9 +2497,10 @@ function hardwareCard() {
     <h3><i class="ph ph-wrench" aria-hidden="true"></i>${next ? 'Now order your hardware' : 'Hardware pack'}</h3>
     <p class="sub">${next ? 'Your panels are on their way. Order the fittings now so everything arrives together.' : 'Cutters supply boards only. Order these once your panels are ordered.'}${isFramed() ? ` Pick up the frame timber at the same time: ${R.linear.map(g => `${g.count} x ${fmtLen(g.stock)} of ${g.section}`).join(' and ')}.` : ''} Quantities are rounded up to whole packs.</p>
     <div class="hw-buy">
-      ${basket ? `<a class="btn ${next || !cab ? 'btn-primary' : 'btn-ghost'}" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add ${missing.length ? 'these' : 'all'} to Amazon basket<span class="sr-only"> (opens Amazon in a new tab)</span></a>` : ''}
+      ${basket ? `<form class="hw-form" action="https://www.amazon.co.uk/gp/aws/cart/add.html" method="get" target="_blank" rel="noopener noreferrer">${basket}<button type="submit" class="btn ${next || !cab ? 'btn-primary' : 'btn-ghost'}" aria-describedby="amzNote"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add ${missing.length ? 'these' : 'all'} to Amazon basket<span class="sr-only"> (opens Amazon in a new tab)</span></button></form>` : ''}
       <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
     </div>
+    ${basket ? `<p class="fine" id="amzNote">Amazon opens and asks you to confirm. Nothing is bought until you pay. As an Amazon Associate, Made to Fit earns from qualifying purchases.</p>` : ''}
     ${basket && missing.length ? `<p class="fine">Not in the Amazon basket yet: ${missing.map(i => esc(i.name)).join(', ')}. Use the links below for those.</p>` : ''}
     <p class="sub hw-collect"><i class="ph ph-storefront" aria-hidden="true"></i><span>Want to start today? Copy the list and collect from your nearest Screwfix. <a href="https://www.screwfix.com/stores" target="_blank" rel="noopener noreferrer">Find a Screwfix</a></span></p>
     <ul class="lines hw">${items.map(i => `<li><span>${esc(i.name)}<small>Need ${i.total_qty}. ${i.pack > 1 ? `Buy ${i.packs} pack${i.packs > 1 ? 's' : ''} of ${i.pack}${i.spare ? `, ${i.spare} spare` : ''}` : `Buy ${i.packs}`}${i.note ? '. ' + esc(i.note) : ''}</small>
@@ -3150,8 +3156,8 @@ function updateARHud() {
 // Sends the request and current sizes to /api/assistant (Claude, server side). If that is not
 // set up or not reachable, a built-in phrase parser handles the common requests instead.
 const ASK = { log: [], busy: false };
-const ASK_FIELDS = ['template', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch', 'doors', 'joinery', 'material'];
-const FIELD_LABEL = { template: 'Design', w: 'Width', h: 'Height', d: 'Depth', low: 'Back height', shelves: 'Shelves', compartments: 'Compartments', thickness: 'Thickness', spacing: 'Centres', pitch: 'Pitch', doors: 'Doors', joinery: 'Joining', material: 'Board', scribe: 'Scribe edges' };
+const ASK_FIELDS = ['template', 'build', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch', 'doors', 'joinery', 'material'];
+const FIELD_LABEL = { template: 'Design', build: 'Build', w: 'Width', h: 'Height', d: 'Depth', low: 'Back height', shelves: 'Shelves', compartments: 'Compartments', thickness: 'Thickness', spacing: 'Centres', pitch: 'Pitch', doors: 'Doors', joinery: 'Joining', material: 'Board', scribe: 'Scribe edges' };
 const WORDNUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, single: 1, double: 2, a: 1, an: 1 };
 
 function askSuggestions() {
@@ -3171,6 +3177,7 @@ function renderAsk() {
 
 function fmtVal(k, v) {
   if (k === 'template') return tplOf(v).name;
+  if (k === 'build') return BUILD_NAMES[v] || v;
   if (k === 'doors') return v === 'auto' ? 'suggested' : v === 0 ? 'none' : String(v);
   if (k === 'material') return MATERIALS[v] ? MATERIALS[v].name : v;
   if (k === 'joinery') return JOINERY[v] ? JOINERY[v].short : v;
@@ -3181,6 +3188,7 @@ function fmtVal(k, v) {
 }
 
 // Validate and apply. Never trust the server (or the parser) blindly.
+const BUILD_NAMES = { frame: 'Batten frame', builtin: 'Built-in shelving', boxes: 'Boxes' };
 function applyChanges(ch) {
   const diff = [];
   if (!ch || typeof ch !== 'object') return diff;
@@ -3199,6 +3207,7 @@ function applyChanges(ch) {
     if (nv !== S[k]) { diff.push(`${FIELD_LABEL[k]}: ${fmtVal(k, nv)}`); S[k] = nv; }
   }
   if (S.template === 'eaves' && S.low >= S.h) { S.low = Math.round(S.h * 0.6); diff.push(`Back height: ${fmtVal('low', S.low)}`); }
+  if (BUILD_NAMES[ch.build] && FRAME_TPL.has(S.template) && ch.build !== S.build && (ch.build !== 'builtin' || S.template === 'eaves')) { S.build = ch.build; S.overrides = {}; diff.push(`Build: ${BUILD_NAMES[ch.build]}`); }
   if (ch.doors !== undefined && ch.doors !== null) {
     const v = ch.doors === 'auto' ? 'auto' : clamp(Math.round(Number(ch.doors)) || 0, 0, 8);
     if (v !== S.doors && isCabinet(S.template)) { S.doors = v; diff.push(`Doors: ${fmtVal('doors', v)}`); }
@@ -3280,7 +3289,7 @@ async function askSend(text) {
   ASK.log.pop();
   const before = JSON.stringify(Object.fromEntries([...ASK_FIELDS, 'scribe', 'priceSheet', 'overrides'].map(k => [k, S[k]])));
   const diff = applyChanges(changes);
-  if (offline && question) reply = answerLocally(text) || 'I can only make changes to the design right now, not answer questions. Try something like "2 shelves" or "1.5m wide".';
+  if (offline && question) reply = answerLocally(text) || 'The question helper is not switched on yet, so for now I can only make changes. Try something like "2 shelves" or "1.5m wide".';
   else if (offline) reply = diff.length ? 'Done.' : diff.skipped ? '' : "I couldn't work that out. Try something like \"5 compartments\", \"no doors\", \"2 shelves\" or \"1.5m wide\".";
   else if (!reply) reply = diff.length ? 'Done.' : 'Nothing to change there.';
   if (diff.skipped) reply = (reply ? reply + ' ' : '') + 'Not changed: ' + diff.skipped.join('; ') + '.';
