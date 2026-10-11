@@ -3150,8 +3150,8 @@ function updateARHud() {
 // Sends the request and current sizes to /api/assistant (Claude, server side). If that is not
 // set up or not reachable, a built-in phrase parser handles the common requests instead.
 const ASK = { log: [], busy: false };
-const ASK_FIELDS = ['template', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch', 'doors', 'joinery', 'material'];
-const FIELD_LABEL = { template: 'Design', w: 'Width', h: 'Height', d: 'Depth', low: 'Back height', shelves: 'Shelves', compartments: 'Compartments', thickness: 'Thickness', spacing: 'Centres', pitch: 'Pitch', doors: 'Doors', joinery: 'Joining', material: 'Board', scribe: 'Scribe edges' };
+const ASK_FIELDS = ['template', 'build', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch', 'doors', 'joinery', 'material'];
+const FIELD_LABEL = { template: 'Design', build: 'Build', w: 'Width', h: 'Height', d: 'Depth', low: 'Back height', shelves: 'Shelves', compartments: 'Compartments', thickness: 'Thickness', spacing: 'Centres', pitch: 'Pitch', doors: 'Doors', joinery: 'Joining', material: 'Board', scribe: 'Scribe edges' };
 const WORDNUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, single: 1, double: 2, a: 1, an: 1 };
 
 function askSuggestions() {
@@ -3171,6 +3171,7 @@ function renderAsk() {
 
 function fmtVal(k, v) {
   if (k === 'template') return tplOf(v).name;
+  if (k === 'build') return BUILD_NAMES[v] || v;
   if (k === 'doors') return v === 'auto' ? 'suggested' : v === 0 ? 'none' : String(v);
   if (k === 'material') return MATERIALS[v] ? MATERIALS[v].name : v;
   if (k === 'joinery') return JOINERY[v] ? JOINERY[v].short : v;
@@ -3181,6 +3182,7 @@ function fmtVal(k, v) {
 }
 
 // Validate and apply. Never trust the server (or the parser) blindly.
+const BUILD_NAMES = { frame: 'Batten frame', builtin: 'Built-in shelving', boxes: 'Boxes' };
 function applyChanges(ch) {
   const diff = [];
   if (!ch || typeof ch !== 'object') return diff;
@@ -3199,6 +3201,7 @@ function applyChanges(ch) {
     if (nv !== S[k]) { diff.push(`${FIELD_LABEL[k]}: ${fmtVal(k, nv)}`); S[k] = nv; }
   }
   if (S.template === 'eaves' && S.low >= S.h) { S.low = Math.round(S.h * 0.6); diff.push(`Back height: ${fmtVal('low', S.low)}`); }
+  if (BUILD_NAMES[ch.build] && FRAME_TPL.has(S.template) && ch.build !== S.build && (ch.build !== 'builtin' || S.template === 'eaves')) { S.build = ch.build; S.overrides = {}; diff.push(`Build: ${BUILD_NAMES[ch.build]}`); }
   if (ch.doors !== undefined && ch.doors !== null) {
     const v = ch.doors === 'auto' ? 'auto' : clamp(Math.round(Number(ch.doors)) || 0, 0, 8);
     if (v !== S.doors && isCabinet(S.template)) { S.doors = v; diff.push(`Doors: ${fmtVal('doors', v)}`); }
@@ -3280,7 +3283,7 @@ async function askSend(text) {
   ASK.log.pop();
   const before = JSON.stringify(Object.fromEntries([...ASK_FIELDS, 'scribe', 'priceSheet', 'overrides'].map(k => [k, S[k]])));
   const diff = applyChanges(changes);
-  if (offline && question) reply = answerLocally(text) || 'I can only make changes to the design right now, not answer questions. Try something like "2 shelves" or "1.5m wide".';
+  if (offline && question) reply = answerLocally(text) || 'The question helper is not switched on yet, so for now I can only make changes. Try something like "2 shelves" or "1.5m wide".';
   else if (offline) reply = diff.length ? 'Done.' : diff.skipped ? '' : "I couldn't work that out. Try something like \"5 compartments\", \"no doors\", \"2 shelves\" or \"1.5m wide\".";
   else if (!reply) reply = diff.length ? 'Done.' : 'Nothing to change there.';
   if (diff.skipped) reply = (reply ? reply + ' ' : '') + 'Not changed: ' + diff.skipped.join('; ') + '.';
