@@ -26,7 +26,7 @@ The picture manual animates each step: parts slide into place, with a pause butt
 
 ## Design assistant ("Change it")
 
-Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (Sonnet 5.5 through Vercel AI Gateway, structured JSON output) for a list of setting changes or an answer to a building question. The browser validates every change again before applying it.
+Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (Haiku 5.5 through Vercel AI Gateway, structured JSON output) for a list of setting changes or an answer to a building question. The browser validates every change again before applying it.
 
 To switch it on in Vercel:
 

@@ -7,7 +7,7 @@
 import { generateObject, jsonSchema, NoObjectGeneratedError } from 'ai';
 import { gateway } from '@ai-sdk/gateway';
 
-const MODEL = 'anthropic/claude-sonnet-5.5';
+const MODEL = 'anthropic/claude-haiku-5.5'; // cheapest current Claude; about 0.03p a request
 
 const TEMPLATES = ['eaves', 'understairs', 'wardrobe', 'shelving', 'kitchenbase', 'kitchenwall', 'studwall', 'partition', 'floorjoists', 'flatroof', 'pitchedroof'];
 const NUM_FIELDS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], thickness: [3, 100], spacing: [200, 1200], pitch: [5, 70] };
