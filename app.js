@@ -1428,6 +1428,7 @@ function renderControls() {
       </div>
       <div class="group">
         <h2 class="group-title">Layout</h2>
+        ${framed ? `<div class="field full"><span class="lbl" id="frDoorsLbl">Doors</span><div class="seg" role="group" aria-labelledby="frDoorsLbl"><button type="button" data-action="style" data-value="doors" aria-pressed="${nd > 0}">A door on each opening</button><button type="button" data-action="style" data-value="open" aria-pressed="${nd === 0}">No doors</button></div><span class="help">${nd > 0 ? 'Each door overlays the studs and hangs on concealed hinges.' : 'Open shelves. The frame stays, so the shelves and dividers are still held square.'}</span></div>` : ''}
         <div class="fields"${framed ? ' hidden' : ''}>
           <div class="field">
             <label for="f-doors">Doors</label>
