@@ -162,8 +162,10 @@ export default async function handler(req, res) {
     // A declined or malformed answer: say so in the chat rather than falling back to offline mode
     if (NoObjectGeneratedError.isInstance(err)) return res.status(200).json({ reply: "Sorry, I can't help with that one. Try describing the change to the design, or ask about building it.", changes: {} });
     const status = err?.statusCode ?? err?.status;
+    // Server log only: the error type, HTTP status and the first part of the message, never the request
+    console.error('assistant upstream error', err?.name, status, String(err?.message || '').slice(0, 300));
     if (status === 429) return res.status(429).json({ error: 'busy' });
-    return res.status(502).json({ error: 'upstream' });
+    return res.status(502).json({ error: 'upstream', type: String(err?.name || '').slice(0, 60), status: Number.isInteger(status) ? status : undefined });
   }
 }
 
