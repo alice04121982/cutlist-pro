@@ -30,8 +30,8 @@ Type what is wrong in plain English ("make it five compartments with two shelves
 
 To switch it on in Vercel:
 
-1. Add an environment variable `ANTHROPIC_API_KEY` (Project Settings, Environment Variables) and redeploy.
-2. Set a monthly spend limit for that key in the Anthropic Console. The function also rate-limits each visitor, accepts same-origin requests only and caps message length.
+1. It calls Claude through Vercel AI Gateway, billed to the Vercel account. On Vercel it signs in with the deployment's own token, so no API key is needed: enable AI Gateway for the team (AI Gateway in the Vercel dashboard) and redeploy. `AI_GATEWAY_API_KEY` is only needed to run it outside Vercel.
+2. Set a spend limit for AI Gateway in Vercel. The function also rate-limits each visitor, accepts same-origin requests only and caps message length.
 
 Without a key, or if the AI is unreachable, a built-in phrase parser handles the common requests (compartments, shelves, doors, sizes, board, joining) so the button still works.
 
