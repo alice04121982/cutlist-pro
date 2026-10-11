@@ -26,14 +26,14 @@ The picture manual animates each step: parts slide into place, with a pause butt
 
 ## Design assistant ("Change it")
 
-Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (`claude-opus-5-5`, low effort, structured JSON output, server-side refusal fallback) for a list of setting changes. The browser validates every change again before applying it.
+Type what is wrong in plain English ("make it five compartments with two shelves each, no doors") and the design updates. The request and the design sizes go to `api/assistant.js`, which asks Claude (Sonnet 5.5 through Vercel AI Gateway, structured JSON output) for a list of setting changes or an answer to a building question. The browser validates every change again before applying it.
 
 To switch it on in Vercel:
 
 1. It calls Claude through Vercel AI Gateway, billed to the Vercel account. On Vercel it signs in with the deployment's own token, so no API key is needed: enable AI Gateway for the team (AI Gateway in the Vercel dashboard) and redeploy. `AI_GATEWAY_API_KEY` is only needed to run it outside Vercel.
 2. Set a spend limit for AI Gateway in Vercel. The function also rate-limits each visitor, accepts same-origin requests only and caps message length.
 
-Without a key, or if the AI is unreachable, a built-in phrase parser handles the common requests (compartments, shelves, doors, sizes, board, joining) so the button still works.
+If AI Gateway is not enabled or the AI is unreachable, a built-in phrase parser handles the common requests (compartments, shelves, doors, sizes, board, joining) so the button still works.
 
 ## Design system
 
