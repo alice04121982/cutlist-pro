@@ -1,4 +1,4 @@
-# CutList Pro
+# Made to Fit
 
 Photograph the space, pick a design, and get exact cuts, build steps and a supplier-ready order.
 

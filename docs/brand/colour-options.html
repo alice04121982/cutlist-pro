@@ -1,0 +1,203 @@
+<title>Made to Fit Colours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a colour study. Each direction is one row: the brand idea, then the same home screen in light and dark, then its contrast checks. The page frame stays neutral so the palettes do the talking. */
+:root{
+  --canvas:#0E0F10; --panel:#17191B; --rule:#2A2D30;
+  --ink:#ECECE9; --ink-2:#A9ADB1; --ink-3:#7A8086;
+  --pass:#7BD3A0; --fail:#F59A8A;
+  --display:"Familjen Grotesk","Helvetica Neue",Arial,sans-serif;
+  --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--canvas);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;padding-inline:clamp(16px,4vw,48px);padding-block:40px 80px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:64px}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:clamp(34px,5vw,58px);line-height:1.02}
+h2{font-size:clamp(26px,3.2vw,36px)}
+p{margin:0;max-width:65ch;color:var(--ink-2)}
+p strong{color:var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.intro{display:grid;gap:16px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px;color:var(--ink-2)}
+
+.dir{display:grid;gap:20px;padding-top:28px;border-top:1px solid var(--rule)}
+.dir-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 24px;align-items:flex-end}
+.dir-head > div{display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{width:40px;height:40px;border-radius:6px;border:1px solid rgba(255,255,255,.12)}
+.rec{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:99px;background:var(--ink);color:var(--canvas);margin-left:10px;vertical-align:middle;letter-spacing:0}
+.screens{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:860px){.screens{grid-template-columns:1fr}}
+
+/* Mock home screen, driven entirely by the palette's tokens */
+.mock{background:var(--m-canvas);color:var(--m-ink);border-radius:12px;overflow:hidden;font-family:var(--body);min-width:0;border:1px solid var(--m-line)}
+.m-nav{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--m-line)}
+.m-nav svg{width:22px;height:22px;flex:none}
+.m-nav b{font-family:var(--display);font-size:16px;letter-spacing:-.025em}
+.m-nav .m-th{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--m-ink-2)}
+.m-body{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;padding:20px 16px 18px;align-items:center}
+@media (max-width:520px){.m-body{grid-template-columns:1fr}}
+.m-copy{display:grid;gap:10px;min-width:0}
+.m-copy h3{font-size:clamp(22px,2.4vw,28px);line-height:1;letter-spacing:-.035em;font-weight:700}
+.m-copy p{color:var(--m-ink-2);font-size:13.5px;line-height:1.45}
+.m-btns{display:flex;gap:8px;flex-wrap:wrap}
+.m-btn{font-family:var(--body);font-weight:600;font-size:13px;padding:9px 14px;border-radius:6px;border:0}
+.m-cta{background:var(--m-action);color:var(--m-on-action)}
+.m-sec{background:transparent;color:var(--m-ink);border:1.5px solid var(--m-line-2)}
+.m-pic{position:relative;background:var(--m-surface);border-radius:8px;aspect-ratio:4/3;border:1px solid var(--m-line);overflow:hidden;max-width:100%}
+.m-pic svg{position:absolute;inset:0;width:100%;height:100%}
+.m-tag{position:absolute;font-family:var(--mono);font-size:10px;font-weight:500;padding:2px 7px;border-radius:4px;background:var(--m-measure);color:var(--m-on-measure)}
+.m-foot{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px}
+.m-pill{font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:4px;display:flex;align-items:center;gap:6px}
+.m-ok{background:var(--m-ok-wash);color:var(--m-ok)}
+.m-ok::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.m-stat{background:var(--m-surface);color:var(--m-ink-2);border:1px solid var(--m-line);font-family:var(--mono);font-weight:500}
+.m-stat b{color:var(--m-ink)}
+
+.lower{display:grid;grid-template-columns:1.2fr 1fr;gap:20px}
+@media (max-width:860px){.lower{grid-template-columns:1fr}}
+.notes{display:grid;gap:10px;align-content:start;min-width:0}
+.notes h3{font-size:15px}
+.notes ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:14.5px;display:grid;gap:4px}
+.checks{background:var(--panel);border-radius:10px;padding:14px 16px;display:grid;gap:2px;align-content:start;min-width:0}
+.checks h3{font-size:13px;font-family:var(--mono);font-weight:500;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.ck{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;font-size:13.5px;padding:4px 0;border-bottom:1px solid var(--rule)}
+.ck:last-child{border-bottom:0}
+.ck .sw{width:28px;height:18px;border-radius:3px;display:grid;place-items:center;font-size:10px;font-weight:700;font-family:var(--body)}
+.ck .r{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.ck .v{font-family:var(--mono);font-size:11px}
+.ck .v.p{color:var(--pass)}.ck .v.f{color:var(--fail)}
+.ck .t{color:var(--ink-2);min-width:0}
+
+.verdict{display:grid;gap:14px}
+.vt{overflow-x:auto;border:1px solid var(--rule);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:680px;font-size:14.5px}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-family:var(--display);font-weight:700;font-size:17px;white-space:nowrap}
+td{color:var(--ink-2)}
+footer p{font-size:14px;color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+<section class="intro">
+  <span class="eyebrow">Made to Fit · colour exploration</span>
+  <h1>Five colour directions, each taken from the workshop or the home</h1>
+  <p>Every direction is drawn from something real in the job: the hi-vis vest, the builder's chalk line, plaster and paint, the spirit level bubble, the carpenter's pencil. Each one is shown on the same home screen in light and dark, so you compare colour, not layout.</p>
+  <p><strong>Ease of use rules that every direction follows:</strong> one colour is reserved for the main action and nothing else. Measurements get their own colour, because measuring is the product's signature moment. Text passes WCAG AA contrast (4.5:1), and buttons pass 3:1 against the page. The checks under each direction are calculated live from the actual colours.</p>
+</section>
+
+<div id="dirs" class="wrap"></div>
+
+<section class="verdict">
+  <span class="eyebrow">Recommendation</span>
+  <h2>How they compare</h2>
+  <div class="vt"><table>
+    <thead><tr><th>Direction</th><th>Feels like</th><th>Best for</th><th>Watch out for</th></tr></thead>
+    <tbody>
+      <tr><td>Hi-vis</td><td>Site, tools, energy</td><td>Keeping continuity with today's site</td><td>Reads as "trade", which is the "Pro" problem again.</td></tr>
+      <tr><td>Chalk Line</td><td>Precise, trustworthy, calm</td><td>Making a technical tool feel safe and easy</td><td>Blue is common in apps; the yellow measure tag is what makes it ours.</td></tr>
+      <tr><td>Plaster</td><td>Homely, design-led, warm</td><td>Homeowners who care how the room looks</td><td>Oxblood sits close to error red, so errors need an icon as well as colour.</td></tr>
+      <tr><td>Spirit Level</td><td>Fresh, confident, a bit unexpected</td><td>Standing out on Instagram and in app stores</td><td>The lime only works on the bottle green, never as text on white.</td></tr>
+      <tr><td>Pencil</td><td>Bold, hands-on, honest</td><td>The black and yellow you mentioned, done properly</td><td>Black and yellow is DeWalt's territory; keep the yellow for highlights, not whole surfaces.</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>My pick is Chalk Line, with Plaster as the alternative.</strong> The audience is a homeowner who is nervous about doing carpentry. Chalk-line blue says "measured and correct", and the yellow measure tag makes the photo-to-measurement step feel like the hero of the app. If you would rather the brand feel like interiors than tools, Plaster is the one.</p>
+</section>
+
+<footer><p>Next step once you choose: write the palette into the site's tokens in <span style="font-family:var(--mono)">styles.css</span> for both themes, swap the logo, and run the Impeccable checks on the real pages.</p></footer>
+</div>
+
+<script>
+const OK_L = {ok:"#1F7A4D", okw:"#DDF1E6"}, OK_D = {ok:"#5FD39A", okw:"#163326"};
+// Each palette: light and dark themes, built as roles not swatches.
+const P = [
+ {id:"hivis", name:"Hi-vis", from:"The safety vest and the tape measure case", n:"01",
+  idea:"Today's colours, tidied up. Charcoal, safety orange and birch ply. Orange does double duty for buttons and measurements, which is why measurements and actions blur together on the current site.",
+  notes:["Today's orange button fails the 3:1 check against the light page (2.8:1); this direction would need a darker orange","Most energetic of the five","Closest to the current site, lowest switching cost","Orange for both action and measure weakens both"],
+  L:{canvas:"#F2F3F1",surface:"#FFFFFF",ink:"#15181B",ink2:"#4A5056",line:"#DADDD7",line2:"#B8BDB5",action:"#FF5B1F",onAction:"#15181B",measure:"#FF5B1F",onMeasure:"#15181B",panel:"#D9C7A8",edge:"#9C8257",...OK_L},
+  D:{canvas:"#111315",surface:"#1B1E21",ink:"#ECEDEA",ink2:"#A9B0B5",line:"#2C3135",line2:"#454C52",action:"#FF6A2E",onAction:"#111315",measure:"#FF6A2E",onMeasure:"#111315",panel:"#8C7556",edge:"#D9C3A0",...OK_D}},
+ {id:"chalk", name:"Chalk Line", from:"The blue chalk line snapped across a wall, and the yellow tape", n:"02", rec:true,
+  idea:"Cool white paper, deep ink and a strong chalk-line blue for every action. Measurements sit on tape-measure yellow, so the moment the app reads the photo is the brightest thing on screen.",
+  notes:["Calm and precise; lowers the fear of getting it wrong","Action and measure are clearly different colours","Yellow appears only on measurements, so it stays special"],
+  L:{canvas:"#F4F6F8",surface:"#FFFFFF",ink:"#0E1726",ink2:"#4A5568",line:"#DCE1E8",line2:"#B5BECC",action:"#1E4FD8",onAction:"#FFFFFF",measure:"#FFD23F",onMeasure:"#0E1726",panel:"#E2D3B5",edge:"#A88E62",...OK_L},
+  D:{canvas:"#0B1220",surface:"#131C2E",ink:"#E8EDF5",ink2:"#A3AEC2",line:"#24304A",line2:"#3A4866",action:"#6B95FF",onAction:"#0B1220",measure:"#FFD23F",onMeasure:"#0B1220",panel:"#5E5340",edge:"#D9C7A8",...OK_D}},
+ {id:"plaster", name:"Plaster", from:"Fresh plaster, a painted door and a heritage green", n:"03",
+  idea:"The colours of a finished room rather than a workshop. Pale plaster pink, deep oxblood for actions and a heritage green for measurements. It says \"this will look lovely\", not \"this is a power tool\".",
+  notes:["Warmest and most interiors-led","Speaks to people who care how the room looks","Oxblood is close to error red, so errors must carry an icon"],
+  L:{canvas:"#F6EEE9",surface:"#FFFBF8",ink:"#2A1A1F",ink2:"#6B5458",line:"#EAD9D0",line2:"#CDB4AA",action:"#7A1F2B",onAction:"#FFF6F0",measure:"#2F5D50",onMeasure:"#FFFFFF",panel:"#E8C4B4",edge:"#B08474",...OK_L},
+  D:{canvas:"#1A1214",surface:"#251A1D",ink:"#F3E7E2",ink2:"#C2ADA8",line:"#3A2A2E",line2:"#5A4448",action:"#F08A96",onAction:"#1A1214",measure:"#8CC7B2",onMeasure:"#1A1214",panel:"#6E4A45",edge:"#E8C4B4",...OK_D}},
+ {id:"level", name:"Spirit Level", from:"The bubble in a spirit level, set in bottle green", n:"04",
+  idea:"Deep bottle green with the acid lime of a level's bubble. In light mode the green carries the buttons; in dark mode the lime does. The most distinctive of the five, and it gives the brand a signature dark look.",
+  notes:["Most ownable in an app store grid","Green also reads as \"safe\" and \"go\"","Lime is never used as text on white"],
+  L:{canvas:"#EFF2EC",surface:"#FFFFFF",ink:"#10261D",ink2:"#45594F",line:"#D8DFD5",line2:"#B3BFB0",action:"#1F5A40",onAction:"#FFFFFF",measure:"#CDE86A",onMeasure:"#10261D",panel:"#DCCDAE",edge:"#9E8A62",...OK_L},
+  D:{canvas:"#0C1A14",surface:"#142620",ink:"#E9F0EA",ink2:"#A7B8AE",line:"#22382F",line2:"#36514A",action:"#CDE86A",onAction:"#0C1A14",measure:"#CDE86A",onMeasure:"#0C1A14",panel:"#5B5240",edge:"#DCCDAE",...OK_D}},
+ {id:"pencil", name:"Pencil", from:"The flat yellow carpenter's pencil and its graphite", n:"05",
+  idea:"The black and yellow you mentioned, done with restraint. Graphite ink and black buttons with yellow text in light mode, a yellow button in dark mode, and yellow for measurements. Bold and hands-on.",
+  notes:["Highest contrast, very easy to scan","Feels honest and practical","Close to DeWalt; keep yellow off large surfaces"],
+  L:{canvas:"#F6F5F1",surface:"#FFFFFF",ink:"#1C1C1A",ink2:"#55534D",line:"#E2E0D8",line2:"#C2BFB4",action:"#1C1C1A",onAction:"#FFD400",measure:"#FFD400",onMeasure:"#1C1C1A",panel:"#E0D2B4",edge:"#A08A5E",...OK_L},
+  D:{canvas:"#151513",surface:"#20201D",ink:"#F0EFEA",ink2:"#AEACA4",line:"#2E2E2A",line2:"#4A4A44",action:"#FFD400",onAction:"#151513",measure:"#FFD400",onMeasure:"#151513",panel:"#6A5C42",edge:"#E0D2B4",...OK_D}}
+];
+
+// WCAG 2 contrast ratio
+const lum = h => { const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)); return .2126*c[0]+.7152*c[1]+.0722*c[2]; };
+const cr = (a,b) => { const x=lum(a), y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+
+const mark = c => `<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M4 18V4h14M46 4h14v14M60 46v14H46M18 60H4V46" fill="none" stroke="${c}" stroke-width="5"/><path d="M16 24v16M48 24v16M16 32h32" stroke="${c}" stroke-width="4"/><rect x="24" y="38" width="16" height="12" fill="${c}"/></svg>`;
+
+// The illustration: an eaves cupboard under a sloped ceiling, coloured from the palette.
+const scene = t => `<svg viewBox="0 0 240 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <rect width="240" height="180" fill="${t.surface}"/>
+  <path d="M0 0h120L240 96V180H0z" fill="${t.canvas}"/>
+  <path d="M120 0L240 96" stroke="${t.line2}" stroke-width="1.5"/>
+  <path d="M0 156h240" stroke="${t.line2}"/>
+  <g stroke="${t.edge}" stroke-width="1.5">
+   <path d="M24 156V70h86l60 48v38z" fill="${t.panel}"/>
+   <path d="M66 70v86M110 70v86M24 112h86"/>
+  </g>
+  <path d="M24 60h86" stroke="${t.ink2}" stroke-dasharray="3 3"/>
+  <path d="M24 56v8M110 56v8" stroke="${t.ink2}"/>
+ </svg>`;
+
+function screen(p, t, label){
+  const vars = `--m-canvas:${t.canvas};--m-surface:${t.surface};--m-ink:${t.ink};--m-ink-2:${t.ink2};--m-line:${t.line};--m-line-2:${t.line2};--m-action:${t.action};--m-on-action:${t.onAction};--m-measure:${t.measure};--m-on-measure:${t.onMeasure};--m-ok:${t.ok};--m-ok-wash:${t.okw}`;
+  return `<div class="mock" style="${vars}">
+    <div class="m-nav">${mark(t.ink)}<b>made to fit</b><span class="m-th">${label}</span></div>
+    <div class="m-body">
+      <div class="m-copy"><h3>Your photo. Your cupboard.</h3><p>Photograph the space, pick a design, get exact cuts and a build guide.</p>
+        <div class="m-btns"><button class="m-btn m-cta" type="button" tabindex="-1">Start with a photo</button><button class="m-btn m-sec" type="button" tabindex="-1">Browse designs</button></div></div>
+      <div class="m-pic">${scene(t)}<span class="m-tag" style="left:12%;top:20%">1200 mm</span><span class="m-tag" style="right:6%;bottom:8%">45°</span></div>
+    </div>
+    <div class="m-foot"><span class="m-pill m-ok">Shelves pass the sag check</span><span class="m-pill m-stat"><b>35</b>&nbsp;cuts · <b>£617</b></span></div>
+  </div>`;
+}
+
+function checks(t, theme){
+  const rows = [
+    ["Body text", t.ink, t.canvas, 4.5, "Aa"],
+    ["Secondary text", t.ink2, t.canvas, 4.5, "Aa"],
+    ["Button label", t.onAction, t.action, 4.5, "Go"],
+    ["Button against page", t.action, t.canvas, 3, ""],
+    ["Measure tag text", t.onMeasure, t.measure, 4.5, "mm"]
+  ];
+  return rows.map(([n,fg,bg,min,s])=>{ const r=cr(fg,bg); const ok=r>=min;
+    return `<div class="ck"><span class="sw" style="background:${bg};color:${fg}">${s||"■"}</span><span class="t">${theme} · ${n}</span><span class="r">${r.toFixed(1)}:1</span><span class="v ${ok?"p":"f"}">${ok?"pass":"fail"} ${min}</span></div>`; }).join("");
+}
+
+document.getElementById("dirs").innerHTML = P.map(p=>`
+<section class="dir" aria-labelledby="d-${p.id}">
+  <div class="dir-head"><div><span class="eyebrow">Direction ${p.n} · ${p.from}</span><h2 id="d-${p.id}">${p.name}${p.rec?'<span class="rec">Recommended</span>':""}</h2></div>
+    <div class="chips" aria-label="Key colours">${[p.L.ink,p.L.action,p.L.measure,p.L.panel,p.L.canvas,p.D.canvas].map(c=>`<span class="chip" style="background:${c}" title="${c}"></span>`).join("")}</div></div>
+  <p>${p.idea}</p>
+  <div class="screens">${screen(p,p.L,"light")}${screen(p,p.D,"dark")}</div>
+  <div class="lower">
+    <div class="notes"><h3>What it does for the brand</h3><ul>${p.notes.map(n=>`<li>${n}</li>`).join("")}</ul></div>
+    <div class="checks"><h3>Contrast, calculated</h3>${checks(p.L,"Light")}${checks(p.D,"Dark")}</div>
+  </div>
+</section>`).join("");
+</script>

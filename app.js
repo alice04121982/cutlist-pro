@@ -1,4 +1,4 @@
-/* CutList Pro
+/* Made to Fit
    Everything runs in the browser. Photos never leave the device.
    No inline handlers: all interaction goes through delegated listeners so a strict CSP can apply. */
 'use strict';
@@ -105,6 +105,12 @@ const FIELDS = {
   pitchedroof: [['w', 'Building length', 'Along the ridge'], ['d', 'Span', 'Wall plate to wall plate'], ['h', 'Rafter depth', 'e.g. 100, 125, 150'], ['pitch', 'Roof pitch', 'Degrees'], ['spacing', 'Rafter centres', 'Usually 400']]
 };
 const fieldsFor = id => FIELDS[id] || (isCabinet(id) ? FIELDS.cabinet : FIELDS.studwall);
+// Sizes a cutter works from. A photo or AR reading is only a guess, so each one must be checked with a tape
+// (typed in, or confirmed) before the order pack goes out.
+const TAPE_KEYS = ['w', 'h', 'low', 'd'];
+const tapeKeys = () => isCabinet(S.template) ? fieldsFor(S.template).map(f => f[0]).filter(k => TAPE_KEYS.includes(k)) : [];
+const unTaped = () => tapeKeys().filter(k => !S.taped.includes(k));
+const tapeLabel = k => (fieldsFor(S.template).find(f => f[0] === k) || [k, k])[1].toLowerCase();
 const LIMITS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], spacing: [200, 1200], pitch: [5, 70], thickness: [3, 100], kerf: [0, 10], sheetW: [300, 3700], sheetH: [300, 2200] };
 
 const MATERIALS = {
@@ -163,7 +169,7 @@ function freshState(template = 'eaves') {
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
     compartments: d.bays || 1, boxes: 'auto', site: defaultSite(template), hand: 'right', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
-    unit: 'mm', done: []
+    unit: 'mm', done: [], ordered: false, taped: [], est: {}
   };
 }
 
@@ -174,7 +180,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered', 'taped', 'est'];
 function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
 
 // Validate anything read from storage before it touches state
@@ -201,7 +207,10 @@ function sanitizeProject(p) {
     delivery: DELIVERY.some(d => d.id === p.delivery) ? p.delivery : 'standard',
     postcode: String(p.postcode || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 8),
     unit: p.unit === 'in' ? 'in' : 'mm',
-    done: Array.isArray(p.done) ? p.done.filter(n => Number.isInteger(n) && n >= 0 && n < 40) : []
+    done: Array.isArray(p.done) ? p.done.filter(n => Number.isInteger(n) && n >= 0 && n < 40) : [],
+    ordered: p.ordered === true,
+    taped: Array.isArray(p.taped) ? p.taped.filter(k => TAPE_KEYS.includes(k)) : [],
+    est: Object.fromEntries(TAPE_KEYS.filter(k => p.est && Number.isFinite(p.est[k])).map(k => [k, num(p.est[k], ...LIMITS[k], 0)]))
   });
   out.overrides = {};
   if (p.overrides && typeof p.overrides === 'object') {
@@ -1221,7 +1230,7 @@ function renderControls() {
       </div>
       <div class="group">
         <h2 class="group-title">Measurements</h2>
-        <p class="group-sub">In millimetres. Measure in two or three places and use the smallest.</p>
+        <p class="group-sub">${tapeKeys().length ? 'Cutters work to the millimetre, so check every size with a tape measure. A photo can only guess. ' : ''}In millimetres. Measure in two or three places and use the smallest.${tapeKeys().length ? ` <strong>${tapeKeys().length - unTaped().length} of ${tapeKeys().length} checked.</strong>` : ''}</p>
         <div class="fields">${fieldsFor(S.template).map(([k, label, help]) => numField(k, label, help, k === 'pitch' ? 'deg' : 'mm')).join('')}</div>
         ${S.template === 'understairs' ? `<div class="field full"><span class="lbl" id="handLbl">Tall end</span><div class="seg" role="group" aria-labelledby="handLbl"><button type="button" data-action="hand" data-value="left" aria-pressed="${S.hand === 'left'}">On the left</button><button type="button" data-action="hand" data-value="right" aria-pressed="${S.hand !== 'left'}">On the right</button></div><span class="help">Stand facing the space. Which end is under the top of the stairs?</span></div><div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The stairs slope at <strong>${stairGeom().angDeg} deg</strong>. Each upright, the top and the doors are cut to follow it.</span></div><div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Keep a gas meter, fuse box or stopcock under the stairs easy to reach. If the stairs are your escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control.</span></div>` : ''}
         ${S.template === 'eaves' ? `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Roof angle works out at <strong>${eavesGeom().angDeg} deg</strong>. The side panels are cut to follow it.</span></div>` : ''}
@@ -1322,7 +1331,11 @@ function layoutPreview() {
 
 function numField(k, label, help, unit) {
   const lim = LIMITS[k] || [0, 99999];
-  return `<div class="field"><label for="f-${k}">${esc(label)}</label><div class="input-unit"><input id="f-${k}" class="input num" type="number" inputmode="numeric" min="${lim[0]}" max="${lim[1]}" value="${S[k]}" data-field="${k}"><span>${unit}</span></div><span class="help" data-help="${k}">${esc(help)}${inchHelp(k)}</span><span class="err" data-err="${k}" hidden></span></div>`;
+  const tape = tapeKeys().includes(k), ok = S.taped.includes(k), est = S.est[k];
+  const status = !tape ? '' : ok
+    ? `<span class="tape ok"><i class="ph ph-check" aria-hidden="true"></i>Checked with a tape</span>`
+    : `<span class="tape"><i class="ph ph-ruler" aria-hidden="true"></i>${est ? 'Photo guess. Measure to check' : 'Not measured yet'}<button type="button" class="link-btn" data-action="tape-ok" data-k="${k}">${est ? 'Matches my tape' : 'This is my measurement'}</button></span>`;
+  return `<div class="field${tape && !ok ? ' needs-tape' : ''}"><label for="f-${k}">${esc(label)}</label><div class="input-unit"><input id="f-${k}" class="input num" type="number" inputmode="numeric" min="${lim[0]}" max="${lim[1]}" value="${S[k]}" data-field="${k}"><span>${unit}</span></div>${status}<span class="help" data-help="${k}">${esc(help)}${inchHelp(k)}</span><span class="err" data-err="${k}" hidden></span></div>`;
 }
 
 function photoBlock() {
@@ -1662,7 +1675,7 @@ function renderBuildPage() {
 
 // ───────────────────────── Assembly manual (IKEA style) ─────────────────────────
 // Fixed "paper" palette so the manual looks the same on screen, in dark mode and in print.
-const MP = { ink: '#15181B', done: '#E4E2DC', wood: '#E9D9BC', add: '#FF8A5C', line: '#15181B', paper: '#FBFBFA' };
+const MP = { ink: '#15181B', done: '#E4E2DC', wood: '#E9D9BC', add: '#FF8F73', line: '#15181B', paper: '#FBFBFA' };
 
 // 3D solids for each named part, in mm. x right, y up, z from the front (0) to the back (D).
 function partSolids(opt = {}) {
@@ -2019,30 +2032,33 @@ function orderNeeds() {
 }
 // What each fitting is called in shops and the pack size it usually comes in.
 // Amazon and Screwfix links are searches, so they never point at a dead listing.
-// To turn on the one-click Amazon basket, add an Associates tag and a checked ASIN per item.
+// ASINs fill the one-click Amazon basket. They were picked from amazon.co.uk search results on
+// 10 October 2026 and NOT yet opened by hand: check each listing (right part, pack size, decent seller)
+// before launch. Wall fixing brackets and handles have none yet (the adhesive anti-tip pads found are not
+// a safe wall fixing); those stay on their search links. Add the Associates tag to earn commission.
 const AMAZON_TAG = '';
 const SHOP = [
-  [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: '' }],
-  [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: '' }],
-  [/wood screws/i, { q: 'wood screws 4x40mm', pack: 200, asin: '' }],
-  [/pocket-hole screws/i, { q: 'pocket hole screws 32mm', pack: 100, asin: '' }],
-  [/pocket-hole jig/i, { q: 'pocket hole jig', pack: 1, asin: '' }],
-  [/glue/i, { q: 'PVA wood glue', pack: 1, asin: '' }],
-  [/cam lock/i, { q: 'cam lock fittings 15mm with bolts', pack: 20, asin: '' }],
-  [/dowel/i, { q: 'wooden dowels 8x30mm', pack: 100, asin: '' }],
-  [/panel pins/i, { q: 'panel pins 25mm', pack: 300, asin: '' }],
-  [/connector screws/i, { q: 'cabinet connector screws', pack: 20, asin: '' }],
-  [/packers/i, { q: 'plastic packers assorted', pack: 1, asin: '' }],
-  [/angle brackets/i, { q: 'angle brackets 40mm', pack: 20, asin: '' }],
-  [/anti-tip/i, { q: 'furniture anti tip wall brackets', pack: 2, asin: '' }],
+  [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: 'B015H9OY28' }],
+  [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: 'B0711TZ4Q1' }],
+  [/wood screws/i, { q: 'wood screws 4x40mm', pack: 200, asin: 'B0CPJQ8428' }],
+  [/pocket-hole screws/i, { q: 'pocket hole screws 32mm', pack: 100, asin: 'B08HQQXSKH' }],
+  [/pocket-hole jig/i, { q: 'pocket hole jig', pack: 1, asin: 'B001DYFISG' }],
+  [/glue/i, { q: 'PVA wood glue', pack: 1, asin: 'B00OQDJM5G' }],
+  [/cam lock/i, { q: 'cam lock fittings 15mm with bolts', pack: 20, asin: 'B08GKV4XBM' }],
+  [/dowel/i, { q: 'wooden dowels 8x30mm', pack: 100, asin: 'B074D9NGNY' }],
+  [/panel pins/i, { q: 'panel pins 25mm', pack: 500, asin: 'B09S3SKGTF' }],
+  [/connector screws/i, { q: 'cabinet connector screws', pack: 20, asin: 'B09PV8QR88' }],
+  [/packers/i, { q: 'plastic packers assorted', pack: 1, asin: 'B0DLWCDCSH' }],
+  [/angle brackets/i, { q: 'angle brackets 40mm', pack: 20, asin: 'B09XFCH6N6' }],
+  [/anti-tip/i, { q: 'furniture anti tip wall brackets', pack: 2, asin: 'B0BRXLJP77' }],
   [/wall fixing brackets/i, { q: 'furniture wall fixing brackets', pack: 10, asin: '' }],
-  [/hanging brackets/i, { q: 'wall cabinet hanging brackets', pack: 2, asin: '' }],
-  [/knob/i, { q: 'cupboard door knobs', pack: 1, asin: '' }],
+  [/hanging brackets/i, { q: 'wall cabinet hanging brackets', pack: 2, asin: 'B09YNDGQHJ' }],
+  [/knob/i, { q: 'cupboard door knobs', pack: 8, asin: 'B0GY8VD6VR' }],
   [/handle/i, { q: 'cabinet handles', pack: 1, asin: '' }],
-  [/drawer runners/i, { q: 'drawer runners 400mm soft close pair', pack: 1, asin: '' }],
-  [/plinth clips/i, { q: 'kitchen plinth clips', pack: 10, asin: '' }],
-  [/legs/i, { q: 'adjustable cabinet legs', pack: 4, asin: '' }],
-  [/rail end/i, { q: 'wardrobe rail end sockets', pack: 2, asin: '' }]
+  [/drawer runners/i, { q: 'drawer runners 400mm soft close pair', pack: 1, asin: 'B01N2RABT3' }],
+  [/plinth clips/i, { q: 'kitchen plinth clips', pack: 10, asin: 'B01H2SXCXE' }],
+  [/legs/i, { q: 'adjustable cabinet legs', pack: 4, asin: 'B0BMHYXZCG' }],
+  [/rail end/i, { q: 'wardrobe rail end sockets 25mm', pack: 4, asin: 'B0CF28MSTT' }]
 ];
 function shopItem(f) {
   const hit = SHOP.find(([re]) => re.test(f.name)), spec = hit ? hit[1] : { q: f.name.replace(/\(.*?\)/g, ''), pack: 1, asin: '' };
@@ -2051,22 +2067,31 @@ function shopItem(f) {
 }
 const amazonSearch = q => 'https://www.amazon.co.uk/s?k=' + encodeURIComponent(q) + (AMAZON_TAG ? '&tag=' + encodeURIComponent(AMAZON_TAG) : '');
 const screwfixSearch = q => 'https://www.screwfix.com/search?search=' + encodeURIComponent(q);
-// One link that puts every item in the user's Amazon basket. Only product IDs and quantities go in it, no user data.
+// One link that puts every item with a product ID in the user's Amazon basket. Only product IDs and
+// quantities go in it, no user data. The Associates tag is added when set; items without an ID are listed
+// beside the button so they can be bought from the search links.
+const hasAsin = i => /^[A-Z0-9]{10}$/.test(i.asin);
 function amazonBasket(items) {
-  const ok = items.filter(i => /^[A-Z0-9]{10}$/.test(i.asin));
-  if (!AMAZON_TAG || ok.length !== items.length) return '';
-  return 'https://www.amazon.co.uk/gp/aws/cart/add.html?AssociateTag=' + encodeURIComponent(AMAZON_TAG) + ok.map((i, n) => `&ASIN.${n + 1}=${i.asin}&Quantity.${n + 1}=${i.packs}`).join('');
+  const ok = items.filter(hasAsin);
+  if (!ok.length) return '';
+  return 'https://www.amazon.co.uk/gp/aws/cart/add.html?' + (AMAZON_TAG ? 'AssociateTag=' + encodeURIComponent(AMAZON_TAG) + '&' : '') + ok.map((i, n) => `ASIN.${n + 1}=${i.asin}&Quantity.${n + 1}=${i.packs}`).join('&');
 }
 function shoppingList() {
   return R.fittings.map(shopItem).map(i => `${i.packs} x ${i.name}${i.pack > 1 ? ` (pack of ${i.pack})` : ''}: need ${i.total_qty}`).join('\n');
 }
 function hardwareCard() {
-  const items = R.fittings.map(shopItem), basket = amazonBasket(items);
-  return `<div class="card">
-    <h3><i class="ph ph-wrench" aria-hidden="true"></i>Hardware pack</h3>
-    <p class="sub">Cutters supply boards only. Buy these yourself while the panels are being cut. Quantities are rounded up to whole packs.</p>
-    ${basket ? `<a class="btn btn-primary" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add all to Amazon basket</a>` : ''}
-    <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
+  const items = R.fittings.map(shopItem), basket = amazonBasket(items), missing = items.filter(i => !hasAsin(i));
+  const cab = isCabinet(S.template), next = cab && S.ordered;
+  return `<div class="card hw-card${next ? ' is-next' : ''}" id="hwCard">
+    ${cab ? `<p class="step-tag">${next ? 'Next' : 'Step 2'}</p>` : ''}
+    <h3><i class="ph ph-wrench" aria-hidden="true"></i>${next ? 'Now order your hardware' : 'Hardware pack'}</h3>
+    <p class="sub">${next ? 'Your panels are on their way. Order the fittings now so everything arrives together.' : 'Cutters supply boards only. Order these once your panels are ordered.'} Quantities are rounded up to whole packs.</p>
+    <div class="hw-buy">
+      ${basket ? `<a class="btn ${next || !cab ? 'btn-primary' : 'btn-ghost'}" href="${basket}" target="_blank" rel="noopener noreferrer"><i class="ph ph-shopping-cart" aria-hidden="true"></i>Add ${missing.length ? 'these' : 'all'} to Amazon basket<span class="sr-only"> (opens Amazon in a new tab)</span></a>` : ''}
+      <button type="button" class="btn btn-ghost" data-action="copy-shopping"><i class="ph ph-copy" aria-hidden="true"></i>Copy shopping list</button>
+    </div>
+    ${basket && missing.length ? `<p class="fine">Not in the Amazon basket yet: ${missing.map(i => esc(i.name)).join(', ')}. Use the links below for those.</p>` : ''}
+    <p class="sub hw-collect"><i class="ph ph-storefront" aria-hidden="true"></i><span>Want to start today? Copy the list and collect from your nearest Screwfix. <a href="https://www.screwfix.com/stores" target="_blank" rel="noopener noreferrer">Find a Screwfix</a></span></p>
     <ul class="lines hw">${items.map(i => `<li><span>${esc(i.name)}<small>Need ${i.total_qty}. ${i.pack > 1 ? `Buy ${i.packs} pack${i.packs > 1 ? 's' : ''} of ${i.pack}${i.spare ? `, ${i.spare} spare` : ''}` : `Buy ${i.packs}`}${i.note ? '. ' + esc(i.note) : ''}</small>
       <span class="sup-act"><a class="chip" href="${amazonSearch(i.q)}" target="_blank" rel="noopener noreferrer">Amazon</a><a class="chip" href="${screwfixSearch(i.q)}" target="_blank" rel="noopener noreferrer">Screwfix</a></span></span><span>${gbp(i.total_cost)}</span></li>`).join('')}</ul>
     <p class="fine">Pick branded fittings. Shelf pins must be rated 12kg or more each. Prices are estimates for the amount you use.</p>
@@ -2087,30 +2112,46 @@ function cutterCard() {
   const serves = sup => sup.area === 'uk' || sup.area === 'store' || (area && Array.isArray(sup.area) && sup.area.includes(area));
   const req = [['angles', need.angles, 'Angled cuts', 'Angled cuts'], ['drilling', need.holes > 0, `${need.holes} holes`, 'Drilling'], ['edging', need.edging, 'Edge banding', 'Edge banding']].filter(r => r[1]);
   const score = sup => req.reduce((a, [k]) => a + (sup[k] === 'yes' ? 0 : sup[k] === 'ask' ? 1 : 10), 0) + (serves(sup) ? 0 : 20);
-  const list = SUPPLIERS.filter(sup => serves(sup) || !area).sort((x, y) => score(x) - score(y));
+  const yeses = sup => req.filter(([k]) => sup[k] === 'yes').length;
+  const list = SUPPLIERS.filter(sup => serves(sup) || !area).sort((x, y) => score(x) - score(y) || yeses(y) - yeses(x));
   const badge = (sup, k, label) => `<span class="cap cap-${sup[k]}"><i class="ph ph-${sup[k] === 'yes' ? 'check' : sup[k] === 'no' ? 'x' : 'question'}" aria-hidden="true"></i>${esc(label)}${sup[k] === 'ask' ? ': ask' : ''}</span>`;
   const mail = sup => {
     const body = [`Hello ${sup.name},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
+      unTaped().length ? 'Note: some sizes are still estimates and will be confirmed before cutting.' : 'All sizes measured with a tape.', '',
       `Material: ${MATERIALS[S.material].name} ${S.thickness}mm${R.sheets.ply3 ? ', plus 3mm backs' : ''}`, `Pieces: ${need.pieces} (about ${R.nMain} sheets)`,
       need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes, all on the panel faces: shelf pins, hinge cups, joint screws and connector screws. They are in the DXF on layers starting DRILL_, named by diameter and depth. Through holes for screws should be countersunk on the outside face.` : '',
       S.joinery === 'cam' ? 'Cam fittings also need an 8mm hole into the end edge of each top and bottom. Please say if you can edge-bore; if not we will drill those.' : '',
       need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
     return `mailto:${sup.email || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
   };
-  return `<div class="card cutters">
-    <h3><i class="ph ph-storefront" aria-hidden="true"></i>Send to a cutter</h3>
-    <p class="sub">Your order pack has every panel, its shape, its edging and every hole to drill. ${req.length ? 'This design needs: ' + req.map(r => r[2]).join(', ') + '.' : ''}</p>
-    <button type="button" class="btn btn-primary" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download the order pack</button>
-    <span class="help">Two files: a cut list spreadsheet (CSV) and a drawing (DXF) with shapes and holes.</span>
-    ${postcodeField()}
-    ${area ? `<p class="sub">Showing services that deliver to ${esc(area)}.</p>` : ''}
-    <ul class="sup-list">${list.map(sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
+  const top = list.find(sup => sup.area !== 'store') || list[0], rest = list.filter(sup => sup !== top);
+  const why = top ? [serves(top) && area ? `delivers to ${area}` : top.area === 'uk' ? 'delivers UK-wide' : '', ...req.filter(([k]) => top[k] === 'yes').map(r => r[3].toLowerCase())].filter(Boolean) : [];
+  const supItem = sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
       <div class="sup-head"><strong>${esc(sup.name)}</strong>${score(sup) === 0 ? '<span class="cap cap-yes">Good match</span>' : ''}</div>
       <div class="sup-meta">${esc(sup.howTo)}. ${sup.lead !== 'Ask' ? esc(sup.lead) + '. ' : ''}${esc(sup.note)}</div>
       ${req.length ? `<div class="caps">${req.map(([k, , , label]) => badge(sup, k, label)).join('')}</div>` : ''}
       <div class="sup-act"><a class="chip" href="${sup.url}" target="_blank" rel="noopener noreferrer"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Open site</a>${sup.area === 'store' ? '' : `<a class="chip" href="${mail(sup)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>${sup.email ? 'Email order' : 'Draft email'}</a>`}</div>
-    </li>`).join('')}</ul>
-    <p class="fine">Details from each company's website, October 2026. "Ask" means they do not say. Your quote and their terms are final.</p>
+    </li>`;
+  return `<div class="card cutters">
+    <p class="step-tag">Step 1</p>
+    <h3><i class="ph ph-storefront" aria-hidden="true"></i>Get your panels cut</h3>
+    ${postcodeField()}
+    ${top ? `<div class="pick-card">
+      <div class="pick-head"><span class="cap cap-yes"><i class="ph ph-star" aria-hidden="true"></i>Our pick for this design</span><strong>${esc(top.name)}</strong></div>
+      <p class="sub">${why.length ? 'Why: ' + esc(why.join(', ')) + '. ' : ''}${esc(top.note)} Expect roughly ${gbp0(R.costs.panels)} for the panels before their delivery charge.</p>
+      <ol class="pick-steps">
+        <li><span>Download your order pack: the cut list and the drawing with every cut and hole.</span><button type="button" class="btn btn-ghost btn-sm" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download order pack</button></li>
+        <li>${top.email
+          ? `<span>Send it to ${esc(top.name)}. The email is written for you; attach the two files.</span><a class="btn btn-primary btn-sm" href="${mail(top)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Email ${esc(top.name)}</a>`
+          : `<span>${esc(top.name)}: ${esc(top.howTo.toLowerCase())}. Enter the sizes from your cut list on their website, or send them the written email with the two files attached.</span><span class="row-btns"><a class="btn btn-primary btn-sm" href="${top.url}" target="_blank" rel="noopener noreferrer"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Open ${esc(top.name)}</a>${top.area === 'store' ? '' : `<a class="btn btn-ghost btn-sm" href="${mail(top)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Draft email</a>`}</span>`}</li>
+        <li><span>They reply with the exact price and delivery date. Pay them, then tick below.</span></li>
+      </ol>
+    </div>` : ''}
+    ${rest.length ? `<details class="more-cutters"><summary>Compare with ${rest.length} other cutter${rest.length > 1 ? 's' : ''}</summary><ul class="sup-list">${rest.map(supItem).join('')}</ul></details>` : ''}
+    ${S.ordered
+      ? `<div class="ordered-row"><span class="cap cap-yes"><i class="ph ph-check" aria-hidden="true"></i>Panels ordered</span><button type="button" class="link-btn" data-action="mark-ordered">Not ordered yet</button></div>`
+      : `<button type="button" class="btn btn-primary" data-action="mark-ordered"><i class="ph ph-check-circle" aria-hidden="true"></i>I've ordered my panels</button><span class="help">Then we'll help you order the hardware.</span>`}
+    <p class="fine">Cutters price each job by quote until a Made to Fit partner offers fixed prices. Details from each company's website, October 2026.</p>
   </div>`;
 }
 
@@ -2125,16 +2166,18 @@ function renderOrderPage() {
   R.rolls.forEach(p => lines.push(['Breathable membrane', `${p.rolls} roll${p.rolls > 1 ? 's' : ''}`, p.rolls * FELT_ROLL]));
   return `<div class="page">
     <div class="page-head"><div><h2>Order your materials</h2><p>Send the order pack to a cutting service. They cut, drill, edge and deliver every panel, ready to build like flat-pack.</p></div></div>
+    ${unTaped().length ? `<div class="callout warn"><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>Check your sizes with a tape before you order.</strong> Not yet checked: ${unTaped().map(tapeLabel).join(', ')}. Panels are cut to these numbers and cannot be recut for free.</span><button type="button" class="chip" data-action="goto" data-step="0">Check sizes</button></div>` : ''}
     ${safetyChecks().some(c => c.status === 'fail') ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span><strong>A safety check failed.</strong> Go back to Design and fix it before you order.</span><button type="button" class="chip" data-action="goto" data-step="1">Fix it</button></div>` : ''}
     <div class="order">
       <div>
         ${cutterCard()}
+        ${isCabinet(S.template) ? hardwareCard() : ''}
         <div class="card">
           <h3><i class="ph ph-package" aria-hidden="true"></i>Materials</h3>
           <ul class="lines">${lines.map(([a, b, p]) => `<li><span>${esc(a)}<small>${esc(b)}</small></span><span>${gbp(p)}</span></li>`).join('')}</ul>
           ${S.template !== 'pitchedroof' && isCabinet(S.template) ? `<div class="price-in"><label for="f-priceSheet">Price per sheet (edit to match your quote)</label><input id="f-priceSheet" class="input" type="number" min="0" step="0.5" value="${R.sheetPrice}" data-field="priceSheet"></div>` : ''}
         </div>
-        ${hardwareCard()}
+        ${isCabinet(S.template) ? '' : hardwareCard()}
         <div class="card">
           <h3><i class="ph ph-truck" aria-hidden="true"></i>Delivery</h3>
 
@@ -2255,7 +2298,7 @@ function heroScene(after, d) {
   const a = 100 * Math.PI / 180, fx = ox0 + dw * Math.cos(a), fz = FZ - dw * Math.sin(a);
   s += poly([[ox0, plinth + 4, FZ], [ox0, FH - 12, FZ], [fx, FH - 12, fz], [fx, plinth + 4, fz]], sageDark, ' stroke="#7F8B7A" stroke-width="1.5"');
   // Measurements
-  const chip = (x, y, z, txt, dx = 0, dy = 0) => { const [px, py] = P(x, y, z); return `<g transform="translate(${(px + dx).toFixed(1)} ${(py + dy).toFixed(1)})"><rect x="-44" y="-14" width="88" height="28" rx="14" fill="#FF5B1F"/><text x="0" y="5" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" fill="#15181B">${txt}</text></g>`; };
+  const chip = (x, y, z, txt, dx = 0, dy = 0) => { const [px, py] = P(x, y, z); return `<g transform="translate(${(px + dx).toFixed(1)} ${(py + dy).toFixed(1)})"><rect x="-44" y="-14" width="88" height="28" rx="5" fill="#F47A5E"/><text x="0" y="5" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" font-weight="600" fill="#0E1726">${txt}</text></g>`; };
   s += chip(L * 0.8, FH, FZ, fmt(L), 0, -26) + chip(L, FH / 2, FZ, fmt(FH), -54, 0);
   return s + '</svg>';
 }
@@ -2399,7 +2442,7 @@ function exportCNC() {
   const mat = MATERIALS[S.material];
   const panels = R.parts.filter(p => p.stock === 'sheet' || p.stock === 'ply3' || p.stock === 'ply6');
   if (!panels.length) { exportCSV(); return; }
-  let csv = '# CNC Cut List Export - CutList Pro\n';
+  let csv = '# CNC Cut List Export - Made to Fit\n';
   csv += '# Project: ' + safeName(S.name) + '\n# Material: ' + mat.name + ' (' + S.thickness + 'mm)\n# Date: ' + new Date().toISOString().split('T')[0] + '\n# All dimensions in mm. Grain direction: L=Length\n#\n';
   csv += 'Part Name,Length (mm),Width (mm),Qty,Material,Thickness (mm),Grain,Edge L1,Edge L2,Edge W1,Edge W2,Scribed,Holes,Notes\n';
   panels.forEach(p => {
@@ -2461,7 +2504,7 @@ function printSheet() {
   R.fittings.forEach(f => { h += `<tr><td>${esc(f.name)}</td><td>${f.total_qty}</td><td>${gbp(f.total_cost)}</td></tr>`; });
   h += '</table><h2>Build steps</h2><ol>';
   steps.forEach(s => { h += `<li><strong>${esc(s.title)}.</strong> ${esc(s.body.join(' '))}${s.warn ? ' <em>' + esc(s.warn) + '</em>' : ''}</li>`; });
-  h += `</ol><div class="meta">Made with CutList Pro. Prices are estimates. Check every measurement before cutting.</div>`;
+  h += `</ol><div class="meta">Made with Made to Fit. Prices are estimates. Check every measurement before cutting.</div>`;
   $('#printSheet').innerHTML = h;
   window.print();
 }
@@ -2497,7 +2540,7 @@ function cmDrawImage() {
 }
 function cmRedrawAll() {
   cmDrawImage();
-  if (CM.ref) { CM.ref.forEach(p => cmAddDot(p, 'ref')); cmDrawLine(CM.ref[0], CM.ref[1], '#FF5B1F', CM.refSizeMM.toFixed(0) + 'mm reference'); }
+  if (CM.ref) { CM.ref.forEach(p => cmAddDot(p, 'ref')); cmDrawLine(CM.ref[0], CM.ref[1], '#FF8F73', CM.refSizeMM.toFixed(0) + 'mm reference'); }
   Object.entries(CM.pts).forEach(([k, p]) => { cmAddDot(p[0], 'a'); cmAddDot(p[1], 'b'); cmDrawLine(p[0], p[1], '#2E9E62', CM.measurements[k] + 'mm'); });
   CM.points.forEach((p, i) => cmAddDot(p, CM.phase === 'calibrate' ? 'ref' : (i ? 'b' : 'a')));
 }
@@ -2512,7 +2555,7 @@ function cmTap(e) {
       if (du < 0.01) { CM.points = []; cmRedrawAll(); toast('Those points are too close. Try again.'); cmUpdateUI(); return; }
       CM.k = du / CM.refSizeMM; // photo-width units per mm
       CM.ref = CM.points.slice();
-      cmDrawLine(CM.ref[0], CM.ref[1], '#FF5B1F', CM.refSizeMM.toFixed(0) + 'mm reference');
+      cmDrawLine(CM.ref[0], CM.ref[1], '#FF8F73', CM.refSizeMM.toFixed(0) + 'mm reference');
       CM.phase = 'measure'; CM.points = [];
     }
   } else if (CM.phase === 'measure') {
@@ -2575,7 +2618,7 @@ function cmRedo() {
 }
 function cmDone() {
   const m = CM.measurements;
-  Object.keys(m).forEach(k => { const lim = LIMITS[k]; if (lim) S[k] = clamp(m[k], lim[0], lim[1]); });
+  Object.keys(m).forEach(k => { const lim = LIMITS[k]; if (lim) { S[k] = clamp(m[k], lim[0], lim[1]); if (TAPE_KEYS.includes(k)) { S.est[k] = S[k]; S.taped = S.taped.filter(x => x !== k); } } });
   if (S.template === 'eaves' && S.low >= S.h) S.low = Math.round(S.h * 0.6);
   // Anchor the design where the user measured. u units are fractions of photo width.
   S.fracPerMM = CM.k;
@@ -2587,7 +2630,7 @@ function cmDone() {
   cmClose();
   saveDraft();
   render();
-  toast('Sizes added from your photo');
+  toast('Sizes guessed from your photo. Check each one with a tape.');
 }
 
 // ───────────────────────── AR (Android WebXR) ─────────────────────────
@@ -2681,7 +2724,7 @@ function arUndo() {
   $('#arInstructions').textContent = AR.points.length ? 'Tap a surface to place the end point' : 'Tap a surface to place the start point';
 }
 function arDone() {
-  Object.entries(AR.measurements).forEach(([k, v]) => { const lim = LIMITS[k]; if (lim) S[k] = clamp(v, lim[0], lim[1]); });
+  Object.entries(AR.measurements).forEach(([k, v]) => { const lim = LIMITS[k]; if (lim) { S[k] = clamp(v, lim[0], lim[1]); if (TAPE_KEYS.includes(k)) { S.est[k] = S[k]; S.taped = S.taped.filter(x => x !== k); } } });
   endARSession(); saveDraft(); render();
 }
 function endARSession() { if (AR.session) AR.session.end().catch(() => {}); else onARSessionEnd(); }
@@ -2897,6 +2940,11 @@ const ACTIONS = {
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
   'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
+  'tape-ok': el => { const k = el.dataset.k; if (TAPE_KEYS.includes(k) && !S.taped.includes(k)) S.taped.push(k); delete S.est[k]; saveDraft(); render(); },
+  'mark-ordered': () => {
+    S.ordered = !S.ordered; saveDraft(); render();
+    if (S.ordered) { toast('Panels ordered. Now the hardware.'); requestAnimationFrame(() => $('#hwCard')?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' })); }
+  },
   'copy-shopping': async () => { try { await navigator.clipboard.writeText(shoppingList()); toast('Shopping list copied'); } catch { toast('Could not copy. Select the list and copy it instead.'); } },
   'ask-undo': el => {
     const m = ASK.log[Number(el.dataset.i)];
@@ -2995,6 +3043,7 @@ document.addEventListener('input', e => {
     if (err) { err.textContent = msg; err.hidden = !msg; }
     if (msg) return;
     S[k] = k === 'shelves' ? Math.round(v) : v;
+    if (TAPE_KEYS.includes(k) && !S.taped.includes(k)) { S.taped.push(k); delete S.est[k]; const f = el.closest('.field'); if (f) { f.classList.remove('needs-tape'); const t = f.querySelector('.tape'); if (t) t.outerHTML = '<span class="tape ok"><i class="ph ph-check" aria-hidden="true"></i>Checked with a tape</span>'; } }
     if (k === 'priceSheet') { clearTimeout(liveTimer); liveTimer = setTimeout(() => { compute(); renderBar(); saveDraft(); const p = $('.summary'); if (p) render(); }, 500); return; }
     liveUpdate();
   }

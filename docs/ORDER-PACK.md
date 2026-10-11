@@ -1,6 +1,6 @@
 # Order pack: what a cutting partner receives
 
-CutList Pro turns a customer's design into two files. This page is for cutting services: it says exactly what is in them, so an order can be cut, drilled, edged and delivered without a back-and-forth quote.
+Made to Fit turns a customer's design into two files. This page is for cutting services: it says exactly what is in them, so an order can be cut, drilled, edged and delivered without a back-and-forth quote.
 
 ## 1. Cut list (`<project>-CNC.csv`)
 

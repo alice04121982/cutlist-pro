@@ -1,0 +1,190 @@
+<title>Made to Fit Logos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Fraunces:opsz,wght,SOFT@9..144,600,100&family=Outfit:wght@500;600&family=Saira+Stencil+One&family=Schibsted+Grotesk:wght@800&family=Unbounded:wght@600&family=Familjen+Grotesk:wght@700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a logo study sheet. Typeface strip first (the question asked), then four concept boards, each a row of applications in the Chalk Line palette. */
+:root{
+  --paper:#F4F6F8; --card:#FFFFFF; --ink:#0E1726; --ink-2:#4A5568; --ink-3:#6B7689; --rule:#DCE1E8;
+  --chalk:#1E4FD8; --tape:#FFD23F; --birch:#E2D3B5; --night:#0B1220; --night-2:#131C2E; --chalk-lt:#6B95FF;
+  --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --bric:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#0B1220;--card:#131C2E;--ink:#E8EDF5;--ink-2:#A3AEC2;--ink-3:#7F8BA2;--rule:#24304A;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0B1220;--card:#131C2E;--ink:#E8EDF5;--ink-2:#A3AEC2;--ink-3:#7F8BA2;--rule:#24304A;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;padding-inline:clamp(16px,4vw,48px);padding-block:40px 80px}
+.wrap{max-width:1200px;margin:0 auto;display:grid;gap:64px}
+h1,h2,h3{font-family:var(--bric);margin:0;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:clamp(34px,5vw,56px);line-height:1.02;font-weight:800}
+h2{font-size:clamp(26px,3.2vw,36px);font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0;max-width:65ch;color:var(--ink-2)}
+p strong{color:var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.intro{display:grid;gap:16px}
+.rec{font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;background:var(--tape);color:#0E1726;margin-left:10px;vertical-align:middle;letter-spacing:0}
+
+/* Typeface strip */
+.faces{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+@media (max-width:760px){.faces{grid-template-columns:1fr}}
+.face{background:var(--card);padding:22px 22px 18px;display:grid;gap:10px;min-width:0}
+.face .sample{font-size:clamp(34px,4.4vw,48px);line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:clip}
+.face .meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+.face .meta b{font-size:14px}
+.face .meta span{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.face p{font-size:14px}
+.verdict{font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:4px}
+.v-yes{background:rgba(30,79,216,.12);color:var(--chalk)}
+.v-no{background:var(--rule);color:var(--ink-2)}
+
+/* Concept boards */
+.concept{display:grid;gap:18px;padding-top:28px;border-top:1px solid var(--rule)}
+.board{display:grid;grid-template-columns:1.6fr 1fr 1fr;grid-template-rows:auto auto;gap:10px}
+@media (max-width:860px){.board{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.board{grid-template-columns:1fr}}
+.tile{position:relative;border-radius:10px;min-height:200px;display:grid;place-items:center;padding:28px 20px 34px;overflow:hidden;min-width:0;border:1px solid var(--rule)}
+.tile .lbl{position:absolute;left:14px;bottom:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+.t-paper{background:#F4F6F8;color:#0E1726}.t-paper .lbl{color:#6B7689}
+.t-chalk{background:#1E4FD8;color:#FFFFFF;border-color:#1E4FD8}.t-chalk .lbl{color:rgba(255,255,255,.7)}
+.t-night{background:#0B1220;color:#E8EDF5;border-color:#24304A}.t-night .lbl{color:#7F8BA2}
+.t-birch{background:#E2D3B5;color:#0E1726;border-color:#D2C09C}.t-birch .lbl{color:#6E5A3A}
+.big{grid-row:span 2;min-height:420px}
+@media (max-width:860px){.big{grid-column:1/-1;grid-row:auto;min-height:260px}}
+.icons{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;justify-content:center}
+.ic{display:grid;place-items:center;border-radius:22%}
+.ic svg{width:64%;height:64%}
+.ic.s88{width:88px;height:88px}.ic.s56{width:56px;height:56px}.ic.s32{width:32px;height:32px;border-radius:7px}.ic.s18{width:18px;height:18px;border-radius:4px}
+.ic.cb{background:#1E4FD8}.ic.cy{background:#FFD23F}.ic.cn{background:#0B1220;box-shadow:inset 0 0 0 1px #24304A}
+
+/* Header mock */
+.hdr{width:100%;max-width:340px;background:#FFFFFF;border-radius:8px;border:1px solid #DCE1E8;padding:12px 14px;display:flex;align-items:center;gap:10px;color:#0E1726}
+.hdr .go{margin-left:auto;background:#1E4FD8;color:#fff;font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:5px;white-space:nowrap}
+.hdr .lockup{font-size:17px}
+
+/* Wordmarks */
+.lockup{display:inline-flex;align-items:center;gap:.4em;line-height:1;white-space:nowrap}
+.lockup svg{height:1.15em;width:auto;flex:none}
+.wm{font-size:1em}
+/* A: the dimension "to" */
+.wm-a{font-family:var(--bric);font-weight:800;letter-spacing:-.045em;display:inline-flex;align-items:baseline}
+.dim{position:relative;display:inline-block;width:1.7em;height:.72em;margin:0 .12em}
+.dim::before{content:"";position:absolute;left:0;right:0;bottom:.12em;border-bottom:.07em solid currentColor}
+.dim::after{content:"";position:absolute;left:0;right:0;bottom:.02em;height:.42em;border-left:.07em solid currentColor;border-right:.07em solid currentColor}
+.dim i{position:absolute;left:50%;bottom:.24em;transform:translateX(-50%);font-family:var(--mono);font-style:normal;font-weight:600;font-size:.44em;letter-spacing:0;background:var(--tape);color:#0E1726;padding:.05em .3em;border-radius:.15em}
+/* B: m cupboard */
+.wm-b{font-family:"Outfit","Helvetica Neue",Arial,sans-serif;font-weight:600;letter-spacing:-.03em}
+/* C: snug fit, warm serif */
+.wm-c{font-family:"Fraunces",Georgia,serif;font-weight:600;font-variation-settings:"SOFT" 100,"opsz" 96;letter-spacing:-.025em}
+/* D: stencil */
+.wm-d{font-family:"Saira Stencil One","Arial Narrow",sans-serif;letter-spacing:.02em;text-transform:uppercase}
+
+.coverA{font-size:clamp(46px,6vw,76px)}
+.coverM{font-size:clamp(34px,4vw,46px)}
+.stack{display:grid;gap:14px;justify-items:center;text-align:center}
+.small{font-family:var(--mono);font-size:12px}
+
+/* Application: the measure tag on a photo */
+.photo{width:100%;max-width:300px;aspect-ratio:4/3;border-radius:8px;overflow:hidden;position:relative;background:#EDE7DC}
+.photo svg{position:absolute;inset:0;width:100%;height:100%}
+
+.why{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media (max-width:760px){.why{grid-template-columns:1fr}}
+.why div{border-top:2px solid var(--rule);padding-top:10px;display:grid;gap:4px;align-content:start;min-width:0}
+.why p{font-size:14.5px}
+.end{display:grid;gap:12px}
+footer p{font-size:14px;color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+<section class="intro">
+  <span class="eyebrow">Made to Fit · logo rethink · Chalk Line palette</span>
+  <h1>Four new logo ideas, and the right typeface for them</h1>
+  <p>The first mark (camera brackets around a dimension line) said "photo app" more than "cupboard", and the bold grotesque made the name feel like any other startup. <strong>These four start from the name itself:</strong> the word "to" is a measurement, the letter m is already a cupboard, a box can fit snugly under a roof, and timber gets marked with a stencil.</p>
+</section>
+
+<section class="intro">
+  <span class="eyebrow">Step 1 · Typeface</span>
+  <h2>"made to fit" in eight typefaces</h2>
+  <p>The name is three short words, so the typeface does most of the work. Lowercase reads friendly and approachable; the best faces have a little character in the a, t and f without becoming cute.</p>
+  <div class="faces" id="faces"></div>
+</section>
+
+<div id="concepts" class="wrap"></div>
+
+<section class="end">
+  <span class="eyebrow">Recommendation</span>
+  <h2>Concept A, "the dimension", in Bricolage Grotesque</h2>
+  <p>It is the only one where the name and the product are the same idea: the word "to" becomes a measurement between "made" and "fit", which is exactly what the app does with your photo. The dimension line with its yellow tag works alone as the app icon, and it reuses the measure tag you will see on every design. <strong>Concept B</strong> (the m cupboard) is the strongest standalone symbol if you would rather have a classic icon plus name.</p>
+  <p>Next step once you choose: final drawing as outlined SVG (so it no longer depends on a web font), favicon and app icon set, then the header on the site.</p>
+</section>
+<footer><p>Draft logos for choosing a direction. All fonts are free (SIL Open Font License) from Google Fonts.</p></footer>
+</div>
+
+<script>
+const FACES = [
+ ["Bricolage Grotesque","'Bricolage Grotesque'",800,"-.045em","Workshop warmth with sharp, slightly quirky details. Friendly without being soft.","yes","Best fit"],
+ ["Outfit","'Outfit'",600,"-.03em","Clean geometric. Very easy to read at small sizes; needs the symbol to carry personality.","yes","Good with a symbol"],
+ ["Fraunces (soft)","'Fraunces'",600,"-.025em","Warm, homely serif. Feels like interiors and craft, not software.","yes","Warm option"],
+ ["Saira Stencil","'Saira Stencil One'",400,".02em","Spray-stencilled on a timber crate. Very workshop; strong in caps, harder in long copy.","yes","Bold option"],
+ ["Familjen Grotesk","'Familjen Grotesk'",700,"-.035em","The first-round face. Competent but anonymous; this is the one that felt wrong.","no","Replace"],
+ ["Schibsted Grotesk","'Schibsted Grotesk'",800,"-.04em","Newspaper-strong. Confident, but reads as media rather than home.","no","Too newsy"],
+ ["Unbounded","'Unbounded'",600,"-.02em","Wide and techy. Memorable, but leans crypto and gaming.","no","Wrong world"],
+ ["Instrument Sans","'Instrument Sans'",600,"-.03em","Good for body text across the app. Too plain to be the name.","no","Body text"]
+];
+document.getElementById("faces").innerHTML = FACES.map(f=>`<div class="face"><div class="sample" style="font-family:${f[1]},sans-serif;font-weight:${f[2]};letter-spacing:${f[3]}${f[0].startsWith("Fraunces")?";font-variation-settings:'SOFT' 100,'opsz' 96":""}">made to fit</div><div class="meta"><b>${f[0]}</b><span class="verdict ${f[5]==="yes"?"v-yes":"v-no"}">${f[6]}</span></div><p>${f[4]}</p></div>`).join("");
+
+// Symbols on a 64 grid. c = main colour, t = tape yellow accent, bg = cut-out colour.
+const S = {
+  a:(c,t)=>`<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 22v26M56 22v26" stroke="${c}" stroke-width="6" stroke-linecap="square"/><path d="M8 40h48" stroke="${c}" stroke-width="5"/><rect x="19" y="17" width="26" height="16" rx="2.5" fill="${t}"/></svg>`,
+  b:(c,bg)=>`<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M6 58V10h32l20 20v28H47V34L38 25h-1v33H27V21H17v37z" fill="${c}"/></svg>`,
+  c:(c,t)=>`<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M6 60V6h24l28 28v26" fill="none" stroke="${c}" stroke-width="4.5"/><path d="M14 60V14h12.5L50 37.5V60z" fill="${t}"/><path d="M14 37h36" stroke="${c}" stroke-width="3"/></svg>`,
+  d:(c,bg)=>`<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M6 56V8h12l14 22L46 8h12v48H47V27L36 44h-8L17 27v29z" fill="${c}"/><path d="M0 22h64M0 42h64" stroke="${bg}" stroke-width="3.5"/></svg>`
+};
+
+const WM = {
+  a:(sz)=>`<span class="wm wm-a">made<span class="dim"><i>to</i></span>fit</span>`,
+  b:()=>`<span class="wm wm-b">made to fit</span>`,
+  c:()=>`<span class="wm wm-c">made to fit</span>`,
+  d:()=>`<span class="wm wm-d">made to fit</span>`
+};
+
+// The photo application: an eaves space with the measure tag in the concept's style.
+const photo = k => `<div class="photo"><svg viewBox="0 0 300 225" aria-hidden="true"><rect width="300" height="225" fill="#EDE7DC"/><path d="M0 0h140l160 120v105H0z" fill="#F7F3EC"/><path d="M140 0l160 120" stroke="#CFC6B6" stroke-width="2"/><path d="M0 196h300" stroke="#CFC6B6" stroke-width="2"/><path d="M30 196V96h110l60 46v54z" fill="#E2D3B5" stroke="#A88E62" stroke-width="2"/><path d="M85 96v100M140 96v100" stroke="#A88E62" stroke-width="2"/><path d="M30 80h110" stroke="#1E4FD8" stroke-width="2.5"/><path d="M30 72v16M140 72v16" stroke="#1E4FD8" stroke-width="2.5"/><rect x="60" y="62" width="50" height="18" rx="3" fill="#FFD23F"/><text x="85" y="75" text-anchor="middle" font-family="IBM Plex Mono" font-weight="600" font-size="11" fill="#0E1726">1200</text><g transform="translate(244 14)"><rect width="44" height="44" rx="10" fill="#1E4FD8"/><g transform="translate(8 8) scale(.44)">${S[k]("#FFFFFF", k==="a"||k==="c"?"#FFD23F":"#1E4FD8").replace(/<\/?svg[^>]*>/g,"")}</g></g></svg></div>`;
+
+const C = [
+ {k:"a", n:"A", rec:true, title:"The dimension", font:"Bricolage Grotesque",
+  idea:"\"to\" becomes a measurement. The space between \"made\" and \"fit\" is drawn as a dimension line, with \"to\" on the yellow tag where a size would normally sit. The name reads normally, and it shows what the app does.",
+  why:[["Meaning","The logo is the product: a measured gap, filled exactly."],["Icon","Clean and ownable, but at small sizes it can read as a bed. The final drawing should lengthen the line and shorten the ticks to fix that."],["System","The same yellow tag marks every measurement in the app, so the brand repeats on every screen."]]},
+ {k:"b", n:"B", title:"The m cupboard", font:"Outfit",
+  idea:"A lowercase m is already a cupboard: two bays with three uprights. Give its right shoulder a roof slope and it becomes the eaves cupboard that started this. Strong as a standalone symbol beside a calm geometric name.",
+  why:[["Meaning","Letter, cupboard and sloped ceiling in one shape."],["Icon","Solid and bold, the most legible at 16px of the four."],["System","Works as a pattern of bays on packaging and the order pack."]]},
+ {k:"c", n:"C", title:"Snug fit", font:"Fraunces (soft)",
+  idea:"A sloped space drawn as an outline, with a yellow cupboard sitting snugly inside it and one shelf line. Paired with a soft serif, it feels like interiors and home, the warmest of the four.",
+  why:[["Meaning","Says \"fits your space\" at a glance, and reads as a house."],["Icon","Two layers; the outline thins out below 24px."],["System","Suits a lifestyle, Instagram-led brand; less techy."]]},
+ {k:"d", n:"D", title:"Stencil", font:"Saira Stencil",
+  idea:"Made to Fit stencilled in caps, the way timber and crates are marked in a workshop. The symbol is a stencilled M cut by two chalk lines. Bold, practical and the most distinctive in a feed.",
+  why:[["Meaning","Says \"real workshop\", great for the DIY audience."],["Icon","Very strong, but the M alone does not say cupboard."],["System","Can feel tough rather than welcoming to nervous first-timers."]]}
+];
+
+document.getElementById("concepts").innerHTML = C.map(c=>{
+  const onBlue = c.k==="a"||c.k==="c" ? S[c.k]("#FFFFFF","#FFD23F") : S[c.k]("#FFFFFF","#1E4FD8");
+  const onPaper = S[c.k]("#1E4FD8", c.k==="a"||c.k==="c" ? "#FFD23F" : "#F4F6F8");
+  const onNight = S[c.k]("#6B95FF", c.k==="a"||c.k==="c" ? "#FFD23F" : "#0B1220");
+  const onYellow = S[c.k]("#0E1726", c.k==="a"||c.k==="c" ? "#FFFFFF" : "#FFD23F");
+  const cover = c.k==="a"
+    ? `<div class="lockup coverA">${WM.a()}</div>`
+    : `<div class="stack"><div class="lockup coverM" style="color:#0E1726">${onPaper}${WM[c.k]()}</div></div>`;
+  return `<section class="concept" aria-labelledby="c-${c.k}">
+  <div style="display:grid;gap:8px"><span class="eyebrow">Concept ${c.n} · ${c.font}</span><h2 id="c-${c.k}">${c.title}${c.rec?'<span class="rec">Recommended</span>':""}</h2></div>
+  <p>${c.idea}</p>
+  <div class="board">
+    <div class="tile t-paper big">${cover}<span class="lbl">Primary logo</span></div>
+    <div class="tile t-chalk"><div class="lockup" style="font-size:${c.k==="a"?34:26}px;color:#fff">${c.k==="a"?"":onBlue}${WM[c.k]()}</div><span class="lbl">Reversed</span></div>
+    <div class="tile t-night"><div class="icons"><div class="ic s88 cb">${onBlue}</div><div class="ic s56 cn">${onNight}</div><div class="ic s32 cy">${onYellow}</div><div class="ic s18 cb">${onBlue}</div></div><span class="lbl">App icon and favicon</span></div>
+    <div class="tile t-birch"><div class="hdr"><div class="lockup" style="${c.k==="a"?"font-size:21px":""}">${c.k==="a"?"":S[c.k]("#1E4FD8", c.k==="c"?"#FFD23F":"#FFFFFF")}${WM[c.k]()}</div><span class="go">Start with a photo</span></div><span class="lbl">Site header</span></div>
+    <div class="tile t-paper">${photo(c.k)}<span class="lbl">In the app</span></div>
+  </div>
+  <div class="why">${c.why.map(w=>`<div><h3>${w[0]}</h3><p>${w[1]}</p></div>`).join("")}</div>
+</section>`;}).join("");
+</script>
