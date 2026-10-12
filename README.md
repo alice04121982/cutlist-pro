@@ -63,6 +63,6 @@ Permissions-Policy: camera=(self), geolocation=(), microphone=(), xr-spatial-tra
 
 ## Credits
 
-The home page loft scene is drawn in code (`heroScene()` in `app.js`). Design tile photo by Andrea Davis on Unsplash.
+The home page loft scene and the under-eaves design tile are pencil sketches drawn in code (`heroScene()` in `app.js`).
 
 Prices are estimates. Always check measurements before you order.

@@ -35,11 +35,11 @@ Used at home, often on a phone in the space itself (taking the photo, measuring 
 - Name: Made to Fit. The logo is fixed: the "m" cupboard mark (`assets/icon.svg`, `.brand-mark` in `index.html`) and the lowercase "made to fit" wordmark in Outfit 600. Only its colour may change (confirmed 12 October 2026).
 - Fonts already used by sibling products are off limits: Bricolage Grotesque and Hanken Grotesk (IVF app), Archivo (Stay Prepared).
 - No em dashes in copy; ranges use "to".
-- Current look (Chalk Line blue, coral measure tag, Outfit headings) is rejected as generic SaaS (12 October 2026). Earlier explorations live in `docs/brand/`.
+- Look and feel: the "Drafting table" direction with a pencil-sketch feel, chosen 12 October 2026 (`docs/brand/look-and-feel.html`, option 3). The earlier Chalk Line look was rejected as generic SaaS. Earlier explorations live in `docs/brand/`.
 
 ## Evidence on Hand
 
-No testimonials, user counts, press or reviews exist. The safety rules and sources are in `docs/SAFETY.md`; the order file format in `docs/ORDER-PACK.md`. The only photo asset is `assets/aframe.jpg` (Unsplash). Do not invent customers, savings figures beyond the carpenter range above, or build counts.
+No testimonials, user counts, press or reviews exist. The safety rules and sources are in `docs/SAFETY.md`; the order file format in `docs/ORDER-PACK.md`. There are no photos of real builds; the home page and design tile use pencil sketches drawn in code. Do not invent customers, savings figures beyond the carpenter range above, or build counts.
 
 ## Product Principles
 
