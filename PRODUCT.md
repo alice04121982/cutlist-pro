@@ -32,7 +32,7 @@ Used at home, often on a phone in the space itself (taking the photo, measuring 
 
 ## Brand Commitments
 
-- Name: Made to Fit. Lowercase lockup explored; no final mark yet.
+- Name: Made to Fit. The logo is fixed: the "m" cupboard mark (`assets/icon.svg`, `.brand-mark` in `index.html`) and the lowercase "made to fit" wordmark in Outfit 600. Only its colour may change (confirmed 12 October 2026).
 - Fonts already used by sibling products are off limits: Bricolage Grotesque and Hanken Grotesk (IVF app), Archivo (Stay Prepared).
 - No em dashes in copy; ranges use "to".
 - Current look (Chalk Line blue, coral measure tag, Outfit headings) is rejected as generic SaaS (12 October 2026). Earlier explorations live in `docs/brand/`.
