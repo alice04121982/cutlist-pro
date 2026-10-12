@@ -12,11 +12,11 @@ Nervous first-time builders: UK homeowners with an awkward space (under the eave
 
 ## Product Purpose
 
-Made to Fit turns a photo of an awkward space into a fitted cupboard you can build yourself: the space is measured on the photo, a design is chosen and previewed on that photo, and the product produces exact cuts, sheet layouts, a picture manual and a supplier-ready order. Success is a first-timer finishing a cupboard that fits, at the price of the board rather than the £2,000 to £3,000 a carpenter charges.
+Made to Fit turns a photo of an awkward space into a fitted cupboard you can build yourself: the photo gives a first guess at the sizes, every size is then confirmed with a tape measure before anything is ordered, a design is chosen and previewed on that photo, and the product produces exact cuts, sheet layouts, a picture manual and a supplier-ready order. Success is a first-timer finishing a cupboard that fits, at the price of the board rather than the £2,000 to £3,000 a carpenter charges.
 
 ## Positioning
 
-The photo of the reader's own space is the starting point and the proof: the design is measured on it, previewed on it, then broken into boxes that fit up the stairs and onto one sheet each. Cut-list tools start from a spreadsheet; this starts from the room.
+The photo of the reader's own space is the starting point and the proof: the design is sketched and previewed on it, sized from tape measurements the user confirms, then broken into boxes that fit up the stairs and onto one sheet each. Cut-list tools start from a spreadsheet; this starts from the room.
 
 ## Operating Context
 
@@ -47,6 +47,7 @@ No testimonials, user counts, press or reviews exist. The safety rules and sourc
 2. Make a first-timer feel capable: show the next step, never the whole trade.
 3. Exact and honest: measurements, prices and safety limits are specific and sourced.
 4. Privacy by default: photos never leave the device.
+5. Never claim the photo measures the space. A photo or AR reading is a first guess; the customer confirms every size with a tape before the order pack goes out (confirmed 12 October 2026).
 
 ## Accessibility & Inclusion
 
