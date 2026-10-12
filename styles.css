@@ -83,8 +83,9 @@ button,input,select{font:inherit;color:inherit}
 .skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--pill);text-decoration:none}
 .skip:focus{top:12px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{width:100%;max-width:1240px;margin:0 auto;padding-left:16px;padding-right:16px}
-@media(min-width:768px){.wrap{padding-left:32px;padding-right:32px}}
+/* Full width: the page gutter is the only side space, 16px on phones up to 48px on wide screens */
+:root{--gutter:clamp(16px,3vw,48px)}
+.wrap{width:100%;margin:0 auto;padding-left:var(--gutter);padding-right:var(--gutter)}
 .mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 /* ---------- Buttons ---------- */
@@ -95,11 +96,11 @@ button,input,select{font:inherit;color:inherit}
 .btn-lg{min-height:52px;padding:0 24px;font-size:16px}
 .btn-primary{background:var(--accent);color:var(--on-accent)}
 .btn-primary:hover{background:var(--accent-hover)}
-.btn-ghost{background:transparent;border-color:var(--line-2);color:var(--ink)}
-.btn-ghost:hover{border-color:var(--ink-3);background:var(--surface)}
+.btn-ghost{background:var(--surface);border-color:var(--line-2);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--ink-3);background:var(--surface-2)}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
-.icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:var(--pill);border:1px solid var(--line-2);background:transparent;cursor:pointer}
-.icon-btn:hover{background:var(--surface)}
+.icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:var(--pill);border:1px solid var(--line-2);background:var(--surface);cursor:pointer}
+.icon-btn:hover{background:var(--surface-2)}
 .icon-btn i{font-size:18px}
 .link-btn{background:none;border:0;padding:6px 2px;color:var(--accent-ink);font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .chip{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border-radius:var(--pill);border:1px solid var(--line-2);background:var(--surface);font-weight:600;font-size:14px;cursor:pointer;transition:border-color .2s,background .2s}
@@ -114,8 +115,7 @@ button,input,select{font:inherit;color:inherit}
 
 /* ---------- Nav ---------- */
 .nav{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
-.nav-in{display:flex;align-items:center;gap:16px;height:var(--nav-h);max-width:1440px;margin:0 auto;padding:0 16px}
-@media(min-width:768px){.nav-in{padding:0 24px}}
+.nav-in{display:flex;align-items:center;gap:16px;height:var(--nav-h);margin:0 auto;padding:0 var(--gutter)}
 .brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;cursor:pointer}
 /* Logo: the m is a two-bay cupboard with a sloped (eaves) shoulder */
 .brand-mark{width:26px;height:26px;flex:none;color:var(--accent)}
@@ -187,7 +187,7 @@ body[data-view="plan"] .home-only{display:none!important}
 .ov-dim-h{right:6px;top:50%;transform:translateY(-50%)}
 .hero-stats{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
 @media(min-width:560px){.hero-stats{grid-template-columns:repeat(3,1fr)}}
-.hero-stats li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);font-size:13px;line-height:1.35;color:var(--ink-2)}
+.hero-stats li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);font-size:13px;line-height:1.35;color:var(--ink-2)}
 .hero-stats strong{display:block;color:var(--ink);font-size:14px}
 .hero-stats i{font-size:20px;color:var(--accent);margin-top:1px}
 .on-photo .rl{stroke:#fff;stroke-width:var(--sw,6)}
@@ -197,11 +197,11 @@ body[data-view="plan"] .home-only{display:none!important}
 .how h2,.designs h2{font-size:clamp(38px,5.6vw,76px);line-height:.98;letter-spacing:-.035em;max-width:20ch}
 .rail{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,78%);gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px;scrollbar-width:thin}
 @media(min-width:900px){.rail{grid-auto-flow:row;grid-template-columns:repeat(4,1fr);overflow:visible}}
-.rail-item{scroll-snap-align:start;padding:12px 0 0;border-top:2px solid var(--ink)}
-.rail-img{display:block;width:100%;height:auto;max-width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:var(--r);background:var(--surface-2);filter:saturate(.85)}
+.rail-item{scroll-snap-align:start;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:var(--r);overflow:hidden;padding-bottom:16px}
+.rail-img{display:block;width:100%;height:auto;max-width:100%;aspect-ratio:3/2;object-fit:cover;background:var(--surface-2);filter:saturate(.85)}
 .rail-item i{font-size:28px;color:var(--accent-ink)}
-.rail-item h3{font-size:clamp(26px,2.4vw,34px);margin-top:10px}
-.rail-item p{margin-top:4px;color:var(--ink-2);max-width:32ch}
+.rail-item h3{font-size:clamp(26px,2.4vw,34px);margin-top:12px;padding:0 16px}
+.rail-item p{margin-top:4px;padding:0 16px;color:var(--ink-2);max-width:36ch}
 
 /* ---------- Designs bento ---------- */
 .designs{padding-top:28px;padding-bottom:32px}
@@ -211,7 +211,7 @@ body[data-view="plan"] .home-only{display:none!important}
 .tile i{font-size:30px;margin-bottom:auto;color:var(--accent-ink)}
 .tile-title{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.01em;line-height:1.1}
 .tile-text{font-size:14px;color:var(--ink-2)}
-.tile-tint{background:var(--accent-wash);border-color:transparent}
+.tile-tint{background:linear-gradient(var(--accent-wash),var(--accent-wash)),var(--surface);border-color:transparent}
 .tile-ink{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .tile-ink .tile-text{color:color-mix(in srgb,var(--bg) 75%,transparent)}
 .tile-ink i{color:inherit}
@@ -231,14 +231,15 @@ body[data-view="plan"] .home-only{display:none!important}
 .trade{display:grid;gap:16px;padding-top:28px;padding-bottom:28px;border-top:1px solid var(--line)}
 @media(min-width:900px){.trade{grid-template-columns:7fr 5fr;gap:56px;align-items:end}}
 .trade h2{font-size:clamp(36px,5vw,68px);line-height:.98;letter-spacing:-.035em}
-.trade-copy p{margin-top:14px;color:var(--ink-2);max-width:52ch}
+.trade-copy p{margin-top:14px;color:var(--ink-2);max-width:52ch;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;width:fit-content}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
-.note-card{display:flex;gap:14px;align-items:flex-start;padding:20px;border-radius:var(--r);background:var(--warn-wash);color:var(--ink)}
+.note-card{display:flex;gap:14px;align-items:flex-start;padding:20px;border-radius:var(--r);background:linear-gradient(var(--warn-wash),var(--warn-wash)),var(--surface);color:var(--ink)}
 .note-card i{font-size:26px;color:var(--warn);flex:none}
 .note-card p{font-size:15px}
 
 /* ---------- Privacy + footer ---------- */
 .privacy{display:flex;gap:18px;align-items:flex-start;padding-top:24px;padding-bottom:24px;border-top:1px solid var(--line)}
+.privacy>div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 20px;flex:1;min-width:0}
 .privacy>i{font-size:34px;color:var(--ok);flex:none}
 .privacy h2{font-size:clamp(28px,3.4vw,44px);letter-spacing:-.03em}
 .privacy ul{margin:12px 0 0;padding-left:18px;color:var(--ink-2);display:grid;gap:4px}
@@ -253,7 +254,7 @@ body[data-view="plan"] .home-only{display:none!important}
 
 /* ---------- Planner ---------- */
 .stepper{position:sticky;top:var(--nav-h);z-index:30;background:var(--bg);border-bottom:1px solid var(--line)}
-.stepper ol{list-style:none;margin:0 auto;padding:10px 16px;display:flex;gap:6px;max-width:1440px;overflow-x:auto;scrollbar-width:none}
+.stepper ol{list-style:none;margin:0 auto;padding:10px var(--gutter);display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .stepper ol::-webkit-scrollbar{display:none}
 @media(min-width:768px){.stepper ol{padding:12px 24px;gap:8px}}
 .step-btn{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 14px 0 6px;border-radius:var(--pill);border:1px solid transparent;background:transparent;cursor:pointer;font-weight:600;font-size:14px;color:var(--ink-3);white-space:nowrap}
@@ -263,7 +264,7 @@ body[data-view="plan"] .home-only{display:none!important}
 .step-btn.done .n{background:var(--accent);color:var(--on-accent)}
 .step-btn:hover{color:var(--ink)}
 
-.plan{max-width:1440px;margin:0 auto;padding:16px 16px calc(var(--bar-h) + 24px);display:grid;gap:20px}
+.plan{margin:0 auto;padding:16px var(--gutter) calc(var(--bar-h) + 24px);display:grid;gap:20px}
 @media(min-width:1024px){
   .plan{grid-template-columns:minmax(0,1fr) 420px;padding:24px 24px calc(var(--bar-h) + 24px);gap:28px;align-items:start}
   .stage-col{position:sticky;top:calc(var(--nav-h) + 76px)}
@@ -353,7 +354,7 @@ details.more .fields{margin-top:12px}
 @media(max-width:520px){.plan-bar [data-action="prev"] span{display:none}.plan-bar [data-action="prev"]{padding:0 14px}}
 
 /* ---------- Wide pages (cut list, build, order) ---------- */
-.page{max-width:1180px;margin:0 auto;width:100%}
+.page{margin:0 auto;width:100%}
 .page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
 .page-head h2{font-size:clamp(30px,4vw,44px)}
 .page-head p{color:var(--ink-2);margin-top:8px;max-width:60ch}
@@ -810,3 +811,13 @@ dialog.ask{width:min(620px,100%)}
   .ol-row,.ol-head{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) 40px;gap:6px}
   .ol-num{width:24px;height:24px}
 }
+
+/* ---------- Orange highlights (the measure colour, used as a highlighter) ----------
+   A marker stroke behind key words in headings, figure tags on the hero stats and a
+   step number on each how-it-works card. Text on orange is always ink for contrast. */
+.hl{background:linear-gradient(transparent 58%,var(--measure) 58%,var(--measure) 88%,transparent 88%);-webkit-box-decoration-break:clone;box-decoration-break:clone;padding:0 .06em}
+.hero-stats strong{display:table;background:var(--measure);color:var(--on-measure);font-family:var(--mono);font-size:13px;font-weight:500;padding:1px 7px;border-radius:2px;margin-bottom:3px;font-variant-numeric:tabular-nums}
+.hero-stats i{color:var(--measure)}
+.rail{counter-reset:step}
+.rail-item{position:relative;counter-increment:step}
+.rail-item::before{content:"Step " counter(step);position:absolute;top:12px;left:12px;z-index:1;background:var(--measure);color:var(--on-measure);font:500 12px/1 var(--mono);padding:6px 9px;border-radius:2px}
