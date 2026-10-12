@@ -3056,6 +3056,125 @@ function heroScene(after, d, id = 'hs') {
   return s + '</svg>';
 }
 
+// Pencil sketches for the design tiles, in the hero's style: graphite edges that run past their ends,
+// blue washes, hatching, and orange dimension lines lettered by hand. Each piece is framed to fit the
+// tile, from a camera up and to the left so the side and top show. Units are mm, z away from the camera.
+const TILE_SKETCH = {
+  eaves: { label: 'Pencil sketch of under-eaves cupboards running along a loft below the sloping roof', cam: { x: 1700, y: 1200 }, bb: [-100, 1400, 0, 1500, 2600, 6200], draw(k) {
+    // Looking along the loft: knee wall on the left, roof rising to the right, cupboards running away from us
+    const D = 600, FH = 1100, KH = 450, Z0 = 2600, Z1 = 6200, ZF = 9000, ZN = 2200, n = 3, rise = (FH - KH) / D, roofY = x => KH + x * rise, X = 2600;
+    let s = k.hatch([[0, 0, ZN], [X, 0, ZN], [X, 0, ZF], [0, 0, ZF]]);
+    s += k.poly([[0, 0, ZN], [0, 0, ZF], [0, KH, ZF], [0, KH, ZN]], 'sk-paper sk-ln');
+    s += k.hatch([[0, KH, ZN], [X, roofY(X), ZN], [X, roofY(X), ZF], [0, KH, ZF]]);
+    for (let z = ZN + 1200; z <= ZF; z += 1600) s += k.edge([0, KH, z], [X, roofY(X), z], 0, 'sk-ln sk-faint');
+    s += k.edge([0, KH, ZN], [0, KH, ZF], 0) + k.edge([0, 0, ZN], [0, 0, ZF], 0);
+    s += k.poly([[D, 0, Z0], [D, 0, Z1], [D, FH, Z1], [D, FH, Z0]], 'sk-wash sk-ln sk-bold') + k.dense([[D, 0, Z0], [D, 0, Z1], [D, 70, Z1], [D, 70, Z0]]);
+    for (let i = 1; i < n; i++) { const z = Z0 + (Z1 - Z0) * i / n; s += k.edge([D, 70, z], [D, FH - 10, z], 6); }
+    for (let i = 0; i < n; i++) s += k.knob(D + 5, FH * 0.6, Z0 + (Z1 - Z0) * (i + 1) / n - 80);
+    s += k.poly([[0, 0, Z0], [D, 0, Z0], [D, FH, Z0], [0, KH, Z0]], 'sk-wash2 sk-ln sk-bold');
+    return s + '</g>' + k.dim([0, 0, Z0], [D, 0, Z0], 30, '600') + k.dim([D, 0, Z0], [D, FH, Z0], 30, '1100') + k.note(D * 0.4, KH + (FH - KH) * 0.4, Z0, 'cut to the roof', 50, -150);
+  } },
+  wardrobe: { label: 'Pencil sketch of a wardrobe with one door open on a hanging rail', cam: { x: -900, y: 2500 }, bb: [0, 1000, 0, 2000, 3000, 3600], draw(k) {
+    const W = 1000, H = 2000, Z = 3000, D = 600, P = 80, h = W / 2;
+    let s = k.box(0, W, 0, H, Z, Z + D, 'sk-wash') + k.dense([[0, 0, Z], [W, 0, Z], [W, P, Z], [0, P, Z]]);
+    s += k.dense([[h, P, Z], [W - 18, P, Z], [W - 18, H - 18, Z], [h, H - 18, Z]]);
+    s += k.poly([[h, 1780, Z], [W - 18, 1780, Z], [W - 18, 1780, Z + D - 20], [h, 1780, Z + D - 20]], 'sk-paper sk-ln');
+    s += k.edge([h, 1650, Z + 300], [W - 18, 1650, Z + 300], 0);
+    for (let x = h + 60; x < W - 60; x += 110) s += k.box(x, x + 70, 900 + (x % 3) * 60, 1610, Z + 120, Z + 480, x % 220 < 110 ? 'sk-paper' : 'sk-wash2');
+    s += k.knob(h - 50, 1050, Z);
+    const a = 105 * Math.PI / 180, dw = W - 18 - h, fx = W - 18 - dw * Math.cos(a), fz = Z - dw * Math.sin(a);
+    s += k.poly([[W - 18, P + 4, Z], [W - 18, H - 22, Z], [fx, H - 22, fz], [fx, P + 4, fz]], 'sk-wash sk-ln');
+    return s + '</g>' + k.dim([0, H, Z], [0, 0, Z], 30, '2000') + k.note(W * 0.8, 1650, Z + 300, 'hanging rail', 60, -50);
+  } },
+  shelving: { label: 'Pencil sketch of an open bookcase with books on its shelves', cam: { x: -700, y: 2400 }, bb: [0, 900, 0, 1800, 3000, 3300], draw(k) {
+    const W = 900, H = 1800, Z = 3000, D = 300, T = 18, levels = [0, 440, 880, 1320];
+    let s = k.poly([[0, 0, Z], [0, 0, Z + D], [0, H, Z + D], [0, H, Z]], 'sk-wash sk-ln');
+    s += k.dense([[T, 0, Z + D], [W - T, 0, Z + D], [W - T, H, Z + D], [T, H, Z + D]]);
+    s += k.poly([[W - T, 0, Z], [W - T, 0, Z + D], [W - T, H, Z + D], [W - T, H, Z]], 'sk-wash2 sk-ln');
+    levels.forEach((y, i) => {
+      s += k.poly([[T, y + T, Z], [W - T, y + T, Z], [W - T, y + T, Z + D], [T, y + T, Z + D]], 'sk-paper sk-ln');
+      s += k.poly([[0, y, Z], [W, y, Z], [W, y + T, Z], [0, y + T, Z]], 'sk-wash2 sk-ln');
+      let x = T + 30 + i * 40;
+      for (let b = 0; b < 6 && x < W - 150; b++) { const bw = 36 + (b * 17 + i * 11) % 30, bh = 230 + (b * 53 + i * 29) % 120; s += k.box(x, x + bw, y + T, y + T + bh, Z + 40, Z + 250, b % 3 === 1 ? 'sk-wash' : b % 3 === 2 ? 'sk-wash2' : 'sk-paper'); x += bw + 4; }
+    });
+    s += k.poly([[0, H - T, Z], [W, H - T, Z], [W, H, Z + D], [0, H, Z + D]], 'sk-paper sk-ln');
+    s += k.poly([[0, H - T, Z], [W, H - T, Z], [W, H, Z], [0, H, Z]], 'sk-wash2 sk-ln');
+    s += k.poly([[0, 0, Z], [T, 0, Z], [T, H, Z], [0, H, Z]], 'sk-paper sk-ln') + k.poly([[W - T, 0, Z], [W, 0, Z], [W, H, Z], [W - T, H, Z]], 'sk-paper sk-ln');
+    return s + '</g>' + k.dim([0, 0, Z], [W, 0, Z], 30, '900');
+  } },
+  kitchenbase: { label: 'Pencil sketch of a kitchen base unit with a drawer, door and plinth', cam: { x: -700, y: 1700 }, bb: [0, 600, 0, 910, 2980, 3560], draw(k) {
+    const W = 600, Z = 3000, D = 560, P = 100, H = 870;
+    let s = k.box(0, W, P, H, Z, Z + D, 'sk-paper') + k.dense([[0, 0, Z + 60], [W, 0, Z + 60], [W, P, Z + 60], [0, P, Z + 60]]);
+    s += k.box(-10, W + 10, H, H + 40, Z - 20, Z + D, 'sk-wash2');
+    s += k.poly([[4, H - 160, Z], [W - 4, H - 160, Z], [W - 4, H - 4, Z], [4, H - 4, Z]], 'sk-wash sk-ln');
+    s += k.poly([[4, P + 4, Z], [W - 4, P + 4, Z], [W - 4, H - 166, Z], [4, H - 166, Z]], 'sk-wash sk-ln');
+    s += k.edge([200, H - 80, Z - 10], [400, H - 80, Z - 10], 0, 'sk-ln sk-bold') + k.edge([200, H - 240, Z - 10], [400, H - 240, Z - 10], 0, 'sk-ln sk-bold');
+    return s + '</g>' + k.dim([0, H + 40, Z - 20], [W, H + 40, Z - 20], -30, '600') + k.note(W * 0.7, P * 0.5, Z + 60, 'plinth', 70, 40);
+  } },
+  kitchenwall: { label: 'Pencil sketch of a two-door wall cupboard fixed to a wall', cam: { x: -800, y: 1500 }, bb: [-200, 800, 1300, 2120, 3000, 3320], draw(k) {
+    const W = 600, Z = 3000, D = 320, y0 = 1400, y1 = 2120, h = W / 2;
+    let s = k.hatch([[-500, 1150, Z + D], [W + 500, 1150, Z + D], [W + 500, 2400, Z + D], [-500, 2400, Z + D]]);
+    s += k.box(0, W, y0, y1, Z, Z + D, 'sk-wash sk-bold');
+    s += k.edge([h, y0 + 6, Z], [h, y1 - 6, Z], 6) + k.knob(h - 40, y0 + 90, Z) + k.knob(h + 40, y0 + 90, Z);
+    s += k.edge([-200, y0 - 120, Z + D], [W + 200, y0 - 120, Z + D], 0, 'sk-ln sk-faint sk-dash');
+    return s + '</g>' + k.dim([0, y1, Z], [0, y0, Z], 30, '720') + k.note(W + 150, y0 - 120, Z + D, 'fixed to the wall', -60, 30, 'end');
+  } },
+  custom: { label: 'Pencil sketch of an odd-shaped space traced point by point', cam: { x: -300, y: 1600 }, bb: [0, 2000, 0, 1500, 3000, 3000], draw(k) {
+    const Z = 3000, o = [[0, 0], [2000, 0], [2000, 500], [1500, 500], [900, 1500], [300, 1500], [0, 1000]].map(([x, y]) => [x, y, Z]);
+    let s = k.hatch(o) + k.poly(o, 'sk-glass sk-ln sk-bold');
+    o.forEach(p => { s += k.knob(p[0], p[1], p[2]); });
+    s += k.edge([1500, 500, Z], [1500, 0, Z], 6, 'sk-ln sk-thin sk-dash');
+    return s + '</g>' + k.dim(o[0], o[1], 30, '2000') + k.dim(o[3], o[4], 30, '1170');
+  } },
+};
+
+function tileSketch(kind, id) {
+  const t = TILE_SKETCH[kind]; if (!t) return '';
+  const VW = 600, VH = 400, cam = t.cam, raw = (x, y, z) => [1000 * (x - cam.x) / z, -1000 * (y - cam.y) / z];
+  const [bx0, bx1, by0, by1, bz0, bz1] = t.bb, corners = [];
+  for (const x of [bx0, bx1]) for (const y of [by0, by1]) for (const z of [bz0, bz1]) corners.push(raw(x, y, z));
+  const xs = corners.map(c => c[0]), ys = corners.map(c => c[1]), mnx = Math.min(...xs), mny = Math.min(...ys);
+  const sc = Math.min(500 / (Math.max(...xs) - mnx), 300 / (Math.max(...ys) - mny));
+  const ox = VW / 2 - sc * (mnx + Math.max(...xs)) / 2, oy = VH / 2 - sc * (mny + Math.max(...ys)) / 2;
+  const P = (x, y, z) => { const [a, b] = raw(x, y, z); return [ox + a * sc, oy + b * sc]; };
+  const f1 = n => n.toFixed(1), pts = a => a.map(v => P(...v).map(f1).join(',')).join(' ');
+  const k = {
+    poly: (a, cls) => `<polygon points="${pts(a)}" class="${cls}"/>`,
+    hatch: a => `<polygon points="${pts(a)}" fill="url(#${id}Hatch)" class="sk-shade"/>`,
+    dense: a => `<polygon points="${pts(a)}" fill="url(#${id}Dense)" class="sk-ln"/>`,
+    edge(a, b, over = 10, cls = 'sk-ln') {
+      const [x1, y1] = P(...a), [x2, y2] = P(...b), len = Math.hypot(x2 - x1, y2 - y1) || 1, ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+      return `<line x1="${f1(x1)}" y1="${f1(y1)}" x2="${f1(x2)}" y2="${f1(y2)}" class="${cls}"/><line x1="${f1(x1 - ux * over)}" y1="${f1(y1 - uy * over)}" x2="${f1(x2 + ux * over)}" y2="${f1(y2 + uy * over)}" class="sk-ln sk-thin"/>`;
+    },
+    box(x0, x1, y0, y1, z0, z1, cls = 'sk-paper') {
+      let o = '';
+      if (cam.x < x0) o += k.poly([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], 'sk-wash sk-ln');
+      if (cam.x > x1) o += k.poly([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], 'sk-wash sk-ln');
+      if (cam.y > y1) o += k.poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], 'sk-paper sk-ln');
+      return o + k.poly([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], cls + ' sk-ln');
+    },
+    knob(x, y, z) { const [px, py] = P(x, y, z - 5); return `<circle cx="${f1(px)}" cy="${f1(py)}" r="3.5" class="sk-paper sk-ln"/>`; },
+    note(x, y, z, txt, dx, dy, anchor = 'start') { const [px, py] = P(x, y, z); return `<path d="M${f1(px)} ${f1(py)}q${f1(dx * .4)} ${f1(dy * .9)} ${f1(dx)} ${f1(dy)}" class="sk-ln sk-thin"/><text x="${f1(px + dx + (anchor === 'end' ? 4 : -4))}" y="${f1(py + dy - 8)}" text-anchor="${anchor}" class="sk-note">${txt}</text>`; },
+    dim(A, B, off, txt) {
+      const [ax, ay] = P(...A), [bx, by] = P(...B), len = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / len * off, ny = (bx - ax) / len * off;
+      const tick = (x, y) => `<line x1="${f1(x - 6)}" y1="${f1(y + 6)}" x2="${f1(x + 6)}" y2="${f1(y - 6)}" class="sk-dim sk-tick"/>`;
+      const mx = (ax + bx) / 2 + nx, my = (ay + by) / 2 + ny, ang = Math.atan2(by - ay, bx - ax) * 180 / Math.PI, rot = ang > 90 || ang < -90 ? ang + 180 : ang;
+      return `<line x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(ax + nx * 1.25)}" y2="${f1(ay + ny * 1.25)}" class="sk-dim sk-ext"/><line x1="${f1(bx)}" y1="${f1(by)}" x2="${f1(bx + nx * 1.25)}" y2="${f1(by + ny * 1.25)}" class="sk-dim sk-ext"/>`
+        + `<line x1="${f1(ax + nx)}" y1="${f1(ay + ny)}" x2="${f1(bx + nx)}" y2="${f1(by + ny)}" class="sk-dim"/>` + tick(ax + nx, ay + ny) + tick(bx + nx, by + ny)
+        + `<text transform="translate(${f1(mx)} ${f1(my)}) rotate(${f1(rot)})" y="-7" text-anchor="middle" class="sk-dimt">${txt}</text>`;
+    },
+  };
+  return `<svg viewBox="0 0 ${VW} ${VH}" class="hero-svg tile-svg" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="${id}Grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" class="sk-gridline"/></pattern>
+    <pattern id="${id}Hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" class="sk-hatchline"/></pattern>
+    <pattern id="${id}Dense" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2="4" class="sk-hatchline"/></pattern>
+    <filter id="${id}Pencil" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="1.8"/></filter>
+  </defs>
+  <rect x="-300" y="-300" width="${VW + 600}" height="${VH + 600}" class="sk-bg"/><rect x="-300" y="-300" width="${VW + 600}" height="${VH + 600}" fill="url(#${id}Grid)"/>
+  <g filter="url(#${id}Pencil)">${t.draw(k)}</svg>`;
+}
+
 // ───────────────────────── Home ─────────────────────────
 let heroBuilt = false;
 function renderHome() {
@@ -3071,6 +3190,7 @@ function renderHome() {
   const root = $('#heroCompare');
   $('#heroBefore').innerHTML = heroScene(false, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments }, 'hb');
   $('#heroOverlay').innerHTML = heroScene(true, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments }, 'ha');
+  document.querySelectorAll('[data-sketch]').forEach(el => { el.innerHTML = tileSketch(el.dataset.sketch, 'ts' + el.dataset.sketch); });
   $('#heroStats').innerHTML = `<li><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>${fmt(S.w)} x ${fmt(S.h)}</strong> checked with a tape</span></li>`
     + `<li><i class="ph ph-scissors" aria-hidden="true"></i><span><strong>${R.pieceCount} cuts</strong> from ${R.nMain} ${R.nMain === 1 ? 'sheet' : 'sheets'} of plywood</span></li>`
     + `<li><i class="ph ph-truck" aria-hidden="true"></i><span><strong>About ${gbp0(R.total)}</strong> cut and delivered</span></li>`;
