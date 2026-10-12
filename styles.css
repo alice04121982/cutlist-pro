@@ -83,8 +83,9 @@ button,input,select{font:inherit;color:inherit}
 .skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--pill);text-decoration:none}
 .skip:focus{top:12px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{width:100%;max-width:1240px;margin:0 auto;padding-left:16px;padding-right:16px}
-@media(min-width:768px){.wrap{padding-left:32px;padding-right:32px}}
+/* Full width: the page gutter is the only side space, 16px on phones up to 48px on wide screens */
+:root{--gutter:clamp(16px,3vw,48px)}
+.wrap{width:100%;margin:0 auto;padding-left:var(--gutter);padding-right:var(--gutter)}
 .mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 /* ---------- Buttons ---------- */
@@ -114,8 +115,7 @@ button,input,select{font:inherit;color:inherit}
 
 /* ---------- Nav ---------- */
 .nav{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
-.nav-in{display:flex;align-items:center;gap:16px;height:var(--nav-h);max-width:1440px;margin:0 auto;padding:0 16px}
-@media(min-width:768px){.nav-in{padding:0 24px}}
+.nav-in{display:flex;align-items:center;gap:16px;height:var(--nav-h);margin:0 auto;padding:0 var(--gutter)}
 .brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;cursor:pointer}
 /* Logo: the m is a two-bay cupboard with a sloped (eaves) shoulder */
 .brand-mark{width:26px;height:26px;flex:none;color:var(--accent)}
@@ -253,7 +253,7 @@ body[data-view="plan"] .home-only{display:none!important}
 
 /* ---------- Planner ---------- */
 .stepper{position:sticky;top:var(--nav-h);z-index:30;background:var(--bg);border-bottom:1px solid var(--line)}
-.stepper ol{list-style:none;margin:0 auto;padding:10px 16px;display:flex;gap:6px;max-width:1440px;overflow-x:auto;scrollbar-width:none}
+.stepper ol{list-style:none;margin:0 auto;padding:10px var(--gutter);display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .stepper ol::-webkit-scrollbar{display:none}
 @media(min-width:768px){.stepper ol{padding:12px 24px;gap:8px}}
 .step-btn{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 14px 0 6px;border-radius:var(--pill);border:1px solid transparent;background:transparent;cursor:pointer;font-weight:600;font-size:14px;color:var(--ink-3);white-space:nowrap}
@@ -263,7 +263,7 @@ body[data-view="plan"] .home-only{display:none!important}
 .step-btn.done .n{background:var(--accent);color:var(--on-accent)}
 .step-btn:hover{color:var(--ink)}
 
-.plan{max-width:1440px;margin:0 auto;padding:16px 16px calc(var(--bar-h) + 24px);display:grid;gap:20px}
+.plan{margin:0 auto;padding:16px var(--gutter) calc(var(--bar-h) + 24px);display:grid;gap:20px}
 @media(min-width:1024px){
   .plan{grid-template-columns:minmax(0,1fr) 420px;padding:24px 24px calc(var(--bar-h) + 24px);gap:28px;align-items:start}
   .stage-col{position:sticky;top:calc(var(--nav-h) + 76px)}
@@ -353,7 +353,7 @@ details.more .fields{margin-top:12px}
 @media(max-width:520px){.plan-bar [data-action="prev"] span{display:none}.plan-bar [data-action="prev"]{padding:0 14px}}
 
 /* ---------- Wide pages (cut list, build, order) ---------- */
-.page{max-width:1180px;margin:0 auto;width:100%}
+.page{margin:0 auto;width:100%}
 .page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
 .page-head h2{font-size:clamp(30px,4vw,44px)}
 .page-head p{color:var(--ink-2);margin-top:8px;max-width:60ch}
