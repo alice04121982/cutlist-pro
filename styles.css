@@ -811,3 +811,13 @@ dialog.ask{width:min(620px,100%)}
   .ol-row,.ol-head{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) 40px;gap:6px}
   .ol-num{width:24px;height:24px}
 }
+
+/* ---------- Orange highlights (the measure colour, used as a highlighter) ----------
+   A marker stroke behind key words in headings, figure tags on the hero stats and a
+   step number on each how-it-works card. Text on orange is always ink for contrast. */
+.hl{background:linear-gradient(transparent 58%,var(--measure) 58%,var(--measure) 88%,transparent 88%);-webkit-box-decoration-break:clone;box-decoration-break:clone;padding:0 .06em}
+.hero-stats strong{display:table;background:var(--measure);color:var(--on-measure);font-family:var(--mono);font-size:13px;font-weight:500;padding:1px 7px;border-radius:2px;margin-bottom:3px;font-variant-numeric:tabular-nums}
+.hero-stats i{color:var(--measure)}
+.rail{counter-reset:step}
+.rail-item{position:relative;counter-increment:step}
+.rail-item::before{content:"Step " counter(step);position:absolute;top:12px;left:12px;z-index:1;background:var(--measure);color:var(--on-measure);font:500 12px/1 var(--mono);padding:6px 9px;border-radius:2px}
