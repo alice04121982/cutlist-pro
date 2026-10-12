@@ -1,12 +1,12 @@
 # Made to Fit
 
-Photograph the space, pick a design, and get exact cuts, build steps and a supplier-ready order.
+Photograph the space for a first sketch, confirm every size with a tape, pick a design, and get exact cuts, build steps and a supplier-ready order.
 
 Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverless function, `api/assistant.js`, for the design assistant. No build step.
 
 ## The flow
 
-1. **Space**: pick what you are making, add a photo, measure on the photo (bank card or A4 for scale) or with AR on Android.
+1. **Space**: pick what you are making, add a photo, take a first guess at the sizes on the photo (bank card or A4 for scale) or with AR on Android, then confirm each size with a tape. The order pack only goes out once every size is confirmed.
 2. **Design**: material, doors, compartments (upright dividers), shelves per compartment, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
 3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
 4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
