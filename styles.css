@@ -2,8 +2,19 @@
    Design tokens (Drafting table, October 2026). Drafting paper with a faint grid, navy ink,
    blueprint blue for actions only, orange for measurements only. Drawings are pencil
    sketches: graphite lines, a pale blueprint wash and hand lettering (--hand) for notes on
-   drawings only. Shape rule: surfaces use --r (4px); buttons, chips and controls --pill (3px).
+   drawings only (Kalam). Type: Clash Grotesk headings, General Sans text, JetBrains Mono
+   for measurements, all from Fontshare. Shape rule: surfaces use --r (4px); buttons, chips and controls --pill (3px).
    The logo (m mark and Outfit wordmark) is fixed; only its colour follows the tokens. */
+/* Fonts from Fontshare (ITF Free Font Licence), self-hosted so the CSP stays font-src 'self'. */
+@font-face{font-family:'Clash Grotesk';font-weight:500;font-style:normal;font-display:swap;src:url(assets/fonts/ClashGrotesk-500.woff2) format('woff2')}
+@font-face{font-family:'Clash Grotesk';font-weight:600;font-style:normal;font-display:swap;src:url(assets/fonts/ClashGrotesk-600.woff2) format('woff2')}
+@font-face{font-family:'Clash Grotesk';font-weight:700 800;font-style:normal;font-display:swap;src:url(assets/fonts/ClashGrotesk-700.woff2) format('woff2')}
+@font-face{font-family:'General Sans';font-weight:400;font-style:normal;font-display:swap;src:url(assets/fonts/GeneralSans-400.woff2) format('woff2')}
+@font-face{font-family:'General Sans';font-weight:500;font-style:normal;font-display:swap;src:url(assets/fonts/GeneralSans-500.woff2) format('woff2')}
+@font-face{font-family:'General Sans';font-weight:600 800;font-style:normal;font-display:swap;src:url(assets/fonts/GeneralSans-600.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:400;font-style:normal;font-display:swap;src:url(assets/fonts/JetBrainsMono-400.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:500 700;font-style:normal;font-display:swap;src:url(assets/fonts/JetBrainsMono-500.woff2) format('woff2')}
+@font-face{font-family:'Kalam';font-weight:400;font-style:normal;font-display:swap;src:url(assets/fonts/Kalam-400.woff2) format('woff2')}
 :root{
   --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#E9EEF5; --surface-3:#DAE2ED;
   --ink:#13233F; --ink-2:#3B4B66; --ink-3:#56657F;
@@ -16,10 +27,10 @@
   --grid:rgba(29,61,115,.055); --grid-major:rgba(29,61,115,.10);
   --graphite:#3A4049; --sk-paper:#FBFCFE; --sk-wash:#DCE6F3; --sk-wash-2:#C6D5EA; --sk-hatch:rgba(58,64,73,.35);
   --el-panel:#E2D3B5; --el-panel-2:#D2BF98; --el-edge:#6E5A3A; --el-back:#EFE6D4; --el-dim:#3B4B66; --el-grid:#E2E9F3;
-  --display:'Chivo',ui-sans-serif,system-ui,sans-serif;
-  --body:'Chivo',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
-  --mono:'Chivo Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  --hand:'Architects Daughter','Comic Sans MS',cursive;
+  --display:'Clash Grotesk',ui-sans-serif,system-ui,sans-serif;
+  --body:'General Sans',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --hand:'Kalam','Comic Sans MS',cursive;
   --wordmark:'Outfit',ui-sans-serif,system-ui,sans-serif;
   --r:4px; --pill:3px;
   --nav-h:64px; --bar-h:76px;
@@ -61,7 +72,7 @@
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:calc(var(--nav-h) + 12px)}
 body{margin:0;background-color:var(--bg);background-image:linear-gradient(var(--grid-major) 1px,transparent 1px),linear-gradient(90deg,var(--grid-major) 1px,transparent 1px),linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:120px 120px,120px 120px,24px 24px,24px 24px;background-position:-1px -1px;color:var(--ink);font:16px/1.55 var(--body);-webkit-font-smoothing:antialiased;min-height:100dvh;overflow-x:hidden}
 img,svg,canvas{display:block;max-width:100%}
-h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.025em;line-height:1.05;margin:0;text-wrap:balance}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:-.025em;line-height:1.05;margin:0;text-wrap:balance}
 ::selection{background:var(--measure);color:var(--on-measure)}
 html{scrollbar-color:var(--line-2) transparent;caret-color:var(--accent)}
 p{margin:0}
@@ -135,7 +146,7 @@ body[data-view="plan"] .home-only{display:none!important}
 /* ---------- Hero ---------- */
 .hero{display:grid;gap:20px;padding-top:16px;padding-bottom:24px;align-items:center}
 @media(min-width:980px){.hero{grid-template-columns:6fr 7fr;gap:40px;padding-top:28px;padding-bottom:32px}}
-.hero h1{font-size:clamp(46px,6.6vw,96px);line-height:.95;letter-spacing:-.04em;font-weight:800}
+.hero h1{font-size:clamp(46px,6.6vw,96px);line-height:.95;letter-spacing:-.035em;font-weight:600}
 .lead{margin-top:14px;font-size:clamp(17px,1.6vw,20px);color:var(--ink-2);max-width:44ch}
 .hero-ctas{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
 .resume{margin-top:24px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:15px;color:var(--ink-2)}

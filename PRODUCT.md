@@ -35,7 +35,7 @@ Used at home, often on a phone in the space itself (taking the photo, measuring 
 - Name: Made to Fit. The logo is fixed: the "m" cupboard mark (`assets/icon.svg`, `.brand-mark` in `index.html`) and the lowercase "made to fit" wordmark in Outfit 600. Only its colour may change (confirmed 12 October 2026).
 - Fonts already used by sibling products are off limits: Bricolage Grotesque and Hanken Grotesk (IVF app), Archivo (Stay Prepared).
 - No em dashes in copy; ranges use "to".
-- Look and feel: the "Drafting table" direction with a pencil-sketch feel, chosen 12 October 2026 (`docs/brand/look-and-feel.html`, option 3). The earlier Chalk Line look was rejected as generic SaaS. Earlier explorations live in `docs/brand/`.
+- Look and feel: the "Drafting table" direction with a pencil-sketch feel, chosen 12 October 2026 (`docs/brand/look-and-feel.html`, option 3), with Fontshare type chosen the same day: Clash Grotesk headings, General Sans text, JetBrains Mono for sizes, Kalam for pencil notes on drawings. The earlier Chalk Line look was rejected as generic SaaS. Earlier explorations live in `docs/brand/`.
 
 ## Evidence on Hand
 
