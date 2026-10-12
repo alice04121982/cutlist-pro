@@ -57,6 +57,7 @@ function downloadFile(name, content, type) {
 const TEMPLATES = [
   { id: 'eaves', name: 'Under-eaves cupboard', icon: 'house-line', kind: 'cabinet' },
   { id: 'understairs', name: 'Under-stairs cupboard', icon: 'stairs', kind: 'cabinet' },
+  { id: 'custom', name: 'Sloped or odd-shaped space', icon: 'polygon', kind: 'cabinet' },
   { id: 'wardrobe', name: 'Wardrobe', icon: 'dresser', kind: 'cabinet' },
   { id: 'shelving', name: 'Open shelving', icon: 'books', kind: 'cabinet' },
   { id: 'kitchenbase', name: 'Kitchen base unit', icon: 'cooking-pot', kind: 'cabinet' },
@@ -73,6 +74,7 @@ function designName() {
   if (isBuiltIn()) return 'Built-in eaves shelving';
   if (S.template === 'eaves' && doorCount() === 0) return 'Under-eaves shelving';
   if (S.template === 'understairs' && doorCount() === 0) return 'Under-stairs shelving';
+  if (S.template === 'custom' && doorCount() === 0) return 'Shelving for a sloped or odd-shaped space';
   if (S.template === 'wardrobe' && doorCount() === 0) return 'Open wardrobe';
   if (S.template === 'shelving' && doorCount() > 0) return 'Shelving unit with doors';
   return tplOf(S.template).name;
@@ -82,6 +84,7 @@ const STRUCTURAL = new Set(['floorjoists', 'flatroof', 'pitchedroof']);
 
 const DEFAULTS = {
   understairs: { w: 2400, h: 2000, d: 800, low: 600, shelves: 2, bays: 4, spacing: 400, pitch: 0 },
+  custom: { w: 3000, h: 2100, d: 600, low: 1000, shelves: 2, bays: 5, spacing: 400, pitch: 0 },
   eaves: { w: 1800, h: 1200, d: 600, low: 700, shelves: 1, bays: 3, spacing: 400, pitch: 0 },
   shelving: { w: 800, h: 1200, d: 300, low: 0, shelves: 4, bays: 2, spacing: 400, pitch: 0 },
   wardrobe: { w: 1000, h: 2100, d: 600, low: 0, shelves: 2, bays: 2, spacing: 400, pitch: 0 },
@@ -97,6 +100,7 @@ const DEFAULTS = {
 // Measurement fields per template: [key, label, help]
 const FIELDS = {
   eaves: [['w', 'Width', 'Wall to wall along the knee wall'], ['h', 'Front height', 'Floor to sloping ceiling, where the doors go'], ['low', 'Back height', 'Height of the knee wall at the back'], ['d', 'Depth', 'Knee wall to where the doors go']],
+  custom: [['w', 'Width', 'Wall to wall, along the front where the doors go'], ['d', 'Depth', 'Back wall to the front edge']],
   understairs: [['w', 'Length', 'Along the stairs, end to end'], ['h', 'Tall end height', 'Floor to the underside of the stairs at the high end'], ['low', 'Short end height', 'Floor to the stairs at the low end'], ['d', 'Depth', 'Back wall to the front edge']],
   cabinet: [['w', 'Width', 'Wall to wall'], ['h', 'Height', 'Floor to top of the unit'], ['d', 'Depth', 'Back wall to the front edge']],
   studwall: [['w', 'Wall length', 'End to end'], ['h', 'Ceiling height', 'Floor to ceiling'], ['spacing', 'Stud centres', 'Usually 400 or 600']],
@@ -170,7 +174,8 @@ function freshState(template = 'eaves') {
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
     compartments: d.bays || 1, build: 'frame', boxes: 'auto', site: defaultSite(template), hand: 'right', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
-    unit: 'mm', done: [], ordered: false, taped: [], est: {}
+    unit: 'mm', done: [], ordered: false, taped: [], est: {},
+    outline: template === 'custom' ? defaultOutline(d.w) : null
   };
 }
 
@@ -181,8 +186,12 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'build', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered', 'taped', 'est'];
-function snapshot() { const o = {}; PERSIST.forEach(k => { o[k] = S[k]; }); o.savedAt = Date.now(); return o; }
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'build', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered', 'taped', 'est', 'outline'];
+function snapshot() {
+  const o = {}; PERSIST.forEach(k => { o[k] = S[k]; });
+  o.outline = S.template === 'custom' ? normOutline(outlinePts(), S.w) : null; // stored at the current width
+  o.savedAt = Date.now(); return o;
+}
 
 // Validate anything read from storage before it touches state
 function sanitizeProject(p) {
@@ -224,6 +233,11 @@ function sanitizeProject(p) {
   }
   if (!isCabinet(tpl)) out.material = 'c16';
   if (tpl === 'eaves' && !(out.low > 0 && out.low < out.h)) out.low = Math.round(out.h * 0.55);
+  if (tpl === 'custom') {
+    out.outline = cleanOutline(p.outline, out.w) || defaultOutline(out.w);
+    const ys = out.outline.map(q => q[1]);
+    out.h = Math.max(...ys); out.low = Math.min(...ys);
+  } else out.outline = null;
   return out;
 }
 
@@ -243,7 +257,7 @@ function saveDraft() {
 
 // ───────────────────────── Generation ─────────────────────────
 // Upright dividers split a unit into bays. Kitchen base units keep one bay (drawer above).
-const BAY_TEMPLATES = new Set(['eaves', 'understairs', 'shelving', 'wardrobe', 'kitchenwall']);
+const BAY_TEMPLATES = new Set(['eaves', 'understairs', 'custom', 'shelving', 'wardrobe', 'kitchenwall']);
 // Long units are built as separate boxes, like kitchen units: each box is a complete carcass with its
 // own sides, top, bottom and back, small enough to cut from one sheet and carry up the stairs.
 // How long a panel can be carried to where the unit is built. Lofts have tight stairs and hatches.
@@ -252,7 +266,7 @@ const SITES = {
   upstairs: { name: 'Upstairs', carry: 1800, note: 'Up a staircase and round a landing' },
   loft: { name: 'Loft or attic', carry: 1200, note: 'Narrow stairs, ladder or hatch' }
 };
-function defaultSite(t) { return t === 'eaves' ? 'loft' : t === 'understairs' ? 'ground' : 'upstairs'; }
+function defaultSite(t) { return t === 'eaves' || t === 'custom' ? 'loft' : t === 'understairs' ? 'ground' : 'upstairs'; }
 // Longest panel that can be carried in, and so the widest box
 // Why a split unit has paired sides instead of single dividers, in plain words
 function boxSideWhy(L) {
@@ -262,6 +276,7 @@ function boxSideWhy(L) {
 function maxBox() { return Math.min((SITES[S.site] || SITES.upstairs).carry, Math.max(S.sheetW, S.sheetH) - 40); }
 function layout() {
   const framed = isFramed(), th = framed ? (isBuiltIn() ? BI.fw : FR.sw) : S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
+  if (S.template === 'custom') return customLayout(framed, th);
   let C = bayTpl ? clamp(Math.round(S.compartments || 1), 1, 8) : 1;
   const widthOf = (k, bay) => 2 * th + k * bay + (k - 1) * th;
   const plan = (n, c) => {
@@ -301,27 +316,98 @@ function layout() {
     x += w;
   });
   // Name every upright. Under the stairs each one is a different height, so they are numbered.
-  const us = S.template === 'understairs', count = { boxside: 0, divider: 0 };
+  nameUprights(verticals, framed);
+  // Boxes with the same number of compartments are identical; give each kind a letter
+  const kinds = [...new Set(ks)].sort((a, b) => b - a);
+  boxes.forEach(b => { b.type = kinds.length > 1 ? String.fromCharCode(65 + kinds.indexOf(b.k)) : ''; });
+  return { n, C, bay, bayW: Math.floor(bay), boxes, bays, verticals, raised: bayTpl && C > clamp(Math.round(S.compartments || 1), 1, 8) };
+}
+// Name every upright. Under a slope each one is a different height, so they are numbered.
+function nameUprights(verticals, framed) {
+  const us = isShaped(), count = { boxside: 0, divider: 0 };
   verticals.forEach((v, i) => {
     if (framed) v.name = us ? 'Stud ' + (i + 1) : 'Stud';
     else if (v.kind === 'left') v.name = 'Left Side';
     else if (v.kind === 'right') v.name = 'Right Side';
     else { count[v.kind]++; v.name = (v.kind === 'boxside' ? 'Box Side' : 'Divider') + (us ? ' ' + count[v.kind] : ''); }
   });
-  // Boxes with the same number of compartments are identical; give each kind a letter
-  const kinds = [...new Set(ks)].sort((a, b) => b - a);
-  boxes.forEach(b => { b.type = kinds.length > 1 ? String.fromCharCode(65 + kinds.indexOf(b.k)) : ''; });
-  return { n, C, bay, bayW: Math.floor(bay), boxes, bays, verticals, raised: bayTpl && C > clamp(Math.round(S.compartments || 1), 1, 8) };
+}
+// Odd-shaped spaces: an upright stands at every change of angle, so each compartment has one straight top.
+// In a frame that is a stud centred on the change; built as boxes, each slope or flat is its own box (or
+// several, so every panel can be carried in), and boxes have their own sizes, so each is numbered.
+function customLayout(framed, th) {
+  const g = shapeGeom(), W = S.w, segs = g.segs, want = clamp(Math.round(S.compartments || 1), 1, 8);
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  // n compartments shared out by width, at least one each
+  // A part of the ceiling under 300mm wide (a beam or step) is one narrow compartment, left open
+  const narrowSeg = s => s.dx < NARROW_SEG;
+  const shareAll = (n, ws) => {
+    const tot = sum(ws) || 1, k = ws.map(w => Math.max(1, Math.floor(n * w / tot)));
+    while (sum(k) < n) { let best = 0; ws.forEach((w, i) => { if (n * w / tot - k[i] > n * ws[best] / tot - k[best]) best = i; }); k[best]++; }
+    return k;
+  };
+  const share = (n, ws, narrow) => {
+    const idx = ws.map((_, i) => i).filter(i => !narrow[i]), k = ws.map(() => 1);
+    if (idx.length) shareAll(Math.max(n, idx.length), idx.map(i => ws[i])).forEach((v, j) => { k[idx[j]] = v; });
+    return k;
+  };
+  const boxes = [], bays = [], verticals = [];
+  if (framed) {
+    const ks = share(want, segs.map(s => s.dx), segs.map(narrowSeg));
+    verticals.push({ x: 0, box: 0, kind: 'left' });
+    segs.forEach((s, i) => {
+      const last = i === segs.length - 1, l = i === 0 ? th : s.x0 + th / 2, r = last ? W - th : s.x1 - th / 2, k = ks[i];
+      const bay = Math.max(1, (r - l - (k - 1) * th) / k);
+      for (let j = 0; j < k; j++) {
+        const bx = l + j * (bay + th);
+        bays.push({ x: bx, w: bay, box: 0, seg: i, open: narrowSeg(s) });
+        if (j > 0) verticals.push({ x: bx - th, box: 0, kind: 'divider', seg: i });
+      }
+      verticals.push(last ? { x: W - th, box: 0, kind: 'right' } : { x: s.x1 - th / 2, box: 0, kind: 'divider', vertex: true });
+    });
+    boxes.push({ i: 0, x0: 0, w: W, k: sum(ks), type: '' });
+  } else {
+    const fits = (s, m) => {
+      const bw = s.dx / m, top = Math.hypot(bw, s.rise / m), backH = Math.max(s.y0, s.y1);
+      return top <= maxBox() && Math.max(bw - 4, backH) <= 2440 && Math.min(bw - 4, backH) <= 1220;
+    };
+    let ms = segs.map(s => { let m = 1; while (m < 8 && !fits(s, m)) m++; return m; });
+    const manual = S.boxes === 'auto' || S.boxes == null ? 0 : clamp(Math.round(S.boxes), 1, 16);
+    if (manual) {
+      ms = segs.map(() => 1);
+      while (sum(ms) < manual) { let best = 0; segs.forEach((s, i) => { if (s.dx / ms[i] > segs[best].dx / ms[best]) best = i; }); ms[best]++; }
+    }
+    // Box edges on whole millimetres, the outer ones on the walls
+    const edges = [];
+    segs.forEach((s, i) => { for (let j = 0; j < ms[i]; j++) edges.push({ x: i === 0 && j === 0 ? 0 : Math.round(s.x0 + j * s.dx / ms[i]), seg: i }); });
+    edges.forEach((e, i) => boxes.push({ i, x0: e.x, w: (i === edges.length - 1 ? W : edges[i + 1].x) - e.x, seg: e.seg }));
+    const ks = share(want, boxes.map(b => b.w), boxes.map(b => narrowSeg(segs[b.seg])));
+    boxes.forEach((b, i) => {
+      b.k = ks[i]; b.type = boxes.length > 1 ? String(i + 1) : ''; b.open = narrowSeg(segs[b.seg]);
+      const bay = Math.max(1, (b.w - 2 * th - (b.k - 1) * th) / b.k);
+      verticals.push({ x: b.x0, box: i, kind: i === 0 ? 'left' : 'boxside', seg: b.seg });
+      for (let j = 0; j < b.k; j++) {
+        const bx = b.x0 + th + j * (bay + th);
+        bays.push({ x: bx, w: bay, box: i, seg: b.seg, open: b.open });
+        if (j > 0) verticals.push({ x: bx - th, box: i, kind: 'divider', seg: b.seg });
+      }
+      verticals.push({ x: b.x0 + b.w - th, box: i, kind: i === boxes.length - 1 ? 'right' : 'boxside', seg: b.seg });
+    });
+  }
+  nameUprights(verticals, framed);
+  const C = bays.length, bay = Math.max(...bays.map(b => b.w)), open = segs.filter(narrowSeg).length;
+  return { n: boxes.length, C, bay, bayW: Math.floor(bay), boxes, bays, verticals, raised: C - open > want, custom: true };
 }
 // Under-stairs doors: one per compartment, overlaying the front, each with a sloping top edge
 function stairDoors() {
-  const L = layout(), sg = stairGeom(), out = [];
+  const L = layout(), sg = shapeGeom(), out = [];
   L.boxes.forEach(b => {
     const dw = Math.floor((b.w - 4 - 3 * (b.k - 1)) / b.k);
+    if (b.open) return; // the box at a beam or step stays open
     for (let j = 0; j < b.k; j++) {
       const x = b.x0 + 2 + j * (dw + 3);
       const hl = Math.round(sg.topAt(x) - 3), hr = Math.round(sg.topAt(x + dw) - 3);
-      out.push({ x, w: dw, hl, hr, hingeLeft: hl >= hr });
+      out.push({ x, w: dw, hl, hr, hingeLeft: hl >= hr, angDeg: boxSeg(sg, b).angDeg });
     }
   });
   return out;
@@ -345,7 +431,7 @@ function doorCount() {
     case 'wardrobe': return W > 1300 ? 3 : 2;
     case 'kitchenbase': case 'kitchenwall': return W > 650 ? 2 : 1;
     case 'eaves': return W <= 700 ? 1 : Math.max(2, Math.ceil(W / 700));
-    case 'understairs': return Math.max(1, Math.ceil(W / 700));
+    case 'understairs': case 'custom': return Math.max(1, Math.ceil(W / 700));
     default: return 0;
   }
 }
@@ -357,13 +443,90 @@ function calcHingePositions(doorH) {
   return names.map((label, i) => ({ label, y: Math.round(90 + (doorH - 180) * i / (n - 1)), bore: 35, depth: 13, inset: 22.5 }));
 }
 
-// Under the stairs the height changes along the length: tall at one end, short at the other.
-// topAt(x) is the underside of the stairs at x (mm from the left end).
-function stairGeom() {
-  const W = S.w, rise = Math.max(0, S.h - S.low), ang = Math.atan2(rise, W), c = Math.cos(ang) || 1;
-  const topAt = x => S.hand === 'left' ? S.low + rise * (W - x) / W : S.low + rise * x / W;
-  return { rise, ang, angDeg: Math.round(deg(ang) * 10) / 10, c, tv: S.thickness / c, topAt };
+// ── Shaped tops: under the stairs, and sloped or odd-shaped spaces ──
+// The top edge of the space seen from the front, as points [x, y]: x from the left wall, y up from the floor.
+// Under the stairs it is two points (tall at one end, short at the other). An odd-shaped space has 2 to 12.
+const SHAPED = new Set(['understairs', 'custom']);
+const isShaped = (t = S.template) => SHAPED.has(t);
+const OL = { min: 2, max: 12, gap: 100, lo: 300, hi: 3000 };
+// A part of the ceiling narrower than this is a step or beam: its compartment is left open, with no shelves or door
+const NARROW_SEG = 300;
+// Strict check for stored or pasted points: anything not exactly right is rejected
+function cleanOutline(raw, w) {
+  if (!Array.isArray(raw) || raw.length < OL.min || raw.length > OL.max) return null;
+  const pts = [];
+  for (const q of raw) {
+    if (!Array.isArray(q) || q.length !== 2 || !q.every(v => typeof v === 'number' && Number.isFinite(v))) return null;
+    pts.push([Math.round(q[0]), clamp(Math.round(q[1]), OL.lo, OL.hi)]);
+  }
+  pts.sort((a, b) => a[0] - b[0]);
+  if (pts[0][0] !== 0 || pts[pts.length - 1][0] !== Math.round(w)) return null;
+  for (let i = 1; i < pts.length; i++) if (pts[i][0] - pts[i - 1][0] < OL.gap) return null;
+  return pts;
 }
+// Lenient tidy for points the app made itself: rounds, pins the ends to the walls, drops crowded points
+function normOutline(raw, w) {
+  const W = Math.round(w);
+  const src = (Array.isArray(raw) ? raw : []).filter(q => Array.isArray(q) && Number.isFinite(+q[0]) && Number.isFinite(+q[1])).map(q => [+q[0], clamp(Math.round(+q[1]), OL.lo, OL.hi)]).sort((a, b) => a[0] - b[0]);
+  if (src.length < 2) return [[0, 2100], [W, 1000]];
+  const out = [[0, src[0][1]]];
+  src.slice(1, -1).forEach(q => { const x = Math.round(q[0]); if (x - out[out.length - 1][0] >= OL.gap && W - x >= OL.gap && out.length < OL.max - 1) out.push([x, q[1]]); });
+  out.push([W, src[src.length - 1][1]]);
+  return out;
+}
+// A roof slope coming down, then flat
+function defaultOutline(w) { const k = w / 3000; return normOutline([[0, 2100], [1200 * k, 2100], [2400 * k, 1000], [w, 1000]], w); }
+// The points at the current width. Stored points are scaled when the width changes, so typing a new width
+// never loses a point part way through.
+function outlinePts() {
+  if (S.template !== 'custom') {
+    const W = S.w, rise = Math.max(0, S.h - S.low);
+    return S.hand === 'left' ? [[0, S.low + rise], [W, S.low]] : [[0, S.low], [W, S.low + rise]];
+  }
+  const o = Array.isArray(S.outline) && S.outline.length >= 2 ? S.outline : defaultOutline(S.w);
+  const k = S.w / (o[o.length - 1][0] || S.w);
+  return o.map(([x, y]) => [x * k, y]);
+}
+// Existing code reads h (the highest point) and low (the lowest), so keep them in step with the points
+function syncOutline() {
+  if (S.template !== 'custom' || !Array.isArray(S.outline)) return;
+  const ys = S.outline.map(q => q[1]);
+  S.h = Math.max(...ys); S.low = Math.min(...ys);
+}
+function bakeOutline() { if (S.template === 'custom') { S.outline = normOutline(outlinePts(), S.w); syncOutline(); } }
+// After the width or overall height is changed from outside the outline editor (photo, AR, assistant)
+function refitOutline(oldH) {
+  if (S.template !== 'custom') return;
+  if (oldH > 0 && S.h !== oldH) S.outline = outlinePts().map(([x, y]) => [x, clamp(Math.round(y * S.h / oldH), OL.lo, OL.hi)]);
+  bakeOutline();
+}
+
+// One straight piece of the top edge per segment. topAt(x) is the height of the top edge at x, piecewise
+// linear. tv is the height a board of the given thickness takes up, measured straight down, on that slope.
+function shapeGeom() {
+  const pts = outlinePts(), th = S.thickness, segs = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], dx = x1 - x0, rise = S.template === 'custom' ? Math.abs(y1 - y0) : Math.max(0, S.h - S.low), ang = Math.atan2(rise, dx), c = Math.cos(ang) || 1;
+    segs.push({ i, x0, x1, y0, y1, dx, rise, ang, angDeg: Math.round(deg(ang) * 10) / 10, c, tv: th / c });
+  }
+  const segAt = x => segs.find(s => x < s.x1) || segs[segs.length - 1];
+  // Measured from the lower end, so two points give exactly the under-stairs numbers
+  const topAt = x => { const s = segAt(x); return s.y1 >= s.y0 ? s.y0 + s.rise * (x - s.x0) / s.dx : s.y1 + s.rise * (s.x1 - x) / s.dx; };
+  const inside = (a, b) => pts.filter(q => q[0] > a && q[0] < b).map(q => q[1]);
+  const minTop = (a, b) => Math.min(topAt(a), topAt(b), ...inside(a, b));
+  const segsIn = (a, b) => segs.filter(s => s.x1 > a && s.x0 < b);
+  // "32.5 deg", or both angles where a part crosses a change of angle
+  const angText = (a, b) => { const ss = segsIn(a, b); return ss.length < 2 ? `${(ss[0] || segAt(a)).angDeg} deg` : `${ss[0].angDeg} deg on the left and ${ss[ss.length - 1].angDeg} deg on the right`; };
+  const s0 = segs[0];
+  return { pts, segs, segAt, topAt, minTop, segsIn, angText, rise: s0.rise, ang: s0.ang, angDeg: s0.angDeg, c: s0.c, tv: s0.tv };
+}
+// Each part of the top edge in plain words, left to right
+function slopeWords(g = shapeGeom()) {
+  return g.segs.map(s => `${fmt(s.x0)} to ${fmt(s.x1)} from the left: ${s.rise < 1 ? `flat at ${fmt(s.y0)}` : `${s.y1 < s.y0 ? 'slopes down' : 'rises'} from ${fmt(s.y0)} to ${fmt(s.y1)}, ${s.angDeg} degrees`}`);
+}
+// The slope a box sits under (one per box for odd shapes, the whole run under the stairs)
+const boxSeg = (g, b) => g.segs[b && b.seg != null ? b.seg : 0];
+const boxTopName = b => S.template === 'custom' && boxSeg(shapeGeom(), b).rise < 1 ? 'Top' : 'Sloped Top';
 
 function eavesGeom() {
   const s = S.scribe ? 2 : 0;
@@ -377,7 +540,7 @@ function eavesGeom() {
 // dividers stand behind it on cleats, shelves rest on battens, and doors hang on the studs. The room's
 // own floor, walls and ceiling are the inside of the cupboard, so there is no carcass to carry in.
 // Sizes: 38x63 CLS for the frame (63 deep, so a hinge plate fits on the side of a stud), 25x38 battens.
-const FRAME_TPL = new Set(['eaves', 'understairs']);
+const FRAME_TPL = new Set(['eaves', 'understairs', 'custom']);
 const FR = { sw: 38, sd: 63, bt: 25, bh: 38, ov: 17, gap: 3, cls: '38x63 CLS', bat: '25x38 batten' };
 const TIMBER_STOCK = { [FR.cls]: { len: 2400, price: 4.5 }, [FR.bat]: { len: 2400, price: 2.4 } };
 function isFramed(t = S.template) { return FRAME_TPL.has(t) && S.build !== 'boxes'; }
@@ -388,8 +551,9 @@ function frameModel() {
   if (isBuiltIn()) return builtinModel();
   const t = S.template, eaves = t === 'eaves', W = S.w, H = S.h, th = S.thickness, s = S.scribe ? 2 : 0;
   const { sw, sd, bt, bh, ov, gap } = FR, L = layout(), back = S.d - s, C = L.C;
-  const g = eaves ? eavesGeom() : stairGeom(), tan = eaves ? Math.tan(g.ang) : 0, cs = Math.cos(g.ang) || 1;
+  const g = eaves ? eavesGeom() : shapeGeom(), tan = eaves ? Math.tan(g.ang) : 0, cs = Math.cos(g.ang) || 1;
   const tv = sw / cs; // head plate depth measured straight down
+  const tvAt = x => eaves ? tv : sw / g.segAt(x).c; // on an odd shape, each slope has its own
   const ceil = eaves ? (x, z) => H - z * tan : x => g.topAt(x);
   const solids = [], parts = [], doors = [];
   // A solid from x0 to x1 and z0 to z1, with bottom and top given as heights at (x, z)
@@ -405,16 +569,30 @@ function frameModel() {
 
   // Plates
   hx('Sole Plate', 'plate', 0, W, 0, sd, flat(0), flat(sw));
-  hx('Head Plate', 'plate', 0, W, 0, sd, under(tv), under(0));
-  const sole = lengths(W), headLen = eaves ? W : Math.hypot(W, g.rise), head = lengths(headLen);
+  const sole = lengths(W);
   lin({ name: 'Sole Plate', w: sole.each, h: sw, qty: sole.k, section: FR.cls, role: 'plate', note: `Screwed to the floor along the door line${sole.k > 1 ? `, in ${sole.k} lengths butted end to end` : ''}` });
-  lin({ name: 'Head Plate', w: head.each, h: sw, qty: head.k, section: FR.cls, role: 'plate', note: (eaves ? 'Lies flat on the slope, screwed up into every rafter' : 'Screwed to the side of the stair string, following the slope') + (head.k > 1 ? `, in ${head.k} lengths` : '') });
+  let head;
+  if (eaves) {
+    hx('Head Plate', 'plate', 0, W, 0, sd, under(tv), under(0));
+    head = lengths(W);
+    lin({ name: 'Head Plate', w: head.each, h: sw, qty: head.k, section: FR.cls, role: 'plate', note: 'Lies flat on the slope, screwed up into every rafter' + (head.k > 1 ? `, in ${head.k} lengths` : '') });
+  } else g.segs.forEach((sg, i) => {
+    // One head plate for each straight part of the top edge, ends cut to meet the next
+    const name = g.segs.length > 1 ? 'Head Plate ' + (i + 1) : 'Head Plate', dv = sw / sg.c;
+    hx(name, 'plate', sg.x0, sg.x1, 0, sd, x => ceil(x) - dv, x => ceil(x));
+    head = lengths(Math.hypot(sg.dx, sg.rise));
+    lin({ name, w: head.each, h: sw, qty: head.k, section: FR.cls, role: 'plate', note: (t === 'custom' ? `Screwed up into the rafters or ceiling joists, ${fmt(sg.x0)} to ${fmt(sg.x1)} from the left${sg.rise < 1 ? ', level' : `, following the ${sg.angDeg} deg slope`}${g.segs.length > 1 ? '. Cut the ends to meet the next plate' : ''}` : 'Screwed to the side of the stair string, following the slope') + (head.k > 1 ? `, in ${head.k} lengths` : '') });
+  });
 
-  // Studs: one at each end and one between each pair of doors, tops cut to sit under the head plate
-  const studTop = under(tv);
+  // Studs: one at each end and one between each pair of doors, tops cut to sit under the head plate.
+  // On an odd shape a stud also stands under every change of angle, its top cut to both slopes.
+  const studTop = eaves ? under(tv) : x => ceil(x) - tvAt(x);
   L.verticals.forEach(v => hx(v.name, 'stud', v.x, v.x + sw, 0, sd, flat(sw), studTop));
   if (eaves) lin({ name: 'Stud', w: Math.round(H - tv - sw), h: sw, qty: L.verticals.length, section: FR.cls, role: 'stud', note: `Top cut at ${g.angDeg} deg. Length to the long point` });
-  else L.verticals.forEach(v => lin({ name: v.name, w: Math.round(Math.max(studTop(v.x), studTop(v.x + sw)) - sw), h: sw, qty: 1, section: FR.cls, role: 'stud', note: `Top cut at ${g.angDeg} deg. Length to the long point` }));
+  else L.verticals.forEach(v => {
+    const peak = g.pts.filter(q => q[0] > v.x && q[0] < v.x + sw).map(q => q[1] - Math.max(...g.segsIn(v.x, v.x + sw).map(sg => sw / sg.c)));
+    lin({ name: v.name, w: Math.round(Math.max(studTop(v.x), studTop(v.x + sw), ...peak) - sw), h: sw, qty: 1, section: FR.cls, role: 'stud', note: `Top cut at ${g.angText(v.x, v.x + sw)}. Length to the long point` });
+  });
 
   // Dividers stand behind the inner studs, on a floor cleat and a wall cleat
   const inner = L.verticals.slice(1, -1), divs = inner.map(v => v.x + (sw - th) / 2);
@@ -424,8 +602,8 @@ function frameModel() {
     hx('Floor Cleat', 'cleat', x0 + th, x0 + th + bt, sd, back, flat(0), flat(bh));
     hx('Wall Cleat', 'cleat', x0 + th, x0 + th + bt, back - bh, back, flat(bh), (x, z) => ceil(x, z) - 50);
     if (!eaves) {
-      const top = Math.round(Math.min(ceil(x0), ceil(x0 + th)) - gap);
-      sheet({ name, w: back - sd, h: top, role: 'divider', note: `Plane the top edge to ${g.angDeg} deg` });
+      const top = Math.round(g.minTop(x0, x0 + th) - gap);
+      sheet({ name, w: back - sd, h: top, role: 'divider', note: `Plane the top edge to ${g.angText(x0, x0 + th)}` });
     }
   });
   if (divs.length) {
@@ -447,7 +625,7 @@ function frameModel() {
     let depth = back - sd;
     if (eaves && tan > 0) depth = Math.floor(Math.min(back, (H - y0 - th - 10) / tan) - sd);
     if (depth < 150) continue;
-    const fit = comps.filter(c => eaves || y0 + th + 150 <= Math.min(ceil(c.l), ceil(c.r)) - gap);
+    const fit = comps.filter((c, j) => !(L.bays[j] && L.bays[j].open) && (eaves || y0 + th + 150 <= g.minTop(c.l, c.r) - gap));
     if (!fit.length) continue;
     const blen = Math.min(depth, back - sd - bh), bearer = 'Shelf Bearer ' + (i + 1);
     const sizes = new Map();
@@ -461,7 +639,8 @@ function frameModel() {
     keys.forEach(w => {
       // End compartments reach the wall behind the end stud, so their shelves can be a little wider
       const atEnd = keys.length > 1 && fit.some(c => Math.round(c.r - c.l - 2) === w && (c === comps[0] || c === comps[C - 1]));
-      const name = (atEnd ? 'End Shelf ' : 'Shelf ') + (i + 1);
+      // An odd shape has compartments of many widths, so each width gets its own letter
+      const name = t === 'custom' ? 'Shelf ' + (i + 1) + (keys.length > 1 ? String.fromCharCode(65 + keys.indexOf(w)) : '') : (atEnd ? 'End Shelf ' : 'Shelf ') + (i + 1);
       sheet({ name, w, h: depth, qty: sizes.get(w), role: 'shelf', edge: 1, yc, note: `${eaves && depth < back - sd ? 'Shallower to clear the slope. ' : ''}Rests on two bearers` });
       fit.filter(c => Math.round(c.r - c.l - 2) === w).forEach(c => hx(name, 'shelf', c.l + 1, c.r - 1, sd, sd + depth, flat(y0), flat(y0 + th)));
     });
@@ -470,20 +649,23 @@ function frameModel() {
 
   // Doors: one per opening, laid over the studs by 17mm each side, hung on the side of the stud
   if (doorCount() > 0) {
-    const drop = tv - ov, bot = sw - ov;
+    const bot = sw - ov;
     L.verticals.slice(0, -1).forEach((v, j) => {
-      const x = v.x + sw - ov, w = Math.round(L.verticals[j + 1].x - v.x - sw + 2 * ov);
+      const x = v.x + sw - ov, w = Math.round(L.verticals[j + 1].x - v.x - sw + 2 * ov), drop = tvAt(x + w / 2) - ov;
+      if (L.bays[j] && L.bays[j].open) return; // the gap at a beam or step stays open
       const hl = Math.round(ceil(x, 0) - drop - bot), hr = Math.round(ceil(x + w, 0) - drop - bot);
       const hingeLeft = eaves ? (C === 1 || j < C / 2) : hl >= hr;
-      doors.push({ x, w, bot, hl, hr, hingeLeft, name: eaves ? 'Door' : 'Door ' + (j + 1) });
-      hx(doors[j].name, 'door', x, x + w, -th, 0, flat(bot), (xx, z) => ceil(xx, 0) - drop);
+      const d = { x, w, bot, hl, hr, hingeLeft, name: eaves ? 'Door' : 'Door ' + (doors.length + 1), angDeg: eaves ? g.angDeg : g.segAt(x + w / 2).angDeg };
+      doors.push(d);
+      hx(d.name, 'door', x, x + w, -th, 0, flat(bot), (xx, z) => ceil(xx, 0) - drop);
     });
     if (eaves) {
       const d0 = doors[0], hinges = calcHingePositions(d0.hl);
       sheet({ name: 'Door', w: d0.w, h: d0.hl, qty: doors.length, hinges, role: 'door', note: `Overlays the studs by ${ov}mm. ${hinges.length} hinges each, 35mm bore`, edge: 4 });
     } else doors.forEach(d => {
       const tall = Math.max(d.hl, d.hr), hinges = calcHingePositions(tall);
-      sheet({ name: d.name, w: d.w, h: tall, hinges, role: 'door', shape: { front: tall, back: Math.min(d.hl, d.hr) }, note: `Angled top: ${d.hl} at the left, ${d.hr} at the right (${g.angDeg} deg). Hinge on the ${d.hingeLeft ? 'left' : 'right'}`, edge: 4 });
+      const square = t === 'custom' && d.hl === d.hr;
+      sheet({ name: d.name, w: d.w, h: tall, hinges, role: 'door', ...(square ? {} : { shape: { front: tall, back: Math.min(d.hl, d.hr) } }), note: `${square ? 'Square top' : `Angled top: ${d.hl} at the left, ${d.hr} at the right (${d.angDeg} deg)`}. Hinge on the ${d.hingeLeft ? 'left' : 'right'}`, edge: 4 });
     });
   }
   return { solids, parts, doors, comps, divs, g, tv, sole, head };
@@ -605,12 +787,12 @@ function generateParts() {
     const L = layout(), eaves = t === 'eaves', g = eaves ? eavesGeom() : null, cosA = eaves ? (Math.cos(g.ang) || 1) : 1;
     const dep = eaves ? g.run : d - s, sideNote = eaves ? `Angled top: ${Math.round(h)} at the front, ${Math.round(S.low)} at the back (${g.angDeg} deg)` : null;
     const side = (name, qty, scribed, why) => qty > 0 && sheet({ name, w: dep, h, qty, scribed, role: 'side', edge: 1, ...(why ? { why } : {}), ...(eaves ? { shape: { front: h, back: S.low }, note: sideNote } : {}) });
-    if (t === 'understairs') {
-      // Every upright is cut to the slope of the stairs: height to the underside of the top, top edge bevelled
-      const sg = stairGeom();
+    if (isShaped(t)) {
+      // Every upright is cut to the slope above it: height to the underside of the top, top edge bevelled
+      const sg = shapeGeom();
       L.verticals.forEach(v => {
-        const top = sg.topAt(v.x + th / 2) - sg.tv, divider = v.kind === 'divider';
-        sheet({ name: v.name, w: d - s, h: Math.round(divider ? top - th : top), qty: 1, scribed: !divider && v.kind !== 'boxside' && sc, role: divider ? 'divider' : 'side', edge: 1, note: `Bevel the top edge at ${sg.angDeg} deg` });
+        const seg = boxSeg(sg, L.boxes[v.box]), top = sg.topAt(v.x + th / 2) - seg.tv, divider = v.kind === 'divider';
+        sheet({ name: v.name, w: d - s, h: Math.round(divider ? top - th : top), qty: 1, scribed: !divider && v.kind !== 'boxside' && sc, role: divider ? 'divider' : 'side', edge: 1, note: seg.rise < 1 && t === 'custom' ? 'Square top' : `Bevel the top edge at ${seg.angDeg} deg` });
       });
     } else {
       side('Left Side', 1, sc); side('Right Side', 1, sc);
@@ -619,10 +801,10 @@ function generateParts() {
     const kinds = [...new Map(L.boxes.map(b => [b.type, b])).values()];
     kinds.forEach(k => {
       const qty = L.boxes.filter(b => b.type === k.type).length, inner = k.w - 2 * th;
-      if (t === 'understairs') {
-        const sg = stairGeom(), rise = sg.rise * k.w / w;
+      if (isShaped(t)) {
+        const seg = boxSeg(shapeGeom(), k), rise = seg.rise * k.w / seg.dx, flatTop = t === 'custom' && seg.rise < 1;
         sheet({ name: boxPart('Bottom', k), w: inner, h: d - s, qty, role: 'bottom', edge: 1, bx: k.i });
-        sheet({ name: boxPart('Sloped Top', k), w: Math.round(Math.hypot(k.w, rise)), h: d - s, qty, role: 'top', note: `Sits on the uprights. Bevel both ends at ${sg.angDeg} deg`, edge: 1 });
+        sheet({ name: boxPart(boxTopName(k), k), w: Math.round(Math.hypot(k.w, rise)), h: d - s, qty, role: 'top', note: flatTop ? 'Sits on the uprights' : `Sits on the uprights. Bevel both ends at ${seg.angDeg} deg`, edge: 1 });
       } else if (eaves) {
         sheet({ name: boxPart('Bottom', k), w: inner, h: g.run, qty, role: 'bottom', edge: 1, bx: k.i });
         sheet({ name: boxPart('Sloped Top', k), w: inner, h: Math.round(Math.hypot(g.run, g.rise)), qty, role: 'top', bx: k.i, note: `Bevel front and back edges at ${g.angDeg} deg`, edge: 1 });
@@ -633,11 +815,12 @@ function generateParts() {
         thin({ name: boxPart('Back Panel', k), w: k.w - 4, h: h - 4, qty, role: 'back', note: '3mm, glued and pinned on. Stops the unit racking sideways' });
       }
     });
-    if (t === 'understairs') {
-      const sg = stairGeom();
+    if (isShaped(t)) {
+      const sg = shapeGeom();
       L.boxes.forEach(b => {
         const hl = Math.round(sg.topAt(b.x0) - 4), hr = Math.round(sg.topAt(b.x0 + b.w) - 4);
-        thin({ name: boxPart('Back Panel', b), w: b.w - 4, h: Math.max(hl, hr), qty: 1, role: 'back', shape: { front: Math.max(hl, hr), back: Math.min(hl, hr) }, note: `3mm, glued and pinned on. Angled top: ${hl} at the left, ${hr} at the right` });
+        if (t === 'custom' && hl === hr) thin({ name: boxPart('Back Panel', b), w: b.w - 4, h: hl, qty: 1, role: 'back', note: '3mm, glued and pinned on' });
+        else thin({ name: boxPart('Back Panel', b), w: b.w - 4, h: Math.max(hl, hr), qty: 1, role: 'back', shape: { front: Math.max(hl, hr), back: Math.min(hl, hr) }, note: `3mm, glued and pinned on. Angled top: ${hl} at the left, ${hr} at the right` });
       });
     }
     // Shelves: one per compartment per row; on eaves they get shallower to clear the slope
@@ -647,14 +830,21 @@ function generateParts() {
         const maxDepth = g.rise > 0 ? (h - th / cosA - yTop) * S.d / g.rise : g.run;
         const depth = Math.floor(Math.min(g.run - 2, maxDepth) - 5);
         if (depth >= 100) sheet({ name: 'Shelf ' + (i + 1), w: L.bayW, h: depth, qty: L.C, role: 'shelf', edge: 1, yc, note: 'Shallower to clear the slope' });
-      } else if (t === 'understairs') {
+      } else if (isShaped(t)) {
         // Same shelf heights all along, but only in the compartments tall enough for them
-        const sg = stairGeom(), yc = th + (h - 2 * th) * (i + 1) / (n + 1);
-        const fit = L.bays.map((b, j) => [j, Math.min(sg.topAt(b.x), sg.topAt(b.x + b.w)) - sg.tv]).filter(([, top]) => yc + th / 2 + 150 <= top).map(([j]) => j);
-        if (fit.length) sheet({ name: 'Shelf ' + (i + 1), w: L.bayW, h: d - 20 - s, qty: fit.length, role: 'shelf', edge: 1, yc, bays: fit, note: fit.length < L.C ? `In ${fit.length} of ${L.C} compartments, where there is room` : '' });
+        const sg = shapeGeom(), yc = th + (h - 2 * th) * (i + 1) / (n + 1);
+        const fit = L.bays.map((b, j) => [j, sg.minTop(b.x, b.x + b.w) - boxSeg(sg, L.boxes[b.box]).tv]).filter(([j, top]) => yc + th / 2 + 150 <= top && !L.bays[j].open).map(([j]) => j);
+        const note = fit.length < L.C ? `In ${fit.length} of ${L.C} compartments, where there is room` : '';
+        if (t !== 'custom') { if (fit.length) sheet({ name: 'Shelf ' + (i + 1), w: L.bayW, h: d - 20 - s, qty: fit.length, role: 'shelf', edge: 1, yc, bays: fit, note }); }
+        else {
+          // Compartments differ in width on an odd shape, so each width is its own part
+          const byW = new Map();
+          fit.forEach(j => { const bw = Math.floor(L.bays[j].w); byW.set(bw, (byW.get(bw) || []).concat(j)); });
+          [...byW.entries()].sort((a, b) => b[0] - a[0]).forEach(([bw, js], gi) => sheet({ name: 'Shelf ' + (i + 1) + (byW.size > 1 ? String.fromCharCode(65 + gi) : ''), w: bw, h: d - 20 - s, qty: js.length, role: 'shelf', edge: 1, yc, bays: js, note }));
+        }
       } else sheet({ name: 'Shelf ' + (i + 1), w: L.bayW, h: t === 'shelving' ? d - s - 2 : d - 20 - s, qty: L.C, role: 'shelf', edge: 1 });
     }
-    const divs = t === 'understairs' ? 0 : L.verticals.filter(v => v.kind === 'divider').length;
+    const divs = isShaped(t) ? 0 : L.verticals.filter(v => v.kind === 'divider').length;
     if (divs) {
       if (eaves) {
         const front = Math.round(h - th - th / cosA), back = Math.max(50, Math.round(S.low - th - th / cosA));
@@ -663,11 +853,10 @@ function generateParts() {
     }
     if (t === 'wardrobe') lin({ name: 'Hanging Rail', w: L.bayW - 20, h: 30, qty: L.C, section: '25mm rail', role: 'rail', note: 'Round chrome rail' });
     // Doors: one per compartment on multi-box units, so no door spans two boxes
-    if (nd && t === 'understairs') {
-      const sg = stairGeom();
+    if (nd && isShaped(t)) {
       stairDoors().forEach((dr, i) => {
-        const tall = Math.max(dr.hl, dr.hr), hinges = calcHingePositions(tall);
-        sheet({ name: 'Door ' + (i + 1), w: dr.w, h: tall, qty: 1, hinges, role: 'door', shape: { front: tall, back: Math.min(dr.hl, dr.hr) }, note: `Angled top: ${dr.hl} at the left, ${dr.hr} at the right (${sg.angDeg} deg). Hinge on the ${dr.hingeLeft ? 'left' : 'right'}`, edge: 4 });
+        const tall = Math.max(dr.hl, dr.hr), hinges = calcHingePositions(tall), square = t === 'custom' && dr.hl === dr.hr;
+        sheet({ name: 'Door ' + (i + 1), w: dr.w, h: tall, qty: 1, hinges, role: 'door', ...(square ? {} : { shape: { front: tall, back: Math.min(dr.hl, dr.hr) } }), note: `${square ? 'Square top' : `Angled top: ${dr.hl} at the left, ${dr.hr} at the right (${dr.angDeg} deg)`}. Hinge on the ${dr.hingeLeft ? 'left' : 'right'}`, edge: 4 });
       });
     } else if (nd) {
       if (L.n === 1) {
@@ -845,6 +1034,7 @@ const FITTING_DB = {
   kitchenwall: [{ name: 'Wall hanging brackets', per: 'unit', qty: 2, unit_cost: 3.5 }, { name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Handles', per: 'handle', qty: 1, unit_cost: 2.8 }],
   eaves: [{ name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Angle brackets 40mm', per: 'unit', qty: 6, unit_cost: 0.6 }, { name: 'Door knobs', per: 'handle', qty: 1, unit_cost: 2.8 }],
   understairs: [{ name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Angle brackets 40mm', per: 'unit', qty: 4, unit_cost: 0.6 }, { name: 'Door knobs', per: 'handle', qty: 1, unit_cost: 2.8 }],
+  custom: [{ name: 'Shelf pins', per: 'shelf', qty: 4, unit_cost: 0.15 }, { name: 'Angle brackets 40mm', per: 'unit', qty: 4, unit_cost: 0.6 }, { name: 'Door knobs', per: 'handle', qty: 1, unit_cost: 2.8 }],
   studwall: [{ name: 'Framing nails 90mm', per: 'stud', qty: 4, unit_cost: 0.08 }, { name: 'Noggin nails 75mm', per: 'noggin', qty: 4, unit_cost: 0.06 }, { name: 'Frame fixings 100mm', per: 'unit', qty: 8, unit_cost: 0.45 }],
   partition: [{ name: 'Framing nails 90mm', per: 'stud', qty: 4, unit_cost: 0.08 }, { name: 'Plasterboard screws 32mm', per: 'plaster', qty: 28, unit_cost: 0.03 }, { name: 'Joint tape (m)', per: 'unit', qty: 10, unit_cost: 0.2 }],
   flatroof: [{ name: 'Joist hangers', per: 'joist', qty: 2, unit_cost: 2.2 }, { name: 'Ring-shank nails 65mm', per: 'board', qty: 20, unit_cost: 0.04 }, { name: 'Vapour control layer (m2)', per: 'area', qty: 1, unit_cost: 1.2 }],
@@ -991,20 +1181,20 @@ function cabinetShapes() {
   const t = S.template, th = S.thickness, W = S.w, H = S.h;
   const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base;
   const L = layout(), sh = [];
-  if (t === 'understairs') {
-    // Front view, y measured down from the tall end
-    const sg = stairGeom(), Y = y => H - y;
+  if (isShaped(t)) {
+    // Front view, y measured down from the highest point
+    const sg = shapeGeom(), Y = y => H - y;
     L.boxes.forEach(b => {
-      const x0 = b.x0, x1 = b.x0 + b.w;
-      if (R.parts.some(p => p.role === 'back')) sh.push({ poly: [[x0 + th, Y(sg.topAt(x0 + th) - sg.tv)], [x1 - th, Y(sg.topAt(x1 - th) - sg.tv)], [x1 - th, Y(th)], [x0 + th, Y(th)]], c: 'bk', part: boxPart('Back Panel', b) });
-      sh.push({ poly: [[x0, Y(sg.topAt(x0))], [x1, Y(sg.topAt(x1))], [x1, Y(sg.topAt(x1) - sg.tv)], [x0, Y(sg.topAt(x0) - sg.tv)]], c: 'p2', part: boxPart('Sloped Top', b) });
+      const x0 = b.x0, x1 = b.x0 + b.w, tv = boxSeg(sg, b).tv;
+      if (R.parts.some(p => p.role === 'back')) sh.push({ poly: [[x0 + th, Y(sg.topAt(x0 + th) - tv)], [x1 - th, Y(sg.topAt(x1 - th) - tv)], [x1 - th, Y(th)], [x0 + th, Y(th)]], c: 'bk', part: boxPart('Back Panel', b) });
+      sh.push({ poly: [[x0, Y(sg.topAt(x0))], [x1, Y(sg.topAt(x1))], [x1, Y(sg.topAt(x1) - tv)], [x0, Y(sg.topAt(x0) - tv)]], c: 'p2', part: boxPart(boxTopName(b), b) });
       sh.push({ x: x0 + th, y: Y(th), w: b.w - 2 * th, h: th, c: 'p2', part: boxPart('Bottom', b) });
     });
     L.verticals.forEach(v => {
-      const top = sg.topAt(v.x + th / 2) - sg.tv, y0 = v.kind === 'divider' ? th : 0;
+      const top = sg.topAt(v.x + th / 2) - boxSeg(sg, L.boxes[v.box]).tv, y0 = v.kind === 'divider' ? th : 0;
       sh.push({ x: v.x, y: Y(top), w: th, h: top - y0, c: 'p', part: v.name });
     });
-    R.parts.filter(p => p.role === 'shelf').forEach(p => (p.bays || []).forEach(j => sh.push({ x: L.bays[j].x, y: Y(p.yc + th / 2), w: L.bayW, h: th, c: 'p2', part: p.name })));
+    R.parts.filter(p => p.role === 'shelf').forEach(p => (p.bays || []).forEach(j => sh.push({ x: L.bays[j].x, y: Y(p.yc + th / 2), w: L.custom ? L.bays[j].w : L.bayW, h: th, c: 'p2', part: p.name })));
     if (R.parts.some(p => p.role === 'door')) stairDoors().forEach((dr, i) => {
       const hx = dr.hingeLeft ? dr.x + dr.w - 50 : dr.x + 50;
       sh.push({ poly: [[dr.x, Y(dr.hl)], [dr.x + dr.w, Y(dr.hr)], [dr.x + dr.w, Y(2)], [dr.x, Y(2)]], c: 'dr', part: 'Door ' + (i + 1), handle: [hx, Y(Math.min(dr.hl, dr.hr) / 2)] });
@@ -1188,15 +1378,15 @@ function solids() {
   } else if (isCabinet(t)) {
     const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base, Lay = layout();
     const prof = [[0, 0], [H, 0], [S.low, D], [0, D]], c = t === 'eaves' ? (Math.cos(eavesGeom().ang) || 1) : 1;
-    if (t === 'understairs') {
-      const sg = stairGeom();
-      Lay.verticals.forEach(v => { const top = sg.topAt(v.x + th / 2) - sg.tv, y0 = v.kind === 'divider' ? th : 0; box(v.x, y0, 0, th, top - y0, D, 'panel'); });
+    if (isShaped(t)) {
+      const sg = shapeGeom();
+      Lay.verticals.forEach(v => { const top = sg.topAt(v.x + th / 2) - boxSeg(sg, Lay.boxes[v.box]).tv, y0 = v.kind === 'divider' ? th : 0; box(v.x, y0, 0, th, top - y0, D, 'panel'); });
       Lay.boxes.forEach(b => {
-        const x0 = b.x0, x1 = b.x0 + b.w, a = sg.topAt(x0), z = sg.topAt(x1);
-        hexa([[x0, a - sg.tv, 0], [x1, z - sg.tv, 0], [x1, z, 0], [x0, a, 0], [x0, a - sg.tv, D], [x1, z - sg.tv, D], [x1, z, D], [x0, a, D]], 'panel2');
+        const x0 = b.x0, x1 = b.x0 + b.w, a = sg.topAt(x0), z = sg.topAt(x1), tv = boxSeg(sg, b).tv;
+        hexa([[x0, a - tv, 0], [x1, z - tv, 0], [x1, z, 0], [x0, a, 0], [x0, a - tv, D], [x1, z - tv, D], [x1, z, D], [x0, a, D]], 'panel2');
         box(x0 + th, 0, 0, b.w - 2 * th, th, D, 'panel2');
       });
-      R.parts.filter(p => p.role === 'shelf').forEach(p => (p.bays || []).forEach(j => box(Lay.bays[j].x, p.yc - th / 2, 0, Lay.bayW, th, p.h, 'shelf')));
+      R.parts.filter(p => p.role === 'shelf').forEach(p => (p.bays || []).forEach(j => box(Lay.bays[j].x, p.yc - th / 2, 0, Lay.custom ? Lay.bays[j].w : Lay.bayW, th, p.h, 'shelf')));
     } else {
     Lay.verticals.forEach(v => {
       if (v.kind === 'divider') {
@@ -1518,7 +1708,8 @@ function renderControls() {
         <h2 class="group-title">Measurements</h2>
         <p class="group-sub">${tapeKeys().length ? 'Cutters work to the millimetre, so check every size with a tape measure. A photo can only guess. ' : ''}In millimetres. Measure in two or three places and use the smallest.${tapeKeys().length ? ` <strong>${tapeKeys().length - unTaped().length} of ${tapeKeys().length} checked.</strong>` : ''}</p>
         <div class="fields">${fieldsFor(S.template).map(([k, label, help]) => numField(k, label, help, k === 'pitch' ? 'deg' : 'mm')).join('')}</div>
-        ${S.template === 'understairs' ? `<div class="field full"><span class="lbl" id="handLbl">Tall end</span><div class="seg" role="group" aria-labelledby="handLbl"><button type="button" data-action="hand" data-value="left" aria-pressed="${S.hand === 'left'}">On the left</button><button type="button" data-action="hand" data-value="right" aria-pressed="${S.hand !== 'left'}">On the right</button></div><span class="help">Stand facing the space. Which end is under the top of the stairs?</span></div><div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The stairs slope at <strong>${stairGeom().angDeg} deg</strong>. ${isFramed() ? 'The head plate, stud tops and doors' : 'Each upright, the top and the doors'} are cut to follow it.</span></div><div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Keep a gas meter, fuse box or stopcock under the stairs easy to reach. If the stairs are your escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control.</span></div>` : ''}
+        ${S.template === 'understairs' ? `<div class="field full"><span class="lbl" id="handLbl">Tall end</span><div class="seg" role="group" aria-labelledby="handLbl"><button type="button" data-action="hand" data-value="left" aria-pressed="${S.hand === 'left'}">On the left</button><button type="button" data-action="hand" data-value="right" aria-pressed="${S.hand !== 'left'}">On the right</button></div><span class="help">Stand facing the space. Which end is under the top of the stairs?</span></div><div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>The stairs slope at <strong>${shapeGeom().angDeg} deg</strong>. ${isFramed() ? 'The head plate, stud tops and doors' : 'Each upright, the top and the doors'} are cut to follow it.</span></div><div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Keep a gas meter, fuse box or stopcock under the stairs easy to reach. If the stairs are your escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control.</span></div>` : ''}
+        ${S.template === 'custom' ? `<div class="outline-ed" id="olEd">${outlineEditor()}</div>` : ''}
         ${S.template === 'eaves' ? `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Roof angle works out at <strong>${eavesGeom().angDeg} deg</strong>. ${isFramed() ? 'The stud tops and dividers are cut to follow it.' : 'The side panels are cut to follow it.'}</span></div>` : ''}
         ${STRUCTURAL.has(S.template) ? `<div class="callout warn"><i class="ph ph-hard-hat" aria-hidden="true"></i><span><strong>Structural work.</strong> Needs Building Regulations approval and timber sizes checked by an engineer. Use this to estimate and brief your builder.</span></div>` : ''}
       </div>`;
@@ -1530,7 +1721,7 @@ function renderControls() {
       ${FRAME_TPL.has(S.template) ? `<div class="group">
         <h2 class="group-title">How it is built</h2>
         <div class="seg" role="group" aria-label="How it is built"><button type="button" data-action="build" data-value="frame" aria-pressed="${framed && !isBuiltIn()}">Batten frame</button>${S.template === 'eaves' ? `<button type="button" data-action="build" data-value="builtin" aria-pressed="${isBuiltIn()}">Built-in shelving</button>` : ''}<button type="button" data-action="build" data-value="boxes" aria-pressed="${!framed}">Boxes</button></div>
-        <p class="group-sub">${isBuiltIn() ? 'Open cubbies with a fitted look: a plinth along the bottom, shelves flush at the front and a painted facing over every edge. Built on site on a low timber frame.' : framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
+        <p class="group-sub">${isBuiltIn() ? 'Open cubbies with a fitted look: a plinth along the bottom, shelves flush at the front and a painted facing over every edge. Built on site on a low timber frame.' : framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : S.template === 'custom' ? 'up into the rafters or ceiling joists' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : S.template === 'custom' ? 'ceiling' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
       </div>` : ''}
       <div class="group">
         <h2 class="group-title">Material</h2>
@@ -1585,6 +1776,125 @@ function renderControls() {
   }
 }
 
+// ── Outline editor: the shape of a sloped or odd-shaped space, point by point ──
+const OL_PRESETS = [['one', 'Slope down to one side'], ['flat', 'Slope then flat'], ['two', 'Two slopes'], ['step', 'Beam or step']];
+function presetOutline(id, W, H, L) {
+  if (L > H - 200) L = Math.max(OL.lo, H - 900); // keep a slope you can see
+  const beam = Math.max(OL.lo, H - 350);
+  const pts = id === 'one' ? [[0, H], [W, L]]
+    : id === 'flat' ? [[0, H], [W * 0.55, L], [W, L]]
+    : id === 'two' ? [[0, L], [W / 2, H], [W, L]]
+    : [[0, H], [W * 0.5, H], [W * 0.5 + 150, beam], [W, beam]];
+  return normOutline(pts, W);
+}
+// Front view of the space, drawn from the points, with every height labelled
+function outlineSVG() {
+  const pts = outlinePts(), W = S.w, H = Math.max(...pts.map(q => q[1])), fs = Math.max(W, H) / 15, pad = fs * 1.6;
+  const Y = y => H - y, poly = [[0, H], ...pts.map(([x, y]) => [x, Y(y)]), [W, H]];
+  let g = `<polygon class="ol-space" points="${poly.map(q => q.map(v => Math.round(v)).join(',')).join(' ')}" vector-effect="non-scaling-stroke"/>`;
+  g += `<polyline class="ol-edge" points="${pts.map(([x, y]) => Math.round(x) + ',' + Math.round(Y(y))).join(' ')}" vector-effect="non-scaling-stroke"/>`;
+  g += `<line class="ol-floor" x1="0" y1="${H}" x2="${W}" y2="${H}" vector-effect="non-scaling-stroke"/>`;
+  let lastRight = -Infinity, lastBelow = false;
+  pts.forEach(([x, y], i) => {
+    const ax = i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle', label = fmt(y), lw = label.length * fs * 0.5;
+    const left = ax === 'start' ? x : ax === 'end' ? x - lw : x - lw / 2;
+    // A label that would run into the one before it goes under its point instead
+    const below = left < lastRight + fs * 0.3 && !lastBelow && y - fs * 2 > 0;
+    lastRight = left + lw; lastBelow = below;
+    g += `<line class="ol-tick" x1="${Math.round(x)}" y1="${Math.round(Y(y))}" x2="${Math.round(x)}" y2="${H}" vector-effect="non-scaling-stroke"/>`;
+    g += `<circle class="ol-pt" cx="${Math.round(x)}" cy="${Math.round(Y(y))}" r="${Math.round(fs * 0.28)}"/>`;
+    g += `<text class="ol-t" x="${Math.round(x)}" y="${Math.round(below ? Y(y) + fs * 1.1 : Y(y) - fs * 0.5)}" font-size="${Math.round(fs * 0.8)}" text-anchor="${ax}">${esc(label)}</text>`;
+    g += `<text class="ol-n" x="${Math.round(x)}" y="${Math.round(H + fs * 1.1)}" font-size="${Math.round(fs * 0.7)}" text-anchor="${ax}">${i + 1}</text>`;
+  });
+  return `<svg class="ol-svg" viewBox="${Math.round(-fs * 0.4)} ${Math.round(-pad)} ${Math.round(W + fs * 0.8)} ${Math.round(H + pad + fs * 1.4)}" role="img" aria-label="${esc(`Front view of the space: ${pts.map(q => fmt(q[1])).join(', ')} high, left to right`)}">${g}</svg>`;
+}
+function outlineAngles() {
+  const g = shapeGeom(), narrow = g.segs.filter(s => s.dx < NARROW_SEG);
+  return `<div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span><strong>The ceiling, left to right</strong><span class="ol-list">${slopeWords(g).map(w => `<span>${esc(w)}</span>`).join('')}</span>${isFramed() ? 'The head plates, stud tops and doors' : 'Each box, its uprights, its top and its doors'} are cut to follow it, with an upright under every change of angle.</span></div>`
+    + (narrow.length ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>${narrow.length > 1 ? 'Some parts' : 'One part'} of the ceiling ${narrow.length > 1 ? 'are' : 'is'} less than ${fmt(300)} wide (${narrow.map(s => `${fmt(s.x0)} to ${fmt(s.x1)}`).join(', ')}), so ${narrow.length > 1 ? 'they make' : 'it makes'} a narrow gap, left open with no door or shelves. That is fine for a beam or step. To use the space, move the points further apart.</span></div>` : '');
+}
+function outlineRows() {
+  const pts = outlinePts(), n = pts.length;
+  return pts.map(([x, y], i) => {
+    const end = i === 0 || i === n - 1;
+    const xCell = end
+      ? `<div class="field"><span class="ol-fixed">${i === 0 ? 'Left wall' : 'Right wall'}, ${esc(fmt(x))}</span></div>`
+      : `<div class="field"><label class="sr-only" for="ol-x-${i}">Point ${i + 1}, distance from left</label><div class="input-unit"><input id="ol-x-${i}" class="input num" type="number" inputmode="numeric" min="0" max="${Math.round(S.w)}" value="${Math.round(x)}" data-ol="x" data-i="${i}"><span>mm</span></div></div>`;
+    return `<li class="ol-row"><span class="ol-num" aria-hidden="true">${i + 1}</span>${xCell}
+      <div class="field"><label class="sr-only" for="ol-y-${i}">Point ${i + 1}, height</label><div class="input-unit"><input id="ol-y-${i}" class="input num" type="number" inputmode="numeric" min="${OL.lo}" max="${OL.hi}" value="${Math.round(y)}" data-ol="y" data-i="${i}"><span>mm</span></div></div>
+      ${end ? '<span class="ol-del-gap"></span>' : `<button type="button" class="icon-btn ol-del" data-action="ol-del" data-i="${i}" aria-label="Remove point ${i + 1}"><i class="ph ph-trash" aria-hidden="true"></i></button>`}
+      <span class="err ol-err" data-ol-err="${i}" hidden></span></li>`;
+  }).join('');
+}
+function outlineEditor() {
+  const pts = outlinePts(), widest = Math.max(...pts.slice(1).map((q, i) => q[0] - pts[i][0]));
+  const canAdd = pts.length < OL.max && widest >= 2 * OL.gap;
+  return `<span class="lbl" id="olLbl">Shape of the ceiling</span>
+    <p class="help">Stand facing the space. Measure the height at the left wall, at every place the ceiling changes angle, and at the right wall. Each point is how far it is from the left wall and how high it is from the floor.</p>
+    <div class="ol-presets" role="group" aria-labelledby="olLbl">${OL_PRESETS.map(([k, t]) => `<button type="button" class="chip" data-action="ol-preset" data-value="${k}">${esc(t)}</button>`).join('')}<button type="button" class="chip" data-action="ol-flip"><i class="ph ph-flip-horizontal" aria-hidden="true"></i>Flip left to right</button></div>
+    <div class="ol-draw" id="olDraw">${outlineSVG()}</div>
+    <div class="ol-head" aria-hidden="true"><span></span><span>Distance from left</span><span>Height</span><span></span></div>
+    <ol class="ol-rows" id="olRows" aria-label="Points, left to right">${outlineRows()}</ol>
+    <button type="button" class="btn btn-ghost btn-sm" data-action="ol-add"${canAdd ? '' : ' disabled'}><i class="ph ph-plus" aria-hidden="true"></i>Add point</button>
+    <span class="help">${pts.length} of ${OL.max} points. Heights ${OL.lo} to ${OL.hi}mm, points at least ${OL.gap}mm apart. A beam or step is two points close together.</span>
+    <div id="olAngles">${outlineAngles()}</div>
+    <div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Only the ceiling is drawn. Anything standing inside the space, such as a chimney breast, is not. Build a cupboard each side of it instead.</span></div>`;
+}
+// Redraw the picture and the angles while a point is typed, without touching the inputs
+function outlineLive(all) {
+  const ed = $('#olEd');
+  if (!ed) return;
+  if (all) { ed.innerHTML = outlineEditor(); return; }
+  const d = $('#olDraw'), a = $('#olAngles');
+  if (d) d.innerHTML = outlineSVG();
+  if (a) a.innerHTML = outlineAngles();
+}
+function olInput(el) {
+  const i = Number(el.dataset.i), k = el.dataset.ol, pts = outlinePts().map(([x, y]) => [Math.round(x), y]);
+  if (!Number.isInteger(i) || i < 0 || i >= pts.length || (k !== 'x' && k !== 'y')) return;
+  const v = Number(el.value), err = $(`[data-ol-err="${i}"]`);
+  let msg = '';
+  if (el.value === '' || !Number.isFinite(v)) msg = 'Enter a number';
+  else if (k === 'y' && (v < OL.lo || v > OL.hi)) msg = `Height between ${OL.lo} and ${OL.hi}`;
+  else if (k === 'x') {
+    if (i === 0 || i === pts.length - 1) return;
+    const lo = pts[i - 1][0] + OL.gap, hi = pts[i + 1][0] - OL.gap;
+    if (v < lo || v > hi) msg = `Distance between ${lo} and ${hi}, at least ${OL.gap}mm from the points either side`;
+  }
+  el.setAttribute('aria-invalid', String(!!msg));
+  if (err) { err.textContent = msg; err.hidden = !msg; }
+  if (msg) return;
+  pts[i][k === 'x' ? 0 : 1] = Math.round(v);
+  const next = normOutline(pts, S.w);
+  S.outline = next; syncOutline();
+  outlineLive(next.length !== pts.length);
+  liveUpdate();
+}
+function olAction(kind, el) {
+  const pts = outlinePts().map(([x, y]) => [Math.round(x), y]), W = S.w;
+  if (kind === 'add') {
+    if (pts.length >= OL.max) return;
+    let best = 0;
+    pts.slice(1).forEach((q, i) => { if (q[0] - pts[i][0] > pts[best + 1][0] - pts[best][0]) best = i; });
+    const [a, b] = [pts[best], pts[best + 1]];
+    if (b[0] - a[0] < 2 * OL.gap) return;
+    const x = Math.round((a[0] + b[0]) / 2);
+    pts.splice(best + 1, 0, [x, Math.round(shapeGeom().topAt(x))]);
+  } else if (kind === 'del') {
+    const i = Number(el.dataset.i);
+    if (!Number.isInteger(i) || i <= 0 || i >= pts.length - 1) return;
+    pts.splice(i, 1);
+  } else if (kind === 'flip') pts.reverse().forEach(q => { q[0] = W - q[0]; });
+  else if (kind === 'preset') {
+    if (!OL_PRESETS.some(([k]) => k === el.dataset.value)) return;
+    S.outline = presetOutline(el.dataset.value, W, S.h, S.low); syncOutline(); S.overrides = {}; saveDraft(); render();
+    return;
+  }
+  S.outline = normOutline(pts, W); syncOutline(); S.overrides = {};
+  saveDraft(); render();
+  if (kind === 'add' || kind === 'del') { const f = $(kind === 'add' ? '[data-action="ol-add"]' : '#olRows input'); if (f && !f.disabled) f.focus(); }
+}
+
 // Big +/- control: no keyboard needed, and the number can't land in the wrong box
 function stepper(k, label, help) {
   const lim = LIMITS[k], v = Math.round(S[k] || 0);
@@ -1607,14 +1917,16 @@ function boxesControl() {
       <output aria-live="polite">${L.n}</output>
       <button type="button" data-action="step" data-k="boxes" data-d="1" aria-label="One more box"${L.n >= 8 ? ' disabled' : ''}><i class="ph ph-plus" aria-hidden="true"></i></button>
     </div><span class="help">${esc(help)}${auto ? '' : ' <button type="button" class="link-btn" data-action="boxes-auto">Back to auto</button>'}</span>
-    ${L.n > 1 && S.template !== 'understairs' ? `<span class="help why"><i class="ph ph-info" aria-hidden="true"></i>Why ${2 * L.n - 2} box sides? One box would need a ${fmt(S.w)} top, too long to carry in. Split into ${L.n}, each box has its own two sides, so where boxes meet there are two sides screwed together instead of one divider. It costs ${L.n - 1} extra panel${L.n > 2 ? 's' : ''}, but each box is rigid on its own, you build them one at a time on the floor, and they come apart if you move. If it is going somewhere with easier access, change the location above: longer boxes fit, so some pairs become single dividers.</span>` : ''}
+    ${L.custom && L.n > 1 ? `<span class="help why"><i class="ph ph-info" aria-hidden="true"></i>Each slope or flat part of the ceiling gets its own box, so every box has one straight top. Long ones are split again so each panel can be carried in.</span>` : ''}
+    ${L.n > 1 && !isShaped() ? `<span class="help why"><i class="ph ph-info" aria-hidden="true"></i>Why ${2 * L.n - 2} box sides? One box would need a ${fmt(S.w)} top, too long to carry in. Split into ${L.n}, each box has its own two sides, so where boxes meet there are two sides screwed together instead of one divider. It costs ${L.n - 1} extra panel${L.n > 2 ? 's' : ''}, but each box is rigid on its own, you build them one at a time on the floor, and they come apart if you move. If it is going somewhere with easier access, change the location above: longer boxes fit, so some pairs become single dividers.</span>` : ''}
     ${L.raised ? `<span class="help">Raised to ${L.C} compartments so every box has at least one.</span>` : ''}</div>`;
 }
 
 // Tiny front view so the numbers above read as a picture
 function layoutPreview() {
   const L = layout(), W = 160, H = 64, t = 3, k = W / S.w;
-  const shelves = R.parts.filter(p => p.role === 'shelf').length || 0;
+  const sp = R.parts.filter(p => p.role === 'shelf');
+  const shelves = L.custom ? new Set(sp.map(p => p.yc)).size : sp.length; // an odd shape splits each row by width
   let g = '';
   L.boxes.forEach(b => { g += `<rect x="${b.x0 * k + 1}" y="0" width="${b.w * k - 2}" height="${H}" rx="2" fill="none" stroke="currentColor" stroke-width="${t}"/>`; });
   L.verticals.filter(v => v.kind === 'divider').forEach(v => { const x = (v.x + S.thickness / 2) * k; g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="currentColor" stroke-width="${t}"/>`; });
@@ -1822,14 +2134,18 @@ function safetyChecks() {
   if (long.length) out.push({ status: 'warn', id: 'carry', title: 'Check the long panels will go in', text: `${[...new Set(long.map(p => p.name.replace(/ \d+$/, '')))].join(', ')} ${long.length > 1 ? 'are' : 'is'} up to ${fmt(Math.max(...long.map(p => Math.max(p.w, p.h))))} long. Panels over about ${fmt(site.carry)} are hard to get ${S.site === 'loft' ? 'up loft stairs or through a hatch' : S.site === 'upstairs' ? 'up stairs and round a landing' : 'in'}. Measure the tightest turn before you order.` });
   const back = R.parts.some(p => p.role === 'back');
   if (isBuiltIn()) out.push({ status: 'pass', id: 'back', title: 'Fixed to the building', text: 'The plinth frame is screwed to the floor, the end panels to the walls and each divider to cleats, so it cannot rack or tip.' });
-  else if (isFramed()) out.push({ status: 'pass', id: 'back', title: 'The frame is fixed to the building', text: `Screwed to the floor and ${S.template === 'eaves' ? 'up into the rafters' : 'to the stair string'}, so it cannot rack or tip.` });
+  else if (isFramed()) out.push({ status: 'pass', id: 'back', title: 'The frame is fixed to the building', text: `Screwed to the floor and ${S.template === 'eaves' ? 'up into the rafters' : S.template === 'custom' ? 'up into the rafters or ceiling joists' : 'to the stair string'}, so it cannot rack or tip.` });
   else out.push(back
     ? { status: 'pass', id: 'back', title: 'Back panel stops it racking', text: 'Pin the back to every edge and divider so it holds the unit square.' }
     : { status: 'fail', id: 'back', title: 'No back panel', text: 'Without a fixed back the unit can lean sideways and collapse.' });
   if (isBuiltIn()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: 'Find the floor joists and wall studs with a detector and fix into them, or use wall plugs that suit the wall.' });
-  else if (isFramed()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: `Find the floor joists and ${S.template === 'eaves' ? 'rafters' : 'stair string'} with a detector and screw the plates into them, not just into boards or plasterboard.` });
+  else if (isFramed()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: `Find the floor joists and ${S.template === 'eaves' ? 'rafters' : S.template === 'custom' ? 'rafters or ceiling joists' : 'stair string'} with a detector and screw the plates into them, not just into boards or plasterboard.` });
   else out.push({ status: 'action', id: 'wall', title: S.template === 'eaves' ? 'Fix it to the floor and knee wall' : S.template === 'kitchenwall' ? 'Hang it on rated wall fixings' : 'Fix it to the wall', text: S.template === 'kitchenwall' ? 'Wall cupboards hang from the wall, so use fixings rated for your wall type and the full load.' : 'Furniture can tip forward, especially if a child climbs it. Always fix it, even if it feels steady.' });
   if (!isFramed() && S.joinery === 'screws' && (S.material === 'mdf' || S.material === 'melamine')) out.push({ status: 'warn', id: 'joints', title: 'Screws hold poorly in board edges', text: `${MATERIALS[S.material].name} edges split and strip easily. Drill pilot holes, keep screws well away from corners, or switch to cam and dowel fittings.` });
+  if (S.template === 'custom') {
+    const narrow = shapeGeom().segs.filter(sg => sg.dx < NARROW_SEG);
+    if (narrow.length) out.push({ status: 'warn', id: 'narrow', title: 'A narrow compartment at a step', text: `The ceiling changes over less than ${fmt(300)} at ${narrow.map(sg => fmt(sg.x0)).join(', ')} from the left, so an upright stands each side and the narrow gap between is left open, with no door or shelves. Fine for a beam. Move the points apart if you want to use it.` });
+  }
   if (S.material === 'osb') out.push({ status: 'warn', id: 'osb', title: 'OSB is a building board', text: 'It is rough, flexible across the strands and can shed splinters. Fine for a loft store, not for a child\'s room.' });
   return out;
 }
@@ -1867,15 +2183,20 @@ function frameCounts(m) {
   const q = role => R.parts.filter(p => p.role === role).reduce((a, p) => a + p.qty, 0);
   const plates = R.parts.filter(p => p.role === 'plate');
   return { studs: q('stud'), divs: q('divider'), cleats: q('cleat'), bearers: q('bearer'), shelves: q('shelf'), doors: q('door'),
-    sole: Math.ceil(S.w / 400) + 1, head: Math.ceil(plates.filter(p => p.name === 'Head Plate').reduce((a, p) => a + p.w * p.qty, 0) / 400) + 1,
+    sole: Math.ceil(S.w / 400) + 1, head: Math.ceil(plates.filter(p => p.name.startsWith('Head Plate')).reduce((a, p) => a + p.w * p.qty, 0) / 400) + 1,
     hinges: R.parts.filter(p => p.hinges).reduce((a, p) => a + p.hinges.length * p.qty, 0) };
 }
 function frameText(m) {
-  const eaves = S.template === 'eaves', L = layout();
+  const eaves = S.template === 'eaves', custom = S.template === 'custom', L = layout();
+  const widths = L.bays.map(b => Math.floor(b.w)), wMin = Math.min(...widths), wMax = Math.max(...widths);
   return {
     sole: 'Snap a chalk line on the floor where the doors will go. Screw the sole plate down along it every 400mm, into the joists where you can.',
-    head: eaves ? 'Use a level or plumb line to mark the door line on the slope, straight above the sole plate. Screw the head plate up into every rafter, lying flat on the slope.' : 'Mark a line on the stair string straight above the sole plate. Screw the head plate to the side of the string. Do not screw up into the treads.',
-    studs: `Measure each stud in place, floors and roofs are rarely true. Cut the top at ${m.g.angDeg} degrees. Space them so each opening is ${L.bayW}mm wide, plumb each one with a level and skew-screw it at both ends.`,
+    head: eaves ? 'Use a level or plumb line to mark the door line on the slope, straight above the sole plate. Screw the head plate up into every rafter, lying flat on the slope.'
+      : custom ? `Use a level or plumb line to mark the door line on the ceiling, straight above the sole plate. Screw ${m.g.segs.length > 1 ? 'one head plate to each slope or flat part' : 'the head plate'} up into the rafters or ceiling joists along it.${m.g.segs.length > 1 ? ' Where two plates meet, cut their ends so they butt together tightly.' : ''}`
+      : 'Mark a line on the stair string straight above the sole plate. Screw the head plate to the side of the string. Do not screw up into the treads.',
+    studs: custom
+      ? `Measure each stud in place, floors and roofs are rarely true. Cut each top to the angle in the cut list. A stud under a change of angle has its top cut to both slopes, meeting at the point. Space them so the openings are ${wMin === wMax ? `${wMin}mm` : `${wMin} to ${wMax}mm`} wide, as in the drawing, plumb each one with a level and skew-screw it at both ends.`
+      : `Measure each stud in place, floors and roofs are rarely true. Cut the top at ${m.g.angDeg} degrees. Space them so each opening is ${L.bayW}mm wide, plumb each one with a level and skew-screw it at both ends.`,
     divs: 'Screw a floor cleat and a wall cleat in line with each inner stud. Slide the divider in behind the stud, screw it to both cleats, then drive 3 screws through the stud into its front edge.',
     shelves: 'Screw a bearer to each side of the compartment at shelf height and check they are level with each other. Rest the shelf on them and put one screw down through each end.',
     doors: 'Screw the hinge plates to the side of the studs, 37mm back from the front. Clip each door on and turn the adjusting screws until the gaps are even.'
@@ -1930,32 +2251,41 @@ function frameManualSteps() {
   const m = frameModel(), c = frameCounts(m), tx = frameText(m), D = S.d, H = S.h;
   const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer'), doors = frameNames(m, 'door');
   const ex = (list, v) => Object.fromEntries(list.map(n => [n, v]));
-  const steps = [];
+  const steps = [], heads = frameNames(m, 'plate').filter(n => n.startsWith('Head Plate'));
   steps.push({ add: ['Sole Plate'], ex: ex(['Sole Plate'], [0, H * 0.3, -D * 0.5]), hw: [['timber screws', c.sole]], wall: true, note: tx.sole });
-  steps.push({ add: ['Head Plate'], ex: ex(['Head Plate'], [0, H * 0.3, -D * 0.5]), hw: [['timber screws', c.head]], wall: true, twoPeople: true, note: tx.head });
+  steps.push({ add: heads, ex: ex(heads, [0, H * 0.3, -D * 0.5]), hw: [['timber screws', c.head]], wall: true, twoPeople: true, note: tx.head });
   steps.push({ add: studs, ex: ex(studs, [0, 0, -D * 0.7]), hw: [['timber screws', 4 * c.studs]], note: tx.studs, twoPeople: H > 1500 });
   if (divs.length) steps.push({ add: [...divs, 'Floor Cleat', 'Wall Cleat'], ex: { ...ex(divs, [0, 0, D * 0.8]), ...ex(['Floor Cleat', 'Wall Cleat'], [0, 0, D * 0.5]) }, hw: [['timber screws', 3 * c.divs + 2 * c.cleats], ['wood screws', 3 * c.cleats]], note: tx.divs });
   if (shelves.length) steps.push({ add: [...bearers, ...shelves], ex: { ...ex(bearers, [0, 0, -D * 0.6]), ...ex(shelves, [0, H * 0.15, -D * 1.1]) }, hw: [['wood screws', 3 * c.bearers + 2 * c.shelves], ['wall plugs', 0]], note: tx.shelves });
   if (doors.length) steps.push({ add: doors, ex: ex(doors, [0, 0, -D * 0.8]), hw: [['hinges', c.hinges], ['knob', c.doors]], note: tx.doors, twoPeople: H > 1500 });
   return steps;
 }
+// Checking an odd-shaped space before you start, with each slope in plain words
+const CUSTOM_WARN = 'Keep air moving in the roof. Do not squash or cover the insulation or vents, and leave a small gap behind the cupboard.';
+function customCheck(g, upright) {
+  return [`Stand facing the space and measure the height at both walls and at every change of angle. Your design is ${Math.round(S.h)}mm at the highest point and ${Math.round(S.low)}mm at the lowest.`,
+    `Left to right, the ceiling is: ${slopeWords(g).join('; ')}. Set a sliding bevel to each slope and check it at a few points.`,
+    `Check the heights again where each ${upright} will go. Ceilings sag and walls lean.`,
+    'Note anything that must stay reachable, such as a loft hatch, water tank, stopcock or junction box. Plan a door in front of it.',
+    upright === 'stud' ? 'Find the rafters or ceiling joists and the floor joists and mark them on masking tape. Scan for cables and pipes.' : 'Find the wall studs, mark them on masking tape and scan for cables and pipes.'];
+}
 function frameBuildSteps() {
   if (isBuiltIn()) return builtinBuildSteps();
-  const m = frameModel(), tx = frameText(m), eaves = S.template === 'eaves', doors = R.parts.find(p => p.role === 'door');
-  const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer');
+  const m = frameModel(), tx = frameText(m), eaves = S.template === 'eaves', custom = S.template === 'custom', doors = R.parts.find(p => p.role === 'door');
+  const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer'), heads = frameNames(m, 'plate').filter(n => n.startsWith('Head Plate'));
   const timber = R.linear.map(g => `${g.count} x ${fmtLen(g.stock)} of ${g.section}`).join(' and ');
   const steps = [];
   steps.push({ title: 'Check your delivery and buy the timber', parts: R.parts.filter(p => p.stock === 'sheet').map(p => p.name), tools: ['Tape measure', 'Pencil'], body: ['Lay every panel out flat and match it to the cut list. Tell the supplier now if anything is off.', `Buy the timber from any builders merchant or DIY store: ${timber}. Cut it on site, as each piece is measured in place.`, 'Pencil the part name on a hidden edge of each panel.'] });
-  steps.push({ title: 'Check the space', parts: [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', 'Sliding bevel'], body: eaves
+  steps.push({ title: 'Check the space', parts: [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', 'Sliding bevel'], body: custom ? customCheck(m.g, 'stud') : eaves
     ? [`Measure the front height, back height and depth at both ends and in the middle. Your design is ${Math.round(S.h)}mm at the front and ${Math.round(S.low)}mm at the back.`, `Set a sliding bevel to the slope (about ${m.g.angDeg} degrees) and check it at each end.`, 'Check the floor is boarded and solid. If the loft only has joists, board it first.', 'Find the rafters and floor joists and mark them on masking tape. Scan for cables and pipes.']
     : [`Measure the height to the underside of the stairs at both ends and where each stud will go. Your design is ${Math.round(S.h)}mm at the tall end and ${Math.round(S.low)}mm at the short end.`, `Set a sliding bevel to the stairs (about ${m.g.angDeg} degrees) and check it at a few points. Old stairs sag.`, 'Note anything under the stairs that must stay reachable: gas meter, fuse box, stopcock. Plan a door in front of it.', 'Find the floor joists and mark them. Scan for cables and pipes.'],
-    warn: eaves ? 'Do not squash or cover the insulation or vents behind the knee wall.' : 'If the stairs are the escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control first.' });
-  steps.push({ title: 'Fix the plates', parts: ['Sole Plate', 'Head Plate'], tools: ['Chalk line', 'Spirit level', 'Drill', 'Stud and cable detector'], twoPeople: true, body: [tx.sole, tx.head, 'Pack behind the plates where the floor or slope dips, so they stay straight.'] });
+    warn: eaves ? 'Do not squash or cover the insulation or vents behind the knee wall.' : custom ? CUSTOM_WARN : 'If the stairs are the escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control first.' });
+  steps.push({ title: 'Fix the plates', parts: ['Sole Plate', ...heads], tools: ['Chalk line', 'Spirit level', 'Drill', 'Stud and cable detector'], twoPeople: true, body: [tx.sole, tx.head, 'Pack behind the plates where the floor or slope dips, so they stay straight.'] });
   steps.push({ title: 'Cut and fit the studs', parts: studs, tools: ['Saw', 'Sliding bevel', 'Spirit level', 'Drill'], body: [tx.studs, 'Check the openings are the same width top and bottom before you fix the last screw.'] });
   if (divs.length) steps.push({ title: 'Fit the dividers', parts: [...divs, 'Floor Cleat', 'Wall Cleat'], tools: ['Drill', 'Spirit level', 'Square'], body: [tx.divs, 'Check each divider is square to the front with a builders square.'] });
   if (shelves.length) steps.push({ title: 'Fit the shelves', parts: [...bearers, ...shelves], tools: ['Drill', 'Spirit level'], body: [tx.shelves, 'On a masonry or plasterboard end wall, use the wall plugs, or screw into a stud.'] });
   if (doors) steps.push({ title: 'Hang the doors', parts: frameNames(m, 'door'), tools: ['Drill', '35mm Forstner bit', 'Screwdriver'], body: [`On the inside face of each door, drill 35mm hinge cups 13mm deep, ${doors.hinges.map(h => h.y + 'mm').join(', ')} from the top and 22.5mm in from the hinge edge. Your cutter can drill these for you.`, tx.doors, 'Fit the knobs last.'] });
-  steps.push({ title: 'Finish', parts: ['Sole Plate', 'Head Plate', ...studs], tools: ['Caulk gun', 'Paint brush'], body: ['Run decorators caulk along every gap between the frame and the walls, floor and ceiling.', 'Fill the screw holes, sand, and paint the frame to match the doors.'] });
+  steps.push({ title: 'Finish', parts: ['Sole Plate', ...heads, ...studs], tools: ['Caulk gun', 'Paint brush'], body: ['Run decorators caulk along every gap between the frame and the walls, floor and ceiling.', 'Fill the screw holes, sand, and paint the frame to match the doors.'] });
   return steps;
 }
 
@@ -1976,13 +2306,13 @@ function buildSteps() {
     const topName = eaves ? 'sloped top' : t === 'kitchenbase' ? 'top rails' : 'top';
     const pilot = S.joinery === 'screws' ? 'Drill 3mm pilot holes and countersink them. ' : '';
     steps.push({ title: 'Check your delivery', parts: all, tools: ['Tape measure', 'Pencil'], body: ['Lay every panel out flat and match it to the cut list.', 'Measure a few. Tell the supplier now if anything is off.', 'Pencil the part name on a hidden edge, and a small triangle on the inside face pointing to the front edge, so nothing goes in back to front.'] });
-    const us = t === 'understairs';
-    steps.push({ title: 'Check the space', parts: eaves || us ? ['Left Side', 'Right Side'] : [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', eaves || us ? 'Sliding bevel' : 'Pencil'], body: us
-      ? [`Measure the height to the underside of the stairs at both ends and where each upright will go. Your design is ${Math.round(S.h)}mm at the tall end and ${Math.round(S.low)}mm at the short end.`, `Set a sliding bevel to the stairs (about ${stairGeom().angDeg} degrees) and check it at a few points. Old stairs sag.`, 'Note anything under the stairs that must stay reachable: gas meter, fuse box, stopcock. Plan a door in front of it.', 'Find the wall studs, mark them on masking tape and scan for cables and pipes.']
+    const us = t === 'understairs', custom = t === 'custom';
+    steps.push({ title: 'Check the space', parts: eaves || us || custom ? ['Left Side', 'Right Side'] : [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', eaves || us || custom ? 'Sliding bevel' : 'Pencil'], body: custom ? customCheck(shapeGeom(), 'upright') : us
+      ? [`Measure the height to the underside of the stairs at both ends and where each upright will go. Your design is ${Math.round(S.h)}mm at the tall end and ${Math.round(S.low)}mm at the short end.`, `Set a sliding bevel to the stairs (about ${shapeGeom().angDeg} degrees) and check it at a few points. Old stairs sag.`, 'Note anything under the stairs that must stay reachable: gas meter, fuse box, stopcock. Plan a door in front of it.', 'Find the wall studs, mark them on masking tape and scan for cables and pipes.']
       : eaves
       ? [`Measure the front height, back height and depth at both ends and in the middle. Lofts are rarely even. Your design is ${Math.round(S.h)}mm at the front and ${Math.round(S.low)}mm at the back.`, 'Offer one side panel up against the slope at each end. If the angle is off, fix it now, not after assembly.', 'Find the knee wall studs and the rafters and mark them on masking tape. Scan for cables and pipes.', 'Check the floor with a level so you know where you will need packers.']
       : ['Check the floor and wall with a level so you know where you will need packers.', 'Find the wall studs and mark them on masking tape.', 'Scan for cables and pipes. Avoid lines straight up, down and across from sockets and switches.'],
-      warn: eaves ? 'Keep air moving in the eaves. Leave a gap of about 25mm behind the unit and do not squash or cover the insulation or vents.' : us ? 'If the stairs are the escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control first.' : null });
+      warn: eaves ? 'Keep air moving in the eaves. Leave a gap of about 25mm behind the unit and do not squash or cover the insulation or vents.' : custom ? CUSTOM_WARN : us ? 'If the stairs are the escape route in a house with three or more storeys, the cupboard may need fire-resisting linings and doors (Approved Document B). Check with Building Control first.' : null });
     if (R.parts.some(p => p.scribed)) steps.push({ title: 'Scribe to your walls', parts: R.parts.filter(p => p.scribed).map(p => p.name), tools: ['Pencil', 'Block plane or jigsaw'], body: ['Hold the panel against the wall where it will go.', 'Run a pencil along the wall on a 2mm block to copy its shape onto the panel.', 'Plane or cut down to the line, angled slightly back.'] });
     const drill = [];
     if (shelves.length) {
@@ -2000,8 +2330,8 @@ function buildSteps() {
         : ['Push glued dowels into the side panels.', 'Fit the cam bolts, slide the bottom on and turn each cam a quarter turn. Do not over-tighten.'];
     if (multi) join.unshift(`This unit is built as ${Lay.n} separate boxes (${boxDesc}) so each one fits on a sheet and up the stairs. Build every box with the next ${hasDiv ? 4 : 3} steps, then join them in place.`);
     steps.push({ title: multi ? 'Build each box: the base' : 'Build the base', parts: [...names('side'), ...names('bottom')], tools: S.joinery === 'pocket' ? ['Drill', 'Pocket-hole jig', 'Clamps'] : S.joinery === 'cam' ? ['Screwdriver', 'Rubber mallet'] : ['Drill', '3mm bit', 'Countersink', 'Clamps'], body: join });
-    if (hasDiv) { const bi = bayInfo(); steps.push({ title: multi ? 'Each box: stand the dividers' : 'Stand the dividers', parts: names('divider'), tools: ['Tape measure', 'Square', 'Drill'], body: [`Mark the divider positions on the bottom. Each compartment is ${bi.bayW}mm wide inside.`, 'Cut a spacer from an offcut to that width. Use it to set each divider square and parallel.', `${pilot}Screw through the underside of the bottom into each divider, ${f} screws each.`] }); }
-    steps.push({ title: (multi ? 'Each box: ' : '') + (eaves || us ? (multi ? 'fit the sloped top' : 'Fit the sloped top') : t === 'kitchenbase' ? 'Fit the top rails' : (multi ? 'fit the top' : 'Fit the top')), parts: names('top'), tools: ['Drill', 'Clamps'], body: [eaves ? `Check the front and back edges are bevelled at ${eavesGeom().angDeg} degrees.` : us ? `Plane or saw the top edge of each upright to ${stairGeom().angDeg} degrees so the top sits flat on them, then lay the top on, flush at the front.` : 'Lay the top on, flush at the front.', `${pilot}Glue and screw it down into the sides${hasDiv ? ' and every divider' : ''}, ${f} screws per joint.`] });
+    if (hasDiv) { const bi = bayInfo(), ws = [...new Set(Lay.bays.map(b => Math.floor(b.w)))].sort((a, b) => a - b); steps.push({ title: multi ? 'Each box: stand the dividers' : 'Stand the dividers', parts: names('divider'), tools: ['Tape measure', 'Square', 'Drill'], body: [Lay.custom && ws.length > 1 ? `Mark the divider positions on the bottom. Compartments are ${ws[0]} to ${ws[ws.length - 1]}mm wide inside, depending on the box: the drawing shows each one.` : `Mark the divider positions on the bottom. Each compartment is ${bi.bayW}mm wide inside.`, 'Cut a spacer from an offcut to that width. Use it to set each divider square and parallel.', `${pilot}Screw through the underside of the bottom into each divider, ${f} screws each.`] }); }
+    steps.push({ title: (multi ? 'Each box: ' : '') + (eaves || us || custom ? (multi ? 'fit the sloped top' : 'Fit the sloped top') : t === 'kitchenbase' ? 'Fit the top rails' : (multi ? 'fit the top' : 'Fit the top')), parts: names('top'), tools: ['Drill', 'Clamps'], body: [eaves ? `Check the front and back edges are bevelled at ${eavesGeom().angDeg} degrees.` : us ? `Plane or saw the top edge of each upright to ${shapeGeom().angDeg} degrees so the top sits flat on them, then lay the top on, flush at the front.` : custom ? `Plane or saw the top edge of each upright to the angle of the ceiling above its box (the cut list gives each one: ${[...new Set(shapeGeom().segs.map(sg => sg.angDeg + ' deg'))].join(', ')}) so the top sits flat on them, then lay the top on, flush at the front. Flat tops need no bevel.` : 'Lay the top on, flush at the front.', `${pilot}Glue and screw it down into the sides${hasDiv ? ' and every divider' : ''}, ${f} screws per joint.`] });
     if (R.parts.some(p => p.role === 'back')) steps.push({ title: multi ? 'Each box: square it and fit the back' : 'Square it and fit the back', parts: names('back'), tools: ['Tape measure', 'Hammer'], body: ['Turn the unit over so it lies face down on a blanket.', 'Measure both diagonals. Push the corners until they match: then the box is square.', `Run glue along every edge${hasDiv ? ' and divider' : ''}, lay the back on and pin it every 150mm with 25mm panel pins.`], warn: eaves ? 'Do this now, before it goes in. Once the unit is under the eaves you cannot reach the back.' : 'The back holds the unit square. Fit it before you stand the unit up or move it.' });
     if (t === 'kitchenbase') steps.push({ title: 'Make the drawer', parts: names('drawer'), tools: ['Drill', 'Clamps'], body: ['Glue and screw the sides to the back.', 'Slide the 6mm base in and pin it from below.', 'Fit the runners to the drawer and the cabinet.'] });
     if (t === 'kitchenbase') steps.push({ title: 'Legs and plinth', parts: ['Plinth'], tools: ['Spirit level'], body: ['Screw the legs to the underside, one near each corner.', 'Level the unit by twisting the legs.', 'Clip the plinth to the front legs.'] });
@@ -2014,6 +2344,7 @@ function buildSteps() {
       body: eaves
         ? [...(multi ? [] : ['With two people, carry the unit in and slide it back under the slope, keeping the 25mm air gap behind it.']), 'Level it front to back and side to side with packers under the bottom.', 'Inside the unit, screw angle brackets to the floor. Screw through the top back edge into the knee wall studs you marked.', 'Fill the gaps to the walls and slope with a scribe strip or decorators caulk.']
         : us ? ['Level it with packers under the bottom.', 'Screw angle brackets inside the unit to the floor and into the wall studs you marked.', 'Do not screw up into the stairs: screws can split the treads or come through.', 'Fill the gap to the underside of the stairs with a scribe strip or caulk.']
+        : custom ? ['Level it with packers under the bottom.', 'Screw angle brackets inside the unit to the floor and into the wall studs you marked.', 'Fill the gap to the ceiling with a scribe strip or decorators caulk.']
         : ['Level the unit, packing under it if needed.', 'Fix it to the studs you marked, or with wall plugs that suit the wall.', 'Fill any gap to the wall with a scribe strip or caulk.'],
       warn: (t === 'wardrobe' || (t === 'shelving' && S.h > 1000)) ? 'Tall units can tip forward. Always fix them to the wall.' : null });
     if (shelves.length || t === 'wardrobe') steps.push({ title: t === 'wardrobe' ? 'Fit shelves and rail' : 'Fit the shelves', parts: [...names('shelf'), ...names('rail')], tools: ['Screwdriver'], body: ['Push four pins into the holes for each shelf and rest the shelf on them.', t === 'wardrobe' ? 'Screw the rail sockets 70mm below the top, then drop the rail in.' : 'Check each shelf sits flat and does not rock.'] });
@@ -2098,24 +2429,24 @@ function partSolids(opt = {}) {
   const only = opt.box != null ? Lay.boxes[opt.box] : null, dx = only ? -only.x0 : 0;
   const inBox = i => !only || i === only.i;
   const hexa = (part, v) => out.push({ part, v, f: [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [0, 3, 7, 4], [1, 2, 6, 5]] });
-  if (t === 'understairs') {
-    const sg = stairGeom();
+  if (isShaped(t)) {
+    const sg = shapeGeom();
     Lay.verticals.forEach(v => {
       if (!inBox(v.box)) return;
-      const top = sg.topAt(v.x + th / 2) - sg.tv, y0 = v.kind === 'divider' ? th : 0;
+      const top = sg.topAt(v.x + th / 2) - boxSeg(sg, Lay.boxes[v.box]).tv, y0 = v.kind === 'divider' ? th : 0;
       box(v.name, v.x + dx, y0, 0, th, top - y0, D);
       Object.assign(out[out.length - 1], { side: v.kind, box: v.box });
     });
     Lay.boxes.forEach(b => {
       if (!inBox(b.i)) return;
-      const x0 = b.x0, x1 = b.x0 + b.w, a = sg.topAt(x0), z = sg.topAt(x1), X = x => x + dx;
-      hexa(boxPart('Sloped Top', b), [[X(x0), a - sg.tv, 0], [X(x1), z - sg.tv, 0], [X(x1), z, 0], [X(x0), a, 0], [X(x0), a - sg.tv, D], [X(x1), z - sg.tv, D], [X(x1), z, D], [X(x0), a, D]]);
+      const x0 = b.x0, x1 = b.x0 + b.w, a = sg.topAt(x0), z = sg.topAt(x1), X = x => x + dx, tv = boxSeg(sg, b).tv;
+      hexa(boxPart(boxTopName(b), b), [[X(x0), a - tv, 0], [X(x1), z - tv, 0], [X(x1), z, 0], [X(x0), a, 0], [X(x0), a - tv, D], [X(x1), z - tv, D], [X(x1), z, D], [X(x0), a, D]]);
       out[out.length - 1].box = b.i;
       box(boxPart('Bottom', b), X(x0 + th), 0, 0, b.w - 2 * th, th, D); out[out.length - 1].box = b.i;
-      if (R.parts.some(p => p.role === 'back')) { const al = a - sg.tv, zr = z - sg.tv; hexa(boxPart('Back Panel', b), [[X(x0), 0, D], [X(x1), 0, D], [X(x1), zr, D], [X(x0), al, D], [X(x0), 0, D + 3], [X(x1), 0, D + 3], [X(x1), zr, D + 3], [X(x0), al, D + 3]]); out[out.length - 1].box = b.i; }
+      if (R.parts.some(p => p.role === 'back')) { const al = a - tv, zr = z - tv; hexa(boxPart('Back Panel', b), [[X(x0), 0, D], [X(x1), 0, D], [X(x1), zr, D], [X(x0), al, D], [X(x0), 0, D + 3], [X(x1), 0, D + 3], [X(x1), zr, D + 3], [X(x0), al, D + 3]]); out[out.length - 1].box = b.i; }
     });
     if (only) return out;
-    R.parts.filter(p => p.role === 'shelf').forEach(p => (p.bays || []).forEach(j => box(p.name, Lay.bays[j].x, p.yc - th / 2, 0, Lay.bayW, th, p.h)));
+    R.parts.filter(p => p.role === 'shelf').forEach(p => (p.bays || []).forEach(j => box(p.name, Lay.bays[j].x, p.yc - th / 2, 0, Lay.custom ? Lay.bays[j].w : Lay.bayW, th, p.h)));
     if (R.parts.some(p => p.role === 'door')) stairDoors().forEach((dr, i) => hexa('Door ' + (i + 1), [[dr.x, 2, -th], [dr.x + dr.w, 2, -th], [dr.x + dr.w, dr.hr, -th], [dr.x, dr.hl, -th], [dr.x, 2, 0], [dr.x + dr.w, 2, 0], [dr.x + dr.w, dr.hr, 0], [dr.x, dr.hl, 0]]));
     return out;
   }
@@ -2306,18 +2637,18 @@ function manualSteps() {
   const names = role => R.parts.filter(p => p.role === role).map(p => p.name);
   const f = Math.max(2, Math.ceil(D / 150));
   const join = k => S.joinery === 'cam' ? [['cam lock', f * k], ['dowels', f * k]] : S.joinery === 'pocket' ? [['pocket-hole screws', f * k]] : [['wood screws', f * k]];
-  const topName = t === 'eaves' || t === 'understairs' ? 'Sloped Top' : t === 'kitchenbase' ? 'Top Rail' : 'Top';
   const steps = [];
   const eaves = t === 'eaves', L = layout(), b0 = L.boxes[0], multi = L.n > 1;
+  const topName = t === 'eaves' || t === 'understairs' ? 'Sloped Top' : t === 'custom' ? boxTopName(b0) : t === 'kitchenbase' ? 'Top Rail' : 'Top';
   const v0 = L.verticals.filter(v => v.box === 0), rightName = v0[v0.length - 1].name, divNames = v0.filter(v => v.kind === 'divider').map(v => v.name), bName = boxPart('Bottom', b0), tName = t === 'kitchenbase' ? 'Top Rail' : boxPart(topName, b0), backName = boxPart('Back Panel', b0);
   const box0Divs = b0.k - 1, scope = multi ? 'box' : null;
-  const makeNote = multi ? (L.boxes.some(b => b.k !== b0.k) ? ` Build ${L.boxes.filter(b => b.k === b0.k).length} boxes like this, and ${L.boxes.filter(b => b.k !== b0.k).length} with ${L.boxes.find(b => b.k !== b0.k).k} compartment${L.boxes.find(b => b.k !== b0.k).k > 1 ? 's' : ''}.` : ` Build ${L.n} boxes like this.`) : '';
+  const makeNote = multi && L.custom ? ` Build all ${L.n} boxes this way. Each has its own sizes and angle, so check the part names against the cut list.` : multi ? (L.boxes.some(b => b.k !== b0.k) ? ` Build ${L.boxes.filter(b => b.k === b0.k).length} boxes like this, and ${L.boxes.filter(b => b.k !== b0.k).length} with ${L.boxes.find(b => b.k !== b0.k).k} compartment${L.boxes.find(b => b.k !== b0.k).k > 1 ? 's' : ''}.` : ` Build ${L.n} boxes like this.`) : '';
   // Same order as a carpenter: base, right side, dividers onto the base, top down onto them,
   // back on while it is still out in the room, then into place, then the loose parts.
   steps.push({ scope, times: multi ? L.n : 0, add: [bName], ex: { [bName]: [b0.w * 0.4, 0, 0] }, hw: [...join(1), ...(S.joinery === 'cam' ? [] : [['glue', 0]])], note: 'Work on a flat floor with the box on its back. Fix the bottom to the left side, flush at the front.' + makeNote });
   steps.push({ scope, add: [rightName], ex: { [rightName]: [b0.w * 0.45, 0, 0] }, hw: join(1), note: 'Fix the right side to the bottom.', twoPeople: H > 1500 });
-  if (box0Divs > 0) steps.push({ scope, add: divNames, ex: Object.fromEntries(divNames.map(n => [n, [0, H * 0.9, 0]])), hw: join(box0Divs), note: `Stand the divider${box0Divs > 1 ? 's' : ''} on the bottom, ${L.bayW}mm apart. Use a spacer cut to that width to keep ${box0Divs > 1 ? 'them' : 'it'} square, then screw through the underside of the bottom.` });
-  steps.push({ scope, add: [tName], ex: { [tName]: [0, H * 0.6, 0] }, hw: join(2 + box0Divs), note: eaves ? `Lay the sloped top on and screw it down into the sides${box0Divs ? ' and every divider' : ''}.` : t === 'understairs' ? `Bevel the top edges of the uprights to the stair angle. Lay the sloped top on them and screw it down into each one.` : 'Lay the top on, flush at the front, and screw it down.' });
+  if (box0Divs > 0) steps.push({ scope, add: divNames, ex: Object.fromEntries(divNames.map(n => [n, [0, H * 0.9, 0]])), hw: join(box0Divs), note: `Stand the divider${box0Divs > 1 ? 's' : ''} on the bottom, ${L.custom ? Math.floor(L.bays.find(b => b.box === 0).w) : L.bayW}mm apart. Use a spacer cut to that width to keep ${box0Divs > 1 ? 'them' : 'it'} square, then screw through the underside of the bottom.` });
+  steps.push({ scope, add: [tName], ex: { [tName]: [0, H * 0.6, 0] }, hw: join(2 + box0Divs), note: eaves ? `Lay the sloped top on and screw it down into the sides${box0Divs ? ' and every divider' : ''}.` : t === 'understairs' ? `Bevel the top edges of the uprights to the stair angle. Lay the sloped top on them and screw it down into each one.` : t === 'custom' ? (topName === 'Top' ? 'Lay the top on the uprights, flush at the front, and screw it down into each one.' : `Bevel the top edges of the uprights to ${boxSeg(shapeGeom(), b0).angDeg} degrees, the slope above this box. Lay the sloped top on them and screw it down into each one.`) : 'Lay the top on, flush at the front, and screw it down.' });
   if (R.parts.some(p => p.role === 'back')) steps.push({ scope, add: [backName], ex: { [backName]: [0, 0, D * 1.1] }, hw: [['panel pins', Math.ceil(2 * (b0.w + (eaves ? S.low : H)) / 150) + box0Divs * Math.ceil((eaves ? S.low : H) / 150)], ['glue', 0]], note: (eaves ? 'Turn the box face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back on now, before it goes under the eaves.' : 'Turn the box face down. Measure corner to corner both ways: when they match it is square. Glue and pin the back every 150mm.'), check: true });
   if (multi) steps.push({ join: true, add: [], hw: [['connector', (S.h > 900 ? 4 : 3)]], note: `Carry the boxes in one at a time${eaves ? ' and slide each back under the slope' : ''}. Stand each one beside the last with the fronts and tops flush, clamp the sides together and drill ${S.h > 900 ? 4 : 3} holes through both. Fit the connector screws.`, twoPeople: H > 1200 });
   if (has('Plinth')) steps.push({ add: ['Plinth'], ex: { Plinth: [0, -H * 0.1, -D * 0.7] }, hw: [['legs', 4], ['plinth clips', 4]], note: 'Screw on the legs. Level the unit, then clip the plinth onto the front legs.' });
@@ -2803,7 +3134,7 @@ function renderProjects() {
 // Every hole the cutter can drill, so the panels arrive ready to screw together like flat-pack.
 // x is from the front edge (hinge edge on doors), y up from the bottom edge, both in mm.
 function panelHoles(p) {
-  const holes = [], th = S.thickness, cab = isCabinet(S.template), us = S.template === 'understairs';
+  const holes = [], th = S.thickness, cab = isCabinet(S.template), us = isShaped();
   const along = len => { const n = Math.max(2, Math.ceil(len / 150)), a = 50, b = len - 50; return Array.from({ length: n }, (_, i) => Math.round(a + (b - a) * i / (n - 1))); };
   const topAt = x => p.shape ? p.shape.front - (p.shape.front - p.shape.back) * x / p.w : p.h;
   const slopeIn = p.shape ? Math.hypot(p.w, p.shape.front - p.shape.back) / p.w : 1; // vertical distance that is th/2 square to the slope
@@ -3028,9 +3359,10 @@ function cmRedo() {
   cmRedrawAll(); cmUpdateUI();
 }
 function cmDone() {
-  const m = CM.measurements;
+  const m = CM.measurements, oldH = S.h;
   Object.keys(m).forEach(k => { const lim = LIMITS[k]; if (lim) { S[k] = clamp(m[k], lim[0], lim[1]); if (TAPE_KEYS.includes(k)) { S.est[k] = S[k]; S.taped = S.taped.filter(x => x !== k); } } });
   if (S.template === 'eaves' && S.low >= S.h) S.low = Math.round(S.h * 0.6);
+  refitOutline(oldH);
   // Anchor the design where the user measured. u units are fractions of photo width.
   S.fracPerMM = CM.k;
   S.ov = S.ov || { x: 0.2, yb: 0.92 };
@@ -3135,7 +3467,9 @@ function arUndo() {
   $('#arInstructions').textContent = AR.points.length ? 'Tap a surface to place the end point' : 'Tap a surface to place the start point';
 }
 function arDone() {
+  const oldH = S.h;
   Object.entries(AR.measurements).forEach(([k, v]) => { const lim = LIMITS[k]; if (lim) { S[k] = clamp(v, lim[0], lim[1]); if (TAPE_KEYS.includes(k)) { S.est[k] = S[k]; S.taped = S.taped.filter(x => x !== k); } } });
+  refitOutline(oldH);
   endARSession(); saveDraft(); render();
 }
 function endARSession() { if (AR.session) AR.session.end().catch(() => {}); else onARSessionEnd(); }
@@ -3192,12 +3526,18 @@ const BUILD_NAMES = { frame: 'Batten frame', builtin: 'Built-in shelving', boxes
 function applyChanges(ch) {
   const diff = [];
   if (!ch || typeof ch !== 'object') return diff;
+  // On an odd shape the heights come from the outline: h scales it, low cannot be set on its own
+  if (ch.template === 'custom' || (!ch.template && S.template === 'custom')) {
+    if (ch.low !== undefined && ch.low !== null) diff.skipped = ['Short end height: set the heights point by point in the outline on the Space step'];
+    ch = { ...ch, low: null };
+  }
   if (ch.template && ch.template !== S.template && TEMPLATES.some(t => t.id === ch.template)) {
     const keep = { name: S.name, unit: S.unit };
     startTemplate(ch.template, { keepOverlay: true });
     Object.assign(S, keep);
     diff.push(`Design: ${tplOf(ch.template).name}`);
   }
+  const oldH = S.h;
   for (const k of ['w', 'h', 'd', 'low', 'shelves', 'compartments', 'thickness', 'spacing', 'pitch']) {
     if (ch[k] === undefined || ch[k] === null) continue;
     const v = Number(ch[k]); const lim = LIMITS[k];
@@ -3207,6 +3547,7 @@ function applyChanges(ch) {
     if (nv !== S[k]) { diff.push(`${FIELD_LABEL[k]}: ${fmtVal(k, nv)}`); S[k] = nv; }
   }
   if (S.template === 'eaves' && S.low >= S.h) { S.low = Math.round(S.h * 0.6); diff.push(`Back height: ${fmtVal('low', S.low)}`); }
+  if (S.template === 'custom') refitOutline(oldH);
   if (BUILD_NAMES[ch.build] && FRAME_TPL.has(S.template) && ch.build !== S.build && (ch.build !== 'builtin' || S.template === 'eaves')) { S.build = ch.build; S.overrides = {}; diff.push(`Build: ${BUILD_NAMES[ch.build]}`); }
   if (ch.doors !== undefined && ch.doors !== null) {
     const v = ch.doors === 'auto' ? 'auto' : clamp(Math.round(Number(ch.doors)) || 0, 0, 8);
@@ -3260,7 +3601,7 @@ function parseLocally(text) {
   }
   if (/pocket/.test(t)) ch.joinery = 'pocket'; else if (/cam|flat ?pack|knock ?down/.test(t)) ch.joinery = 'cam'; else if (/\bscrews?\b/.test(t) && /join|fix|use/.test(t)) ch.joinery = 'screws';
   if (/\bmdf\b/.test(t)) ch.material = 'mdf'; else if (/melamine|chipboard/.test(t)) ch.material = 'melamine'; else if (/\bosb\b/.test(t)) ch.material = 'osb'; else if (/\bply(wood)?\b/.test(t)) ch.material = 'plywood';
-  const T = [['understairs', /under ?(the )?stairs?|stair cupboard/], ['eaves', /eaves|loft|attic|knee ?wall/], ['wardrobe', /wardrobe/], ['kitchenbase', /kitchen base|base unit/], ['kitchenwall', /wall cupboard|wall unit/], ['shelving', /bookcase|shelving unit/]];
+  const T = [['understairs', /under ?(the )?stairs?|stair cupboard/], ['custom', /odd[- ]?shaped?|awkward(ly)? shaped?|attic slope|angled ceiling|slop(ed|ing) ceiling|chimney|\bbeam\b|(several|two|more than one) (slopes|angles)/], ['eaves', /eaves|loft|attic|knee ?wall/], ['wardrobe', /wardrobe/], ['kitchenbase', /kitchen base|base unit/], ['kitchenwall', /wall cupboard|wall unit/], ['shelving', /bookcase|shelving unit/]];
   for (const [id, re] of T) if (re.test(t) && /(make it|change (it )?to|switch to|turn it into|instead)/.test(t)) { ch.template = id; break; }
   return ch;
 }
@@ -3287,7 +3628,7 @@ async function askSend(text) {
   const question = isQuestion(text);
   if (offline) changes = question ? null : parseLocally(text);
   ASK.log.pop();
-  const before = JSON.stringify(Object.fromEntries([...ASK_FIELDS, 'scribe', 'priceSheet', 'overrides'].map(k => [k, S[k]])));
+  const before = JSON.stringify(Object.fromEntries([...ASK_FIELDS, 'scribe', 'priceSheet', 'overrides', 'outline'].map(k => [k, S[k]])));
   const diff = applyChanges(changes);
   if (offline && question) reply = answerLocally(text) || 'The question helper is not switched on yet, so for now I can only make changes. Try something like "2 shelves" or "1.5m wide".';
   else if (offline) reply = diff.length ? 'Done.' : diff.skipped ? '' : "I couldn't work that out. Try something like \"5 compartments\", \"no doors\", \"2 shelves\" or \"1.5m wide\".";
@@ -3367,7 +3708,9 @@ const ACTIONS = {
     if (!m || !m.undo) return;
     const prev = JSON.parse(m.undo);
     if (prev.template !== S.template) startTemplate(prev.template, { keepOverlay: true });
-    Object.assign(S, prev); m.undo = null; m.diff = []; m.text += ' (Undone.)';
+    Object.assign(S, prev);
+    if (S.template === 'custom') { S.outline = cleanOutline(S.outline, S.w) || normOutline(S.outline, S.w); syncOutline(); }
+    m.undo = null; m.diff = []; m.text += ' (Undone.)';
     saveDraft(); render(); renderAsk();
   },
   'export-cnc': () => exportCNC(), 'export-csv': () => exportCSV(), 'export-dxf': () => exportDXF(), 'export-json': () => exportJSON(),
@@ -3381,6 +3724,7 @@ const ACTIONS = {
     if (again && !again.disabled) again.focus();
   },
   hand: el => { S.hand = el.dataset.value === 'left' ? 'left' : 'right'; saveDraft(); render(); },
+  'ol-add': el => olAction('add', el), 'ol-del': el => olAction('del', el), 'ol-flip': el => olAction('flip', el), 'ol-preset': el => olAction('preset', el),
   site: el => { if (SITES[el.dataset.value]) { S.site = el.dataset.value; saveDraft(); render(); } },
   'boxes-auto': () => { S.boxes = 'auto'; saveDraft(); render(); },
   load: el => { if (LOADS[el.dataset.value]) { S.load = el.dataset.value; saveDraft(); render(); } },
@@ -3442,6 +3786,7 @@ document.addEventListener('input', e => {
     liveTimer = setTimeout(() => { compute(); saveDraft(); }, 200);
     return;
   }
+  if (el.dataset.ol) { olInput(el); return; }
   const k = el.dataset.field;
   if (!k) return;
   if (k === 'name') { S.name = el.value.slice(0, 60); $('#saveState').textContent = ''; saveDraft(); return; }
@@ -3459,6 +3804,7 @@ document.addEventListener('input', e => {
     if (err) { err.textContent = msg; err.hidden = !msg; }
     if (msg) return;
     S[k] = k === 'shelves' ? Math.round(v) : v;
+    if (k === 'w' && S.template === 'custom') outlineLive(true); // the points move with the width
     if (TAPE_KEYS.includes(k) && !S.taped.includes(k)) { S.taped.push(k); delete S.est[k]; const f = el.closest('.field'); if (f) { f.classList.remove('needs-tape'); const t = f.querySelector('.tape'); if (t) t.outerHTML = '<span class="tape ok"><i class="ph ph-check" aria-hidden="true"></i>Checked with a tape</span>'; } }
     if (k === 'priceSheet') { clearTimeout(liveTimer); liveTimer = setTimeout(() => { compute(); renderBar(); saveDraft(); const p = $('.summary'); if (p) render(); }, 500); return; }
     liveUpdate();
@@ -3468,8 +3814,10 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.ov) { render(); return; }
+  if (el.dataset.ol) { saveDraft(); return; }
   const k = el.dataset.field;
   if (!k) return;
+  if (k === 'w' && S.template === 'custom') { bakeOutline(); saveDraft(); return; }
   if (k === 'material') { if (MATERIALS[el.value]) { S.material = el.value; S.thickness = MATERIALS[el.value].thick; S.priceSheet = null; } }
   else if (k === 'doors') S.doors = el.value === 'auto' ? 'auto' : clamp(Math.round(Number(el.value)) || 0, 0, 8);
   else if (k === 'scribe') S.scribe = el.checked;

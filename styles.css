@@ -734,3 +734,37 @@ dialog.ask{width:min(620px,100%)}
 .pick-steps li::marker{font-family:var(--mono);font-weight:600;color:var(--accent-ink)}
 .more-cutters{margin-top:12px}
 .more-cutters summary{cursor:pointer;font-weight:600;color:var(--accent-ink);padding:6px 0}
+
+/* ---------- Sloped or odd-shaped space: home tile and outline editor ---------- */
+.tile-wide{grid-column:1/-1;min-height:auto}
+.tile-wide i{margin-bottom:6px}
+.outline-ed{display:grid;gap:12px;margin-top:16px;min-width:0}
+.outline-ed > .lbl{font-size:13px;font-weight:700;color:var(--ink-2)}
+.outline-ed > .help{font-size:12px;color:var(--ink-3);margin:0}
+.ol-presets{display:flex;flex-wrap:wrap;gap:8px}
+.ol-presets .chip{min-height:34px;font-size:13px;padding:0 12px}
+.ol-draw{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2);padding:8px;min-width:0}
+.ol-svg{display:block;width:100%;height:auto;max-height:260px}
+.ol-space{fill:var(--accent-wash);stroke:none}
+.ol-edge{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round}
+.ol-floor{stroke:var(--ink-2);stroke-width:2}
+.ol-tick{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:4 4}
+.ol-pt{fill:var(--surface);stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
+.ol-t{fill:var(--ink);font-family:var(--mono);font-weight:600}
+.ol-n{fill:var(--ink-3);font-family:var(--mono)}
+.ol-rows{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ol-row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;align-items:center;min-width:0}
+.ol-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--ink-2);font-family:var(--mono);font-size:13px;font-weight:600}
+.ol-fixed{display:flex;align-items:center;min-height:46px;font-size:14px;color:var(--ink-2);font-family:var(--mono)}
+.ol-del-gap{width:40px}
+.ol-err{grid-column:2/-1;font-size:12px;color:#C42B1C;font-weight:600}
+.ol-err[hidden]{display:none}
+:root[data-theme="dark"] .ol-err{color:#FF8A80}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ol-err{color:#FF8A80}}
+.ol-list{display:grid;gap:4px;margin:6px 0}
+.ol-head{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:-4px}
+.outline-ed .btn{justify-self:start}
+@media (max-width:420px){
+  .ol-row,.ol-head{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) 40px;gap:6px}
+  .ol-num{width:24px;height:24px}
+}
