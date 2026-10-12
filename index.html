@@ -9,11 +9,11 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://unpkg.com; img-src 'self' blob: data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action https://www.amazon.co.uk; worker-src 'none'; manifest-src 'self'; upgrade-insecure-requests">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#F4F6F8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F7FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1A31" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&amp;family=Instrument+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@600&amp;display=swap">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" integrity="sha384-6p9AefaqUhEVheRlj1mpAkbngHXy9mbYMrIdcIt4Jlc9lOLIablJq3bBsLOjGwZ7" crossorigin="anonymous">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -92,22 +92,22 @@
     <h2 class="reveal">From photo to delivery in four moves.</h2>
     <ol class="rail">
       <li class="rail-item reveal">
-        <i class="ph ph-camera" aria-hidden="true"></i>
+        <img class="rail-img" src="assets/step-snap.jpg" width="900" height="600" alt="Cluttered storage under a sloping attic ceiling" loading="lazy">
         <h3>Snap</h3>
         <p>Photograph the gap with a bank card in shot. Tap two points and we measure it.</p>
       </li>
       <li class="rail-item reveal">
-        <i class="ph ph-magic-wand" aria-hidden="true"></i>
+        <img class="rail-img" src="assets/step-design.jpg" width="900" height="600" alt="A new loft conversion with roof windows, before fitting out" loading="lazy">
         <h3>Design</h3>
         <p>Pick cupboards, shelving or a wardrobe. See it drawn to scale on your own photo.</p>
       </li>
       <li class="rail-item reveal">
-        <i class="ph ph-scissors" aria-hidden="true"></i>
+        <img class="rail-img" src="assets/step-cut.jpg" width="900" height="600" alt="A board being cut to size on a table saw" loading="lazy">
         <h3>Cut</h3>
         <p>Every panel, sheet layout, hinge hole and screw, worked out for you.</p>
       </li>
       <li class="rail-item reveal">
-        <i class="ph ph-truck" aria-hidden="true"></i>
+        <img class="rail-img" src="assets/step-build.jpg" width="900" height="600" alt="Hands fixing a timber panel in place" loading="lazy">
         <h3>Build</h3>
         <p>Send the cut file to a supplier, get the panels delivered, follow the steps.</p>
       </li>
@@ -118,7 +118,7 @@
     <h2 class="reveal">Start from a design.</h2>
     <div class="bento">
       <button type="button" class="tile tile-hero reveal" data-action="start-template" data-template="eaves">
-        <img src="assets/aframe.jpg" width="1400" height="933" alt="Attic bedroom with steep sloping ceilings" loading="lazy">
+        <img class="tile-photo" src="assets/eaves-built-in.jpg" width="1600" height="1067" alt="White built-in cupboards and drawers fitted under the sloping ceiling of an attic" loading="lazy">
         <span class="tile-body">
           <span class="tile-title">Under-eaves cupboards</span>
           <span class="tile-text">Angled tops that follow your roof. Made for loft conversions.</span>
@@ -136,6 +136,9 @@
       </button>
       <button type="button" class="tile tile-ink reveal" data-action="start-template" data-template="kitchenwall">
         <i class="ph ph-square-half" aria-hidden="true"></i><span class="tile-title">Wall cupboard</span><span class="tile-text">Kitchen, utility or bathroom.</span>
+      </button>
+      <button type="button" class="tile tile-wide reveal" data-action="start-template" data-template="custom">
+        <i class="ph ph-polygon" aria-hidden="true"></i><span class="tile-title">Sloped or odd-shaped space</span><span class="tile-text">More than one angle, a step, or a beam to work around. Enter the shape point by point.</span>
       </button>
     </div>
   </section>
@@ -172,6 +175,7 @@
   <footer class="foot wrap">
     <span>Made to Fit</span>
     <span>Prices are estimates. Always check measurements before you order.</span>
+    <span>Photos: Lisa Anna, Brett Jordan, Blaz Erzetic and Samuel Cruz on Unsplash.</span>
   </footer>
 </div>
 
