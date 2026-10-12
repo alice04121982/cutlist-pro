@@ -63,6 +63,6 @@ Permissions-Policy: camera=(self), geolocation=(), microphone=(), xr-spatial-tra
 
 ## Credits
 
-The home page loft scene and the under-eaves design tile are pencil sketches drawn in code (`heroScene()` in `app.js`).
+The home page loft scene is a pencil sketch drawn in code (`heroScene()` in `app.js`). Photos in `assets/` are from Unsplash: built-in eaves cupboards (`eaves-built-in.jpg`) and eaves storage (`step-snap.jpg`) by Lisa Anna, loft conversion (`step-design.jpg`) by Brett Jordan, table saw (`step-cut.jpg`) by Blaz Erzetic, woodwork (`step-build.jpg`) by Samuel Cruz.
 
 Prices are estimates. Always check measurements before you order.

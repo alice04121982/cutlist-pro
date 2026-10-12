@@ -2740,8 +2740,6 @@ function renderHome() {
   const root = $('#heroCompare');
   $('#heroBefore').innerHTML = heroScene(false, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments }, 'hb');
   $('#heroOverlay').innerHTML = heroScene(true, { w: S.w, h: S.h, d: S.d, low: S.low, bays: S.compartments }, 'ha');
-  const tile = $('#tileSketch');
-  if (tile) tile.innerHTML = heroScene(true, { w: 2800, h: 1100, d: 650, low: 650, bays: 4 }, 'ts');
   $('#heroStats').innerHTML = `<li><i class="ph ph-ruler" aria-hidden="true"></i><span><strong>${fmt(S.w)} x ${fmt(S.h)}</strong> measured from the photo</span></li>`
     + `<li><i class="ph ph-scissors" aria-hidden="true"></i><span><strong>${R.pieceCount} cuts</strong> from ${R.nMain} ${R.nMain === 1 ? 'sheet' : 'sheets'} of plywood</span></li>`
     + `<li><i class="ph ph-truck" aria-hidden="true"></i><span><strong>About ${gbp0(R.total)}</strong> cut and delivered</span></li>`;

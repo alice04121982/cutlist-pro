@@ -39,7 +39,7 @@ Used at home, often on a phone in the space itself (taking the photo, measuring 
 
 ## Evidence on Hand
 
-No testimonials, user counts, press or reviews exist. The safety rules and sources are in `docs/SAFETY.md`; the order file format in `docs/ORDER-PACK.md`. There are no photos of real builds; the home page and design tile use pencil sketches drawn in code. Do not invent customers, savings figures beyond the carpenter range above, or build counts.
+No testimonials, user counts, press or reviews exist. The safety rules and sources are in `docs/SAFETY.md`; the order file format in `docs/ORDER-PACK.md`. There are no photos of our own users' builds. The home page uses a pencil sketch drawn in code plus licensed Unsplash photos credited in the README and footer; never present them as customer builds. Do not invent customers, savings figures beyond the carpenter range above, or build counts.
 
 ## Product Principles
 
