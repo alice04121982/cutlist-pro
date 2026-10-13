@@ -10,7 +10,7 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 2. **Design**: material, doors, compartments (upright dividers), shelves per compartment, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
 3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
 4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
-5. **Order**: itemised estimate, an order pack (cut list CSV plus a DXF with true shapes and every hole to drill), and "Send to a cutter": UK cutting services matched to your postcode and to what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md).
+5. **Order**: itemised estimate, an order pack (cut list CSV plus a DXF with true shapes and every hole to drill), and "Send to a cutter": what to ask a UK cutting service for, given what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. Named cutters (`SUPPLIERS` in `app.js`) are hidden until they agree to be listed; set `NAME_CUTTERS` to `true` to show them. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md).
 
 Templates: under-eaves cupboard, under-stairs cupboard (tall end left or right, every upright, top and door cut to the stair angle), wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 
@@ -63,6 +63,6 @@ Permissions-Policy: camera=(self), geolocation=(), microphone=(), xr-spatial-tra
 
 ## Credits
 
-The home page loft scene is a pencil sketch drawn in code (`heroScene()` in `app.js`). Photos in `assets/` are from Unsplash: built-in eaves cupboards (`eaves-built-in.jpg`) and eaves storage (`step-snap.jpg`) by Lisa Anna, loft conversion (`step-design.jpg`) by Brett Jordan, table saw (`step-cut.jpg`) by Blaz Erzetic, woodwork (`step-build.jpg`) by Samuel Cruz.
+The home page loft scene and the design tile drawings are pencil sketches drawn in code (`heroScene()` and `tileSketch()` in `app.js`). Photos in `assets/` are from Unsplash: eaves storage (`step-snap.jpg`) by Lisa Anna, loft conversion (`step-design.jpg`) by Brett Jordan, table saw (`step-cut.jpg`) by Blaz Erzetic, woodwork (`step-build.jpg`) by Samuel Cruz.
 
 Prices are estimates. Always check measurements before you order.
