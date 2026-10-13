@@ -142,6 +142,9 @@ const DELIVERY = [
 // UK cutting services, from their own websites (checked October 2026). 'yes' = they say they do it,
 // 'ask' = not stated, 'no' = they say they do not. area: 'uk', or postcode areas they serve.
 const LONDON = ['E', 'EC', 'N', 'NW', 'SE', 'SW', 'W', 'WC', 'BR', 'CR', 'DA', 'EN', 'HA', 'IG', 'KT', 'RM', 'SM', 'TW', 'UB', 'WD', 'AL', 'SG', 'CM', 'ME', 'TN'];
+// Cutters are named in the app only once they have agreed to it. Partnership emails went out on 12 October 2026;
+// until replies come in, the order page explains what to look for and names no company. Set to true to list them.
+const NAME_CUTTERS = false;
 const SUPPLIERS = [
   { name: 'Cutwrights', url: 'https://www.cutwrights.com', area: 'uk', howTo: 'Online quote in under a minute', lead: 'Ask', angles: 'ask', drilling: 'yes', edging: 'yes', note: 'Cutting, edging and drilling service. Check delivery to your postcode.' },
   { name: 'CNC Creations', url: 'https://cnccreations.co.uk', area: 'uk', howTo: 'Send your files, they can adjust them', lead: '1 to 7 working days (cut to size)', angles: 'yes', drilling: 'yes', edging: 'ask', note: 'Takes one-off orders from private customers. Cuts to shape.' },
@@ -2858,14 +2861,33 @@ function cutterCard() {
   const list = SUPPLIERS.filter(sup => serves(sup) || !area).sort((x, y) => score(x) - score(y) || yeses(y) - yeses(x));
   const badge = (sup, k, label) => `<span class="cap cap-${sup[k]}"><i class="ph ph-${sup[k] === 'yes' ? 'check' : sup[k] === 'no' ? 'x' : 'question'}" aria-hidden="true"></i>${esc(label)}${sup[k] === 'ask' ? ': ask' : ''}</span>`;
   const mail = sup => {
-    const body = [`Hello ${sup.name},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
+    const body = [`Hello${sup ? ' ' + sup.name : ''},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
       unTaped().length ? 'Note: some sizes are still estimates and will be confirmed before cutting.' : 'All sizes measured with a tape.', '',
       `Material: ${MATERIALS[S.material].name} ${S.thickness}mm${R.sheets.ply3 ? ', plus 3mm backs' : ''}`, `Pieces: ${need.pieces} (about ${R.nMain} sheets)`,
       need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes, all on the panel faces: shelf pins, hinge cups, joint screws and connector screws. They are in the DXF on layers starting DRILL_, named by diameter and depth. Through holes for screws should be countersunk on the outside face.` : '',
       S.joinery === 'cam' ? 'Cam fittings also need an 8mm hole into the end edge of each top and bottom. Please say if you can edge-bore; if not we will drill those.' : '',
       need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
-    return `mailto:${sup.email || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
+    return `mailto:${(sup && sup.email) || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
   };
+  const orderedRow = S.ordered
+    ? `<div class="ordered-row"><span class="cap cap-yes"><i class="ph ph-check" aria-hidden="true"></i>Panels ordered</span><button type="button" class="link-btn" data-action="mark-ordered">Not ordered yet</button></div>`
+    : `<button type="button" class="btn btn-primary" data-action="mark-ordered"><i class="ph ph-check-circle" aria-hidden="true"></i>I've ordered my panels</button><span class="help">Then we'll help you order the hardware.</span>`;
+  if (!NAME_CUTTERS) {
+    const ask = ['cuts to size from a cut list or DXF file', ...req.map(r => r[3].toLowerCase()), 'delivery to your home'];
+    const search = 'https://www.google.com/search?q=' + encodeURIComponent(`${MATERIALS[S.material].name} cut to size CNC service UK`);
+    return `<div class="card cutters">
+    <p class="step-tag">Step 1</p>
+    <h3><i class="ph ph-storefront" aria-hidden="true"></i>Get your panels cut</h3>
+    <p class="sub">Any UK cut-to-size service can make these panels from your order pack. Look for one that offers ${esc(ask.slice(0, -1).join(', ') + ' and ' + ask[ask.length - 1])}. Expect roughly ${gbp0(R.costs.panels)} for the panels before delivery.</p>
+    <ol class="pick-steps">
+      <li><span>Download your order pack: the cut list and the drawing with every cut and hole.</span><button type="button" class="btn btn-ghost btn-sm" data-action="order-pack"><i class="ph ph-download-simple" aria-hidden="true"></i>Download order pack</button></li>
+      <li><span>Find a cutting service and send them the pack. The quote email is written for you; add their address and attach the two files.</span><span class="row-btns"><a class="btn btn-primary btn-sm" href="${mail(null)}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Draft email</a><a class="btn btn-ghost btn-sm" href="${search}" target="_blank" rel="noopener noreferrer"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Search for a cutter</a></span></li>
+      <li><span>They reply with the exact price and delivery date. Pay them, then tick below.</span></li>
+    </ol>
+    ${orderedRow}
+    <p class="fine">Cutting services price each job by quote.</p>
+  </div>`;
+  }
   const top = list.find(sup => sup.area !== 'store') || list[0], rest = list.filter(sup => sup !== top);
   const why = top ? [serves(top) && area ? `delivers to ${area}` : top.area === 'uk' ? 'delivers UK-wide' : '', ...req.filter(([k]) => top[k] === 'yes').map(r => r[3].toLowerCase())].filter(Boolean) : [];
   const supItem = sup => `<li class="sup${score(sup) >= 10 ? ' sup-poor' : ''}">
@@ -2890,9 +2912,7 @@ function cutterCard() {
       </ol>
     </div>` : ''}
     ${rest.length ? `<details class="more-cutters"><summary>Compare with ${rest.length} other cutter${rest.length > 1 ? 's' : ''}</summary><ul class="sup-list">${rest.map(supItem).join('')}</ul></details>` : ''}
-    ${S.ordered
-      ? `<div class="ordered-row"><span class="cap cap-yes"><i class="ph ph-check" aria-hidden="true"></i>Panels ordered</span><button type="button" class="link-btn" data-action="mark-ordered">Not ordered yet</button></div>`
-      : `<button type="button" class="btn btn-primary" data-action="mark-ordered"><i class="ph ph-check-circle" aria-hidden="true"></i>I've ordered my panels</button><span class="help">Then we'll help you order the hardware.</span>`}
+    ${orderedRow}
     <p class="fine">Cutters price each job by quote until a Made to Fit partner offers fixed prices. Details from each company's website, October 2026.</p>
   </div>`;
 }

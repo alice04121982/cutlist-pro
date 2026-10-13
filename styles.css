@@ -756,6 +756,7 @@ dialog.ask{width:min(620px,100%)}
 .pick-steps{margin:0;padding-left:22px;display:grid;gap:12px}
 .pick-steps li{padding-left:4px}
 .pick-steps li > span{display:block;color:var(--ink-2);margin-bottom:6px}
+.pick-steps li > .row-btns{display:flex;color:inherit}
 .pick-steps li::marker{font-family:var(--mono);font-weight:600;color:var(--accent-ink)}
 .more-cutters{margin-top:12px}
 .more-cutters summary{cursor:pointer;font-weight:600;color:var(--accent-ink);padding:6px 0}

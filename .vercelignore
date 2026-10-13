@@ -1,0 +1,5 @@
+# Internal notes and plans stay in the repo but are not served on the site.
+docs/
+PRODUCT.md
+fix.txt
+.claude/
