@@ -11,7 +11,7 @@ const MODEL = 'anthropic/claude-haiku-5.5'; // cheapest current Claude; about 0.
 
 const TEMPLATES = ['eaves', 'understairs', 'custom', 'wardrobe', 'shelving', 'kitchenbase', 'kitchenwall', 'studwall', 'partition', 'floorjoists', 'flatroof', 'pitchedroof'];
 const NUM_FIELDS = { w: [100, 15000], h: [50, 6000], d: [50, 8000], low: [50, 6000], shelves: [0, 20], compartments: [1, 8], thickness: [3, 100], spacing: [200, 1200], pitch: [5, 70] };
-const BUILDS = ['frame', 'builtin', 'boxes'];
+const BUILDS = ['frame', 'builtin', 'timber', 'boxes'];
 const MAX_MESSAGE = 600;
 const MAX_REPLY = 900;
 const MAX_HISTORY = 6;
@@ -47,7 +47,7 @@ const SYSTEM = `You help people adjust a DIY furniture or building design in the
 Settings (all sizes in millimetres):
 - template: eaves (under-eaves unit with an angled top), understairs (cupboard under a staircase: tall at one end, short at the other), custom (a sloped or odd-shaped space, such as an attic with more than one roof angle, a step or a beam: the top follows an outline the user enters point by point on the Space step, which you cannot change; h scales its heights, low cannot be set), wardrobe, shelving, kitchenbase, kitchenwall, studwall, partition, floorjoists, flatroof, pitchedroof.
 - w: overall width. h: overall height (for eaves, the front height). d: depth. low: for eaves, the back height at the knee wall; for understairs, the height at the short end. Always less than h.
-- build (eaves, understairs and custom only): frame (default: a 38x63 CLS stud frame screwed to the floor and up into the rafters or stair string, 18mm dividers behind the studs on 25x38 cleats, shelves on 25x38 bearers, overlay doors hung on the studs), builtin (eaves only: open cubbies with no doors, on a 38x89 CLS plinth frame with a base board, end panels and dividers cut to the slope, shelves screwed in flush at the front, 18mm facing strips over every front edge, a plinth board and a quadrant bead along the floor), boxes (separate pre-cut plywood boxes joined side by side, like kitchen units).
+- build (eaves, understairs and custom only): frame (default: a 38x63 CLS stud frame screwed to the floor and up into the rafters or stair string, 18mm dividers behind the studs on 25x38 cleats, shelves on 25x38 bearers, overlay doors hung on the studs), builtin (eaves only: open cubbies with no doors, on a 38x89 CLS plinth frame with a base board, end panels and dividers cut to the slope, shelves screwed in flush at the front, 18mm facing strips over every front edge, a plinth board and a quadrant bead along the floor), timber (eaves only: open shelves on a skeleton of 2x4 ladder frames, one at each end and one between each pair of bays; each frame is a bottom rail, front post, back post and a top rail following the slope, built flat and screwed to the floor and a rafter; shelves span between frames on timber bearers or steel shelf brackets, set in the app, not here), boxes (separate pre-cut plywood boxes joined side by side, like kitchen units).
 - compartments: number of side-by-side bays made with upright dividers, 1 to 8. Works for eaves, understairs, custom, shelving, wardrobe and kitchenwall.
 - shelves: shelves in each compartment, 0 to 20.
 - doors: "auto" (suggested), or "0" for open shelving, or a number of doors up to "8".
