@@ -1832,6 +1832,7 @@ function renderControls() {
         <h2 class="group-title">How it is built</h2>
         <div class="seg" role="group" aria-label="How it is built"><button type="button" data-action="build" data-value="frame" aria-pressed="${framed && !isBuiltIn() && !isTimber()}">Batten frame</button>${S.template === 'eaves' ? `<button type="button" data-action="build" data-value="timber" aria-pressed="${isTimber()}">Timber frame shelving</button><button type="button" data-action="build" data-value="builtin" aria-pressed="${isBuiltIn()}">Built-in shelving</button>` : ''}<button type="button" data-action="build" data-value="boxes" aria-pressed="${!framed}">Boxes</button></div>
         <p class="group-sub">${isTimber() ? 'Open shelves on a skeleton of 2x4 timber. Each frame is built flat on the floor, stood up beside a rafter and screwed down, and the shelves span between the frames.' : isBuiltIn() ? 'Open cubbies with a fitted look: a plinth along the bottom, shelves flush at the front and a painted facing over every edge. Built on site on a low timber frame.' : framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : S.template === 'custom' ? 'up into the rafters or ceiling joists' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : S.template === 'custom' ? 'ceiling' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
+        ${buildGuideHTML()}
         ${isTimber() ? `<div class="field full"><span class="lbl" id="tfSupLbl">What holds the shelves up</span><div class="seg" role="group" aria-labelledby="tfSupLbl">${Object.entries(SUPPORTS).map(([k, n]) => `<button type="button" data-action="support" data-value="${k}" aria-pressed="${(S.support || 'bearers') === k}">${n}</button>`).join('')}</div><span class="help">${S.support === 'brackets' ? 'Steel shelf brackets screwed to the posts, two at each end of every shelf. Quick, neat and easy to move later.' : 'Lengths of the same timber screwed to the side of each frame, with the shelf resting on top. Cheapest and strongest, and uses up your offcuts.'}</span></div>
         <div class="field full"><span class="lbl" id="tfSecLbl">Your timber ("2x4")</span><div class="seg" role="group" aria-labelledby="tfSecLbl">${Object.entries(TF_SECTIONS).map(([k, x]) => `<button type="button" data-action="timber" data-value="${k}" aria-pressed="${(S.timber || '38x89') === k}">${x.name}</button>`).join('')}</div><span class="help">In the UK "2x4" can mean either. Check the label or measure the end of a piece.</span></div>` : ''}
       </div>` : ''}
@@ -3871,6 +3872,27 @@ function fmtVal(k, v) {
 }
 
 // Validate and apply. Never trust the server (or the parser) blindly.
+// The ways to build a framed design, easiest first, for the "which should I choose" panel
+const BUILD_GUIDE = [
+  { id: 'boxes', level: 'Easiest', doors: 'Doors or open', cut: 'Every panel is cut for you by a cutting service', tools: 'Drill and screwdriver', best: 'First-timers who want the least cutting. Goes together like flat-pack, then slides into place.' },
+  { id: 'timber', eaves: true, level: 'Easy', doors: 'Open shelves', cut: 'You cut 2x4 timber yourself: square cuts and one angle', tools: 'Saw, drill, level, square', best: 'Open storage on a budget, from timber sold at any DIY store.' },
+  { id: 'frame', level: 'Medium', doors: 'Doors or open', cut: 'Frame cut on site, boards cut for you', tools: 'Saw, drill, level, sliding bevel', best: 'Cupboards with doors that cope with an uneven loft or stair, using less board than boxes.' },
+  { id: 'builtin', eaves: true, level: 'Hardest', doors: 'Open cubbies', cut: 'Boards cut for you, then scribed and trimmed on site', tools: 'Saw, drill, plane, pins and filler', best: 'A painted finish that looks like a carpenter built it in.' }
+];
+// Rough total for each way of building the current design
+function buildPrices() {
+  const keep = S.build, out = {};
+  BUILD_GUIDE.forEach(o => { S.build = o.id; try { out[o.id] = compute().total; } catch (e) { out[o.id] = null; } });
+  S.build = keep; compute();
+  return out;
+}
+function buildGuideHTML() {
+  const opts = BUILD_GUIDE.filter(o => !o.eaves || S.template === 'eaves'), price = buildPrices(), cur = isFramed() ? S.build : 'boxes';
+  return `<details class="more build-guide"><summary>Which is easiest? Compare the ${opts.length} ways</summary>
+    <ul class="bg-list">${opts.map(o => `<li class="${o.id === cur ? 'is-cur' : ''}"><div class="bg-head"><strong>${BUILD_NAMES[o.id]}</strong><span class="cap ${o.level.startsWith('Eas') ? 'cap-yes' : 'cap-ask'}">${o.level}</span>${price[o.id] ? `<span class="bg-price">about ${gbp0(price[o.id])}</span>` : ''}</div>
+      <p>${esc(o.best)}</p><p class="bg-meta">${esc(o.doors)}. ${esc(o.cut)}. Tools: ${esc(o.tools.toLowerCase())}.</p>${o.id === cur ? '<p class="bg-meta"><strong>Chosen</strong></p>' : `<button type="button" class="link-btn" data-action="build" data-value="${o.id}">Use ${esc(BUILD_NAMES[o.id].toLowerCase())}</button>`}</li>`).join('')}</ul>
+  </details>`;
+}
 const BUILD_NAMES = { frame: 'Batten frame', builtin: 'Built-in shelving', timber: 'Timber frame shelving', boxes: 'Boxes' };
 function applyChanges(ch) {
   const diff = [];

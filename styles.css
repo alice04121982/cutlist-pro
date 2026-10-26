@@ -320,6 +320,14 @@ details.more summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--i
 details.more summary::-webkit-details-marker{display:none}
 details.more summary::before{content:"+";font-family:var(--mono);width:16px}
 details.more[open] summary::before{content:"-"}
+.build-guide{margin-top:10px}
+.bg-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.bg-list li{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:10px 12px}
+.bg-list li.is-cur{border-color:var(--accent)}
+.bg-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.bg-price{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+.bg-list p{margin:4px 0 0;font-size:14px}
+.bg-list .bg-meta{font-size:13px;color:var(--ink-2)}
 details.more .fields{margin-top:12px}
 
 .tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
