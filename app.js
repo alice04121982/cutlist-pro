@@ -72,6 +72,7 @@ const tplOf = id => TEMPLATES.find(t => t.id === id) || TEMPLATES[0];
 // Name for the current design, e.g. under-eaves without doors reads as shelving
 function designName() {
   if (isBuiltIn()) return 'Built-in eaves shelving';
+  if (isTimber()) return 'Timber frame eaves shelving';
   if (S.template === 'eaves' && doorCount() === 0) return 'Under-eaves shelving';
   if (S.template === 'understairs' && doorCount() === 0) return 'Under-stairs shelving';
   if (S.template === 'custom' && doorCount() === 0) return 'Shelving for a sloped or odd-shaped space';
@@ -175,7 +176,7 @@ function freshState(template = 'eaves') {
     thickness: cab ? 18 : 47,
     sheetW: 2440, sheetH: 1220, kerf: 3,
     w: d.w, h: d.h, d: d.d, low: d.low, shelves: d.shelves, spacing: d.spacing, pitch: d.pitch,
-    compartments: d.bays || 1, build: 'frame', boxes: 'auto', site: defaultSite(template), hand: 'right', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
+    compartments: d.bays || 1, build: 'frame', support: 'bearers', timber: '38x89', boxes: 'auto', site: defaultSite(template), hand: 'right', doors: 'auto', joinery: 'screws', scribe: true, load: defaultLoad(template),
     overrides: {}, priceSheet: null, delivery: 'standard', postcode: '',
     unit: 'mm', done: [], ordered: false, taped: [], est: {},
     outline: template === 'custom' ? defaultOutline(d.w) : null
@@ -189,7 +190,7 @@ const S = Object.assign(freshState(), {
 });
 let R = { parts: [], sheets: {}, linear: [], whole: [], rolls: [], fittings: [], hinges: [], totals: {} };
 
-const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'build', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered', 'taped', 'est', 'outline'];
+const PERSIST = ['v', 'name', 'template', 'material', 'thickness', 'sheetW', 'sheetH', 'kerf', 'w', 'h', 'd', 'low', 'shelves', 'compartments', 'build', 'support', 'timber', 'boxes', 'site', 'hand', 'spacing', 'pitch', 'doors', 'joinery', 'scribe', 'load', 'overrides', 'priceSheet', 'delivery', 'postcode', 'unit', 'done', 'ordered', 'taped', 'est', 'outline'];
 function snapshot() {
   const o = {}; PERSIST.forEach(k => { o[k] = S[k]; });
   o.outline = S.template === 'custom' ? normOutline(outlinePts(), S.w) : null; // stored at the current width
@@ -213,7 +214,8 @@ function sanitizeProject(p) {
     spacing: num(pick('spacing', 'dimSpacing'), ...LIMITS.spacing, base.spacing), pitch: num(pick('pitch', 'dimPitch'), 0, 70, base.pitch),
     compartments: Math.round(num(p.compartments, 1, 8, 1)),
     site: SITES[p.site] ? p.site : base.site, hand: p.hand === 'left' ? 'left' : 'right',
-    build: ['boxes', 'builtin'].includes(p.build) ? p.build : 'frame',
+    build: ['boxes', 'builtin', 'timber'].includes(p.build) ? p.build : 'frame',
+    support: SUPPORTS[p.support] ? p.support : 'bearers', timber: TF_SECTIONS[p.timber] ? p.timber : '38x89',
     boxes: p.boxes === undefined || p.boxes === 'auto' ? 'auto' : Math.round(num(p.boxes, 1, 8, 1)),
     doors: p.doors === 'auto' || p.doors === undefined ? 'auto' : Math.round(num(p.doors, 0, 8, 0)),
     joinery: JOINERY[p.joinery] ? p.joinery : 'screws', scribe: p.scribe !== false, load: LOADS[p.load] ? p.load : base.load,
@@ -278,7 +280,7 @@ function boxSideWhy(L) {
 }
 function maxBox() { return Math.min((SITES[S.site] || SITES.upstairs).carry, Math.max(S.sheetW, S.sheetH) - 40); }
 function layout() {
-  const framed = isFramed(), th = framed ? (isBuiltIn() ? BI.fw : FR.sw) : S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
+  const framed = isFramed(), th = framed ? (isBuiltIn() ? BI.fw : isTimber() ? tfSec().t : FR.sw) : S.thickness, W = S.w, bayTpl = BAY_TEMPLATES.has(S.template);
   if (S.template === 'custom') return customLayout(framed, th);
   let C = bayTpl ? clamp(Math.round(S.compartments || 1), 1, 8) : 1;
   const widthOf = (k, bay) => 2 * th + k * bay + (k - 1) * th;
@@ -424,7 +426,7 @@ function bayInfo() {
 const bayX = b => layout().bays[b].x;
 
 function doorCount() {
-  if (isBuiltIn()) return 0; // open by design
+  if (isBuiltIn() || isTimber()) return 0; // open by design
   if (isFramed()) return S.doors === 0 ? 0 : layout().C; // one door per opening in the frame
   if (S.doors !== 'auto') return S.doors;
   const W = S.w, { bays } = bayInfo();
@@ -552,6 +554,7 @@ const HEX_F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [0, 3, 7,
 // Every member as a solid (x along the run, y up, z back from the door line) plus the cut list it makes.
 function frameModel() {
   if (isBuiltIn()) return builtinModel();
+  if (isTimber()) return timberModel();
   const t = S.template, eaves = t === 'eaves', W = S.w, H = S.h, th = S.thickness, s = S.scribe ? 2 : 0;
   const { sw, sd, bt, bh, ov, gap } = FR, L = layout(), back = S.d - s, C = L.C;
   const g = eaves ? eavesGeom() : shapeGeom(), tan = eaves ? Math.tan(g.ang) : 0, cs = Math.cos(g.ang) || 1;
@@ -766,6 +769,85 @@ function builtinModel() {
   const bd = split(W, 2400);
   lin({ name: 'Plinth Bead', w: bd.each, h: 18, qty: bd.k, section: BI.bead, role: 'bead', note: 'Along the floor in front of the plinth. Hides any gap' });
   return { solids, parts, doors: [], comps, divs, g, tv: 0, rows };
+}
+
+// ── Timber frame shelving: a row of 2x4 ladder frames under the slope, shelves between them ──
+// Each frame is a flat trapezoid built on the floor: a bottom rail on edge, a front post, a back post and a
+// sloping top rail that follows the roof, screwed through the rails into the post ends. Frames stand one at
+// each end wall and one between each pair of bays, fixed to the floor and up into a rafter or noggin.
+// Shelves span between frames and sit on either timber bearers (2x4 offcuts screwed to the side of each
+// frame) or steel shelf brackets screwed to the posts. Frames run parallel to the rafters, so a frame that
+// lands beside a rafter screws straight into it.
+const TF_SECTIONS = {
+  '38x89': { t: 38, w: 89, sec: '38x89 CLS', name: '38 x 89mm (CLS)' },
+  '47x100': { t: 47, w: 100, sec: '47x100 C24', name: '47 x 100mm (C16 or C24)' }
+};
+TIMBER_STOCK['47x100 C24'] = { len: 2400, price: 9 };
+const BRACKET = { leg: 75, w: 20, t: 3 }; // a 75mm steel shelf bracket
+const SUPPORTS = { bearers: 'Timber bearers', brackets: 'Metal brackets' };
+const tfSec = () => TF_SECTIONS[S.timber] || TF_SECTIONS['38x89'];
+const isTimber = () => S.template === 'eaves' && S.build === 'timber';
+// Longest common screw that will not come out the far side of two pieces of this timber
+const sideScrew = t => [100, 90, 80, 70, 60].find(l => l <= 2 * t - 6) || 60;
+function timberModel() {
+  const H = S.h, th = S.thickness, s = S.scribe ? 2 : 0, { t, w, sec } = tfSec(), bars = S.support !== 'brackets';
+  const L = layout(), C = L.C, g = eavesGeom(), tan = Math.tan(g.ang), cs = Math.cos(g.ang) || 1;
+  const ceil = z => H - z * tan, tv = w / cs; // tv: depth of the sloping rail measured straight down
+  // The frame stops where the space gets too low for a back post at least 100mm long
+  const D = Math.floor(Math.min(S.d - s, tan > 0 ? (H - tv - w - 100) / tan : S.d - s));
+  const solids = [], parts = [];
+  const hx = (part, role, x0, x1, z0, z1, bot, top, extra = {}) => {
+    const c = (x, z) => [[x, bot(z), z], [x, top(z), z]];
+    const [a, b, e, f] = [c(x0, z0), c(x1, z0), c(x0, z1), c(x1, z1)];
+    solids.push({ part, role, v: [a[0], b[0], b[1], a[1], e[0], f[0], f[1], e[1]], f: HEX_F, ...extra });
+  };
+  const flat = y => () => y, under = drop => z => ceil(z) - drop;
+  const lin = o => parts.push({ stock: 'linear', qty: 1, section: sec, ...o });
+  const frames = L.verticals.map(v => v.x), nF = frames.length;
+
+  frames.forEach((x0, i) => {
+    const x1 = x0 + t, fr = { frame: i };
+    hx('Bottom Rail', 'rail', x0, x1, 0, D, flat(0), flat(w), fr);
+    hx('Front Post', 'stud', x0, x1, 0, w, flat(w), under(tv), fr);
+    hx('Back Post', 'stud', x0, x1, D - w, D, flat(w), under(tv), fr);
+    hx('Top Rail', 'plate', x0, x1, 0, D, under(tv), under(0), fr);
+  });
+  // Posts round down, so a rounded length can never lift the rail above the roof
+  const front = Math.floor(H - tv - w), back = Math.floor(ceil(D - w) - tv - w), drop = Math.round(w * tan);
+  lin({ name: 'Bottom Rail', w: D, h: w, qty: nF, role: 'rail', note: 'Square both ends. Stands on edge on the floor' });
+  lin({ name: 'Front Post', w: front, h: w, qty: nF, role: 'stud', angle: g.angDeg, note: `Top cut at ${g.angDeg} deg: ${front} on the front edge, ${front - drop} on the back edge` });
+  lin({ name: 'Back Post', w: back, h: w, qty: nF, role: 'stud', angle: g.angDeg, note: `Top cut at ${g.angDeg} deg: ${back} on the front edge, ${back - drop} on the back edge` });
+  const slope = Math.round(D / cs);
+  lin({ name: 'Top Rail', w: Math.round(slope + tv * Math.sin(g.ang)), h: w, qty: nF, role: 'plate', angle: g.angDeg, note: `${slope} along each edge. Both ends cut at ${g.angDeg} deg, parallel, so they stand upright` });
+
+  // Shelves: evenly spaced up the front, each as deep as the slope allows
+  const comps = L.bays.map(b => ({ l: b.x, r: b.x + b.w })), rows = [];
+  for (let i = 0; i < S.shelves; i++) {
+    const y0 = Math.round((H * (i + 1) / (S.shelves + 1) - th / 2) / 10) * 10;
+    const dep = Math.floor(Math.min(D, tan > 0 ? (H - y0 - th - 10) / tan : D));
+    if (dep < 150 || y0 < 2 * w) continue;
+    rows.push({ y0, dep, i: i + 1 });
+    const name = 'Shelf ' + (i + 1), sw = Math.round(L.bayW - 2);
+    comps.forEach(c => hx(name, 'shelf', c.l + 1, c.r - 1, 0, dep, flat(y0), flat(y0 + th)));
+    parts.push({ stock: 'sheet', qty: comps.length, name, w: sw, h: dep, role: 'shelf', edge: 1, yc: y0 + th / 2, note: `${dep < D ? 'Shallower to clear the slope. ' : ''}${bars ? 'Rests on a bearer at each end' : 'Rests on 4 brackets'}, ${y0}mm up from the floor` });
+    if (bars) {
+      // One bearer on each side of every bay, screwed to the front post and the back post or top rail
+      comps.forEach(c => {
+        hx('Bearer ' + (i + 1), 'bearer', c.l, c.l + t, 0, dep, flat(y0 - w), flat(y0));
+        hx('Bearer ' + (i + 1), 'bearer', c.r - t, c.r, 0, dep, flat(y0 - w), flat(y0));
+      });
+      lin({ name: 'Bearer ' + (i + 1), w: dep, h: w, qty: 2 * comps.length, role: 'bearer', note: `On edge, top ${y0}mm up from the floor. Square ends` });
+    } else {
+      // Two brackets each side of every bay: one on the front post, one on the back post or top rail
+      const zb = dep >= D - w + 20 ? D - w / 2 : dep - 30;
+      comps.forEach(c => [40, zb].forEach(zc => [[c.l, 1], [c.r, -1]].forEach(([fx, dir]) => {
+        const a = dir > 0 ? fx : fx - BRACKET.t, b = dir > 0 ? fx + BRACKET.leg : fx - BRACKET.leg;
+        hx('Bracket', 'bracket', a, a + BRACKET.t, zc - BRACKET.w / 2, zc + BRACKET.w / 2, flat(y0 - BRACKET.leg), flat(y0));
+        hx('Bracket', 'bracket', Math.min(fx, b), Math.max(fx, b), zc - BRACKET.w / 2, zc + BRACKET.w / 2, flat(y0 - BRACKET.t), flat(y0));
+      })));
+    }
+  }
+  return { solids, parts, doors: [], comps, divs: [], g, tv, D, frames, rows, front, back, slope, drop, sec: tfSec(), bars };
 }
 
 function generateParts() {
@@ -1091,6 +1173,7 @@ function calcFittings(parts) {
 // Fixings for the batten frame: frame screws into the floor, rafters and studs, small screws for the battens
 function frameFittings(parts, sum) {
   if (isBuiltIn()) return builtinFittings(parts, sum);
+  if (isTimber()) return timberFittings(parts, sum);
   const len = role => parts.filter(p => p.role === role).reduce((a, p) => a + p.w * p.qty, 0);
   const studs = sum(p => p.role === 'stud'), divs = sum(p => p.role === 'divider'), cleats = sum(p => p.role === 'cleat'), bearers = sum(p => p.role === 'bearer');
   const endBearers = 2 * new Set(parts.filter(p => p.role === 'bearer').map(p => p.name)).size;
@@ -1104,6 +1187,30 @@ function frameFittings(parts, sum) {
   if (hinges) out.push({ name: 'Door knobs', total_qty: sum(p => p.role === 'door'), unit_cost: 2.8 });
   out.push({ name: 'Plastic packers (assorted)', total_qty: 1, unit_cost: 4, note: 'To pack the frame plumb on uneven floors and rafters' });
   return out.filter(f => f.total_qty > 0);
+}
+
+function timberFittings(parts, sum) {
+  const m = timberModel(), nF = m.frames.length, t = m.sec.t, long = t >= 47 ? 100 : 80, side = sideScrew(t);
+  const shelves = sum(p => p.role === 'shelf'), bearers = sum(p => p.role === 'bearer'), brackets = m.bars ? 0 : 4 * shelves;
+  const out = [
+    // 2 screws through a rail into each end of both posts, 3 through the top rail into a rafter or noggin
+    { name: `Timber screws 5x${long}mm`, total_qty: 11 * nF + 10, unit_cost: 0.1, note: 'Through the rails into the posts, and the top rail into a rafter' },
+    { name: 'Angle brackets 40mm', total_qty: 2 * nF, unit_cost: 0.6, note: 'Two per frame, fixing the bottom rail to the floor' },
+    // 4 per angle bracket, 2 per shelf bracket into the frame
+    { name: 'Wood screws 4x30mm', total_qty: 8 * nF + 2 * brackets + 10, unit_cost: 0.04, note: brackets ? 'For the angle brackets, and the shelf brackets into the frame' : 'For the angle brackets' }
+  ];
+  if (bearers) {
+    // 2 into the front post and 2 into the back post or top rail, short enough not to come out the far side
+    if (side === long) out[0].total_qty += 4 * bearers;
+    else out.push({ name: `Timber screws 5x${side}mm`, total_qty: 4 * bearers + 6, unit_cost: 0.08, note: `For the bearers. Longer screws would come out the far side of the ${t}mm frame` });
+    out.push({ name: 'Wood screws 4x40mm', total_qty: 4 * shelves + 6, unit_cost: 0.05, note: 'Down through each shelf into the bearers, 2 each end' });
+  }
+  if (brackets) {
+    out.push({ name: `Shelf brackets ${BRACKET.leg}mm`, total_qty: brackets, unit_cost: 0.9, note: 'Steel. Four per shelf, two at each end' });
+    out.push({ name: 'Wood screws 4x16mm', total_qty: 2 * brackets + 6, unit_cost: 0.03, note: 'Up through the brackets into the shelves. Short, so they stop inside the board' });
+  }
+  out.push({ name: 'Plastic packers (assorted)', total_qty: 1, unit_cost: 4, note: 'To pack the frames plumb on uneven floors and rafters' });
+  return out;
 }
 
 function builtinFittings(parts, sum) {
@@ -1165,8 +1272,8 @@ function hull(pts) {
   return half(p).concat(half(p.slice().reverse()));
 }
 // Front view of the batten frame: each solid's outline seen from the front, back members first
-const FRAME_ORDER = ['rail', 'cleat', 'divider', 'panel', 'base', 'bearer', 'shelf', 'plate', 'stud', 'plinth', 'facing', 'bead', 'door'];
-const FRAME_CLASS = { cleat: 'p', divider: 'bk', bearer: 'p', shelf: 'p2', plate: 'p', stud: 'p', door: 'dr', rail: 'p', panel: 'bk', base: 'p2', plinth: 'p', facing: 'p', bead: 'p' };
+const FRAME_ORDER = ['rail', 'cleat', 'divider', 'panel', 'base', 'bearer', 'bracket', 'shelf', 'plate', 'stud', 'plinth', 'facing', 'bead', 'door'];
+const FRAME_CLASS = { bracket: 'dr', cleat: 'p', divider: 'bk', bearer: 'p', shelf: 'p2', plate: 'p', stud: 'p', door: 'dr', rail: 'p', panel: 'bk', base: 'p2', plinth: 'p', facing: 'p', bead: 'p' };
 function framedFront() {
   const m = frameModel(), H = S.h;
   return m.solids.slice().sort((a, b) => FRAME_ORDER.indexOf(a.role) - FRAME_ORDER.indexOf(b.role)).map(o => {
@@ -1723,8 +1830,10 @@ function renderControls() {
     col.innerHTML = cab ? `
       ${FRAME_TPL.has(S.template) ? `<div class="group">
         <h2 class="group-title">How it is built</h2>
-        <div class="seg" role="group" aria-label="How it is built"><button type="button" data-action="build" data-value="frame" aria-pressed="${framed && !isBuiltIn()}">Batten frame</button>${S.template === 'eaves' ? `<button type="button" data-action="build" data-value="builtin" aria-pressed="${isBuiltIn()}">Built-in shelving</button>` : ''}<button type="button" data-action="build" data-value="boxes" aria-pressed="${!framed}">Boxes</button></div>
-        <p class="group-sub">${isBuiltIn() ? 'Open cubbies with a fitted look: a plinth along the bottom, shelves flush at the front and a painted facing over every edge. Built on site on a low timber frame.' : framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : S.template === 'custom' ? 'up into the rafters or ceiling joists' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : S.template === 'custom' ? 'ceiling' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
+        <div class="seg" role="group" aria-label="How it is built"><button type="button" data-action="build" data-value="frame" aria-pressed="${framed && !isBuiltIn() && !isTimber()}">Batten frame</button>${S.template === 'eaves' ? `<button type="button" data-action="build" data-value="timber" aria-pressed="${isTimber()}">Timber frame shelving</button><button type="button" data-action="build" data-value="builtin" aria-pressed="${isBuiltIn()}">Built-in shelving</button>` : ''}<button type="button" data-action="build" data-value="boxes" aria-pressed="${!framed}">Boxes</button></div>
+        <p class="group-sub">${isTimber() ? 'Open shelves on a skeleton of 2x4 timber. Each frame is built flat on the floor, stood up beside a rafter and screwed down, and the shelves span between the frames.' : isBuiltIn() ? 'Open cubbies with a fitted look: a plinth along the bottom, shelves flush at the front and a painted facing over every edge. Built on site on a low timber frame.' : framed ? 'How a carpenter builds it on site. A timber frame is screwed to the floor and ' + (S.template === 'eaves' ? 'rafters' : S.template === 'custom' ? 'up into the rafters or ceiling joists' : 'stairs') + ', then the dividers, shelves and doors are cut to fit. Uses less board and copes with an uneven ' + (S.template === 'eaves' ? 'loft' : S.template === 'custom' ? 'ceiling' : 'staircase') + '.' : 'Every panel is pre-cut and built into boxes, like kitchen units. Simpler if you are new to DIY, but uses more board and needs packing to fit.'}</p>
+        ${isTimber() ? `<div class="field full"><span class="lbl" id="tfSupLbl">What holds the shelves up</span><div class="seg" role="group" aria-labelledby="tfSupLbl">${Object.entries(SUPPORTS).map(([k, n]) => `<button type="button" data-action="support" data-value="${k}" aria-pressed="${(S.support || 'bearers') === k}">${n}</button>`).join('')}</div><span class="help">${S.support === 'brackets' ? 'Steel shelf brackets screwed to the posts, two at each end of every shelf. Quick, neat and easy to move later.' : 'Lengths of the same timber screwed to the side of each frame, with the shelf resting on top. Cheapest and strongest, and uses up your offcuts.'}</span></div>
+        <div class="field full"><span class="lbl" id="tfSecLbl">Your timber ("2x4")</span><div class="seg" role="group" aria-labelledby="tfSecLbl">${Object.entries(TF_SECTIONS).map(([k, x]) => `<button type="button" data-action="timber" data-value="${k}" aria-pressed="${(S.timber || '38x89') === k}">${x.name}</button>`).join('')}</div><span class="help">In the UK "2x4" can mean either. Check the label or measure the end of a piece.</span></div>` : ''}
       </div>` : ''}
       <div class="group">
         <h2 class="group-title">Material</h2>
@@ -1736,7 +1845,7 @@ function renderControls() {
       </div>
       <div class="group">
         <h2 class="group-title">Layout</h2>
-        ${framed && !isBuiltIn() ? `<div class="field full"><span class="lbl" id="frDoorsLbl">Doors</span><div class="seg" role="group" aria-labelledby="frDoorsLbl"><button type="button" data-action="style" data-value="doors" aria-pressed="${nd > 0}">A door on each opening</button><button type="button" data-action="style" data-value="open" aria-pressed="${nd === 0}">No doors</button></div><span class="help">${nd > 0 ? 'Each door overlays the studs and hangs on concealed hinges.' : 'Open shelves. The frame stays, so the shelves and dividers are still held square.'}</span></div>` : ''}
+        ${framed && !isBuiltIn() && !isTimber() ? `<div class="field full"><span class="lbl" id="frDoorsLbl">Doors</span><div class="seg" role="group" aria-labelledby="frDoorsLbl"><button type="button" data-action="style" data-value="doors" aria-pressed="${nd > 0}">A door on each opening</button><button type="button" data-action="style" data-value="open" aria-pressed="${nd === 0}">No doors</button></div><span class="help">${nd > 0 ? 'Each door overlays the studs and hangs on concealed hinges.' : 'Open shelves. The frame stays, so the shelves and dividers are still held square.'}</span></div>` : ''}
         <div class="fields"${framed ? ' hidden' : ''}>
           <div class="field">
             <label for="f-doors">Doors</label>
@@ -1748,7 +1857,7 @@ function renderControls() {
         </div>
         <div class="steppers">
           ${BAY_TEMPLATES.has(S.template) ? stepper('compartments', 'Compartments side by side', 'Upright dividers split the unit into bays') : ''}
-          ${stepper('shelves', BAY_TEMPLATES.has(S.template) ? 'Shelves in each compartment' : 'Shelves', isBuiltIn() ? 'Not counting the base. 1 shelf gives 2 rows of cubbies' : isFramed() ? 'Each one rests on two battens' : 'Not counting the top and bottom')}
+          ${stepper('shelves', BAY_TEMPLATES.has(S.template) ? 'Shelves in each compartment' : 'Shelves', isBuiltIn() ? 'Not counting the base. 1 shelf gives 2 rows of cubbies' : isTimber() ? 'Not counting the floor. Spaced evenly up the front' : isFramed() ? 'Each one rests on two battens' : 'Not counting the top and bottom')}
           ${BAY_TEMPLATES.has(S.template) && !framed ? boxesControl() : ''}
           ${layoutPreview()}
         </div>
@@ -2121,7 +2230,13 @@ function safetyChecks() {
       else if (!c.looksOK) out.push({ status: 'warn', id: 'sag', title: 'Shelves will sag a little', text: `Safe, but you may see the widest shelf dip (${sagTxt}). More compartments or a thicker board would stop it.`, fixes: safetyFixes(worst.p.h, load) });
       else out.push({ status: 'pass', id: 'sag', title: 'Shelves are stiff and strong enough', text: `The widest shelf bends ${sagTxt}, within the ${(c.span / 200).toFixed(1)}mm limit.` });
       const pin = Math.max(...checks.map(x => x.c.perPin));
-      if (isBuiltIn()) out.push({ status: 'pass', id: 'pins', title: 'Shelves are screwed in', text: 'Each shelf is screwed in through the uprights at both ends, so there are no shelf pins to overload.' });
+      if (isTimber()) {
+        const kgB = Math.max(...checks.map(x => x.c.kgShelf)) / 4, need = Math.max(10, Math.ceil(2 * kgB / 5) * 5);
+        out.push(S.support === 'brackets'
+          ? { status: 'action', id: 'pins', title: `Buy brackets rated ${need}kg or more`, text: `Each bracket carries about ${Math.round(kgB)}kg on the fullest shelf. Buy brackets rated at least twice that, ${need}kg each, and put both of each bracket's screws into the frame, not the plasterboard.` }
+          : { status: 'pass', id: 'pins', title: 'Shelves sit on timber bearers', text: 'Each shelf rests on a length of timber screwed to the side of the frame at both ends, so there are no pins or brackets to overload.' });
+      }
+      else if (isBuiltIn()) out.push({ status: 'pass', id: 'pins', title: 'Shelves are screwed in', text: 'Each shelf is screwed in through the uprights at both ends, so there are no shelf pins to overload.' });
       else if (isFramed()) out.push({ status: 'pass', id: 'pins', title: 'Shelves sit on battens', text: 'Each shelf rests on a batten screwed along each end, so there are no shelf pins to overload.' });
       else if (pin > PIN_KG) out.push({ status: 'fail', id: 'pins', title: 'Too much weight for shelf pins', text: `Each pin would carry about ${Math.round(pin)}kg. Common pins are rated about 12kg. Screw the shelves in place${BAY_TEMPLATES.has(S.template) ? ' or add compartments' : ''}.` });
       else out.push({ status: 'pass', id: 'pins', title: 'Shelf pins can take the load', text: `About ${pin.toFixed(1)}kg on each pin. Buy pins rated 12kg or more.` });
@@ -2136,12 +2251,14 @@ function safetyChecks() {
   const site = SITES[S.site] || SITES.upstairs, long = R.parts.filter(p => (p.stock === 'sheet' || p.stock === 'ply3') && Math.max(p.w, p.h) > site.carry && !over.includes(p.name));
   if (long.length) out.push({ status: 'warn', id: 'carry', title: 'Check the long panels will go in', text: `${[...new Set(long.map(p => p.name.replace(/ \d+$/, '')))].join(', ')} ${long.length > 1 ? 'are' : 'is'} up to ${fmt(Math.max(...long.map(p => Math.max(p.w, p.h))))} long. Panels over about ${fmt(site.carry)} are hard to get ${S.site === 'loft' ? 'up loft stairs or through a hatch' : S.site === 'upstairs' ? 'up stairs and round a landing' : 'in'}. Measure the tightest turn before you order.` });
   const back = R.parts.some(p => p.role === 'back');
-  if (isBuiltIn()) out.push({ status: 'pass', id: 'back', title: 'Fixed to the building', text: 'The plinth frame is screwed to the floor, the end panels to the walls and each divider to cleats, so it cannot rack or tip.' });
+  if (isTimber()) out.push({ status: 'pass', id: 'back', title: 'Every frame is fixed to the building', text: 'Each frame is screwed to the floor with angle brackets and up into a rafter or noggin, and the shelves are screwed down, so the run cannot rack or tip.' });
+  else if (isBuiltIn()) out.push({ status: 'pass', id: 'back', title: 'Fixed to the building', text: 'The plinth frame is screwed to the floor, the end panels to the walls and each divider to cleats, so it cannot rack or tip.' });
   else if (isFramed()) out.push({ status: 'pass', id: 'back', title: 'The frame is fixed to the building', text: `Screwed to the floor and ${S.template === 'eaves' ? 'up into the rafters' : S.template === 'custom' ? 'up into the rafters or ceiling joists' : 'to the stair string'}, so it cannot rack or tip.` });
   else out.push(back
     ? { status: 'pass', id: 'back', title: 'Back panel stops it racking', text: 'Pin the back to every edge and divider so it holds the unit square.' }
     : { status: 'fail', id: 'back', title: 'No back panel', text: 'Without a fixed back the unit can lean sideways and collapse.' });
-  if (isBuiltIn()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: 'Find the floor joists and wall studs with a detector and fix into them, or use wall plugs that suit the wall.' });
+  if (isTimber()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: 'Fix each top rail into a rafter, or into a noggin screwed between two rafters. Fix the angle brackets through the floorboards into a joist where you can. Scan for cables and pipes first.' });
+  else if (isBuiltIn()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: 'Find the floor joists and wall studs with a detector and fix into them, or use wall plugs that suit the wall.' });
   else if (isFramed()) out.push({ status: 'action', id: 'wall', title: 'Screw into solid timber', text: `Find the floor joists and ${S.template === 'eaves' ? 'rafters' : S.template === 'custom' ? 'rafters or ceiling joists' : 'stair string'} with a detector and screw the plates into them, not just into boards or plasterboard.` });
   else out.push({ status: 'action', id: 'wall', title: S.template === 'eaves' ? 'Fix it to the floor and knee wall' : S.template === 'kitchenwall' ? 'Hang it on rated wall fixings' : 'Fix it to the wall', text: S.template === 'kitchenwall' ? 'Wall cupboards hang from the wall, so use fixings rated for your wall type and the full load.' : 'Furniture can tip forward, especially if a child climbs it. Always fix it, even if it feels steady.' });
   if (!isFramed() && S.joinery === 'screws' && (S.material === 'mdf' || S.material === 'melamine')) out.push({ status: 'warn', id: 'joints', title: 'Screws hold poorly in board edges', text: `${MATERIALS[S.material].name} edges split and strip easily. Drill pilot holes, keep screws well away from corners, or switch to cam and dowel fittings.` });
@@ -2249,8 +2366,83 @@ function builtinBuildSteps() {
   steps.push({ title: 'Bead, fill and paint', parts: ['Plinth Bead'], tools: ['Hammer', 'Caulk gun', 'Paint brush'], body: [tx.bead] });
   return steps;
 }
+// ── Timber frame shelving build guide ──
+function timberText(m) {
+  const L = layout(), { t, w } = m.sec, bars = m.bars, side = sideScrew(t), long = t >= 47 ? 100 : 80;
+  const pos = m.frames.map(x => fmt(Math.round(x))).join(', '), heights = m.rows.map(r => `shelf ${r.i} at ${r.y0}mm`).join(', ');
+  return {
+    mark: `Measure from the left-hand wall and mark where the left face of each frame goes: ${pos}. That leaves ${L.bayW}mm between frames for the shelves. Draw a line square out from the knee wall at each mark.`,
+    rafters: 'Look up at each mark. A frame that lands beside a rafter screws straight into it. Where one does not, screw a noggin (an offcut of your timber) across between the two rafters either side, for the top rail to fix to.',
+    cut: `Every frame is the same, and each needs four pieces. Bottom rail: ${m.D}mm, square ends. Front post: ${m.front}mm on its front edge, top cut at ${m.g.angDeg} degrees. Back post: ${m.back}mm on its front edge, top cut at ${m.g.angDeg} degrees. Top rail: ${m.slope}mm along each edge, both ends cut at ${m.g.angDeg} degrees and parallel.`,
+    angle: `For the angled cuts, set a sliding bevel or your mitre saw to ${m.g.angDeg} degrees. Lay the timber on its wide face and cut across the ${w}mm width.`,
+    flat: `Lay the bottom rail on its edge on the floor. Stand the two posts on it, the front post flush with the front end and the back post flush with the back end, and lay the top rail across their angled tops. Drill 4mm pilot holes and drive 2 ${long}mm screws through the rails into the end of each post.`,
+    square: 'Check the front post is at 90 degrees to the bottom rail with a square before the last screw. Lay the second frame on top of the first to check they match.',
+    stand: `Stand each frame on its line, front end on the front line, and check it is plumb with a level. Screw 2 angle brackets to the floor beside the bottom rail, through the boards into a joist where you can. Then drive 3 ${long}mm screws through the top rail into the rafter or noggin. Pack under the rail where the floor dips.`,
+    supports: bars
+      ? `Mark the shelf heights on both sides of every frame with a level: ${heights}. These are the tops of the bearers. Screw a bearer to the side of the frame at each mark, top edge on the line, with 2 ${side}mm screws into the front post and 2 into the back post or top rail. Check each bearer is level with its partner on the next frame.`
+      : `Mark the shelf heights on both sides of every frame with a level: ${heights}. These are the tops of the brackets. At each mark screw one bracket to the front post, 40mm in from the front, and one to the back post or top rail, near the back of the shelf. Both screws of each bracket must go into timber.`,
+    shelves: bars
+      ? 'Lay each shelf on its two bearers, front edge flush with the front of the frames. Screw down through the shelf into each bearer, 2 screws at each end.'
+      : 'Lay each shelf on its four brackets, front edge flush with the front of the frames. Screw up through every bracket into the shelf with the short 16mm screws.',
+    finish: 'Sand the front edges of the shelves and frames. Paint or oil them if you like, and caulk any gaps to the walls and slope.'
+  };
+}
+function timberManualSteps() {
+  const m = frameModel(), tx = timberText(m), D = S.d, H = S.h, nF = m.frames.length, long = m.sec.t >= 47 ? 100 : 80;
+  const frame = ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer');
+  const qr = role => R.parts.filter(p => p.role === role).reduce((a, p) => a + p.qty, 0);
+  const steps = [];
+  steps.push({ frame: 0, times: nF, timesLabel: `Make ${nF} frames`, add: frame, ex: { 'Top Rail': [0, H * 0.3, 0], 'Front Post': [0, H * 0.12, -D * 0.12], 'Back Post': [0, H * 0.12, D * 0.12] }, hw: [[`timber screws 5x${long}`, 8]], fig: timberFrameSVG(m), note: tx.flat + ' ' + tx.square });
+  steps.push({ add: frame, ex: Object.fromEntries(frame.map(n => [n, [0, H * 0.25, 0]])), hw: [['angle brackets', 2 * nF], ['wood screws 4x30', 8 * nF], [`timber screws 5x${long}`, 3 * nF], ['packers', 0]], wall: true, twoPeople: H > 1200, note: tx.stand });
+  if (bearers.length) steps.push({ add: bearers, ex: Object.fromEntries(bearers.map(n => [n, [0, 0, -D * 0.8]])), hw: [[`timber screws 5x${sideScrew(m.sec.t)}`, 4 * qr('bearer')]], note: tx.supports });
+  else if (m.solids.some(o => o.role === 'bracket')) steps.push({ add: ['Bracket'], ex: { Bracket: [0, 0, -D * 0.3] }, hw: [['shelf brackets', 4 * qr('shelf')], ['wood screws 4x30', 8 * qr('shelf')]], note: tx.supports });
+  if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, H * 0.1, -D * 1.1]])), hw: m.bars ? [['wood screws 4x40', 4 * qr('shelf')]] : [['wood screws 4x16', 8 * qr('shelf')]], note: tx.shelves });
+  return steps;
+}
+function timberBuildSteps() {
+  const m = frameModel(), tx = timberText(m), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer');
+  const timber = R.linear.map(gr => `${gr.count} x ${fmtLen(gr.stock)} of ${gr.section}`).join(' and ');
+  const steps = [];
+  steps.push({ title: 'Check your timber and shelves', parts: R.parts.filter(p => p.stock === 'sheet').map(p => p.name), tools: ['Tape measure', 'Pencil'], body: [`You need ${timber}. Pick straight lengths: sight down each one and put any bowed pieces aside for the short bearers.`, 'Lay out the shelf boards and match them to the cut list. Pencil the name on the underside of each.'] });
+  steps.push({ title: 'Check the space', parts: [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', 'Sliding bevel'], body: [`Measure the front height, back height and depth at both ends and in the middle. Your design is ${Math.round(S.h)}mm at the front and ${Math.round(S.low)}mm at the back.`, `Set a sliding bevel to the slope (about ${m.g.angDeg} degrees) and check it at each end. If it differs by more than a degree, change the angle in the design.`, 'Check the floor is boarded and solid. Find the rafters and floor joists and mark them on masking tape. Scan for cables and pipes.'], warn: 'Do not squash or cover the insulation or vents behind the knee wall.' });
+  steps.push({ title: 'Mark where the frames go', parts: [], tools: ['Tape measure', 'Square', 'Pencil'], body: [tx.mark, tx.rafters] });
+  steps.push({ title: 'Cut one frame and try it in place', parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Saw', 'Sliding bevel', 'Square', 'Tape measure'], body: [tx.cut, tx.angle, 'Hold the first set in place before you cut the rest. Roofs are rarely true: if it is tight, trim the posts and use the trimmed pieces as templates.'] });
+  steps.push({ title: `Build all ${m.frames.length} frames flat`, parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Drill', '4mm drill bit', 'Square', 'Clamps'], body: [tx.flat, tx.square] });
+  steps.push({ title: 'Stand the frames up and fix them', parts: ['Bottom Rail', 'Top Rail'], tools: ['Spirit level', 'Drill', 'Packers'], twoPeople: true, body: [tx.stand, 'Fix the two end frames first, then stretch a string between them along the front to line up the rest.'] });
+  steps.push({ title: m.bars ? 'Fit the bearers' : 'Fit the shelf brackets', parts: bearers, tools: ['Spirit level', 'Drill', 'Pencil'], body: [tx.supports, m.bars ? 'Cut the bearers from your offcuts: each is as long as its shelf is deep.' : 'Use a level across to the next frame so each pair of brackets is at the same height.'] });
+  if (shelves.length) steps.push({ title: 'Fit the shelves', parts: shelves, tools: ['Drill'], body: [tx.shelves] });
+  steps.push({ title: 'Finish', parts: [], tools: ['Sandpaper', 'Paint brush', 'Caulk gun'], body: [tx.finish] });
+  return steps;
+}
+// One frame drawn from the side with every length, angle and shelf height on it
+function timberFrameSVG(m) {
+  const D = m.D, H = S.h, w = m.sec.w, ink = MP.ink, sc = Math.min(420 / D, 300 / H), pad = 70;
+  const X = z => pad + z * sc, Y = y => pad + (H - y) * sc;
+  const one = m.solids.filter(o => o.frame === 0 && ['rail', 'stud', 'plate'].includes(o.role));
+  let g = '';
+  one.forEach(o => { g += `<polygon points="${hull(o.v.map(([, y, z]) => [X(z), Y(y)])).map(q => q.map(n => n.toFixed(1)).join(',')).join(' ')}" fill="${MP.wood}" stroke="${ink}" stroke-width="1.4"/>`; });
+  const txt = (x, y, t, a = 'middle', rot = 0, f = 'JetBrains Mono, monospace') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="12" text-anchor="${a}" fill="${ink}" font-family="${f}"${rot ? ` transform="rotate(${rot.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"` : ''}>${t}</text>`;
+  const dim = (x1, y1, x2, y2, t, off) => {
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1, nx = -(y2 - y1) / len * off, ny = (x2 - x1) / len * off, ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, rot = ang > 90 || ang < -90 ? ang + 180 : ang;
+    return `<line x1="${(x1 + nx).toFixed(1)}" y1="${(y1 + ny).toFixed(1)}" x2="${(x2 + nx).toFixed(1)}" y2="${(y2 + ny).toFixed(1)}" stroke="${MP.add}" stroke-width="1.2"/>`
+      + [[x1, y1], [x2, y2]].map(([x, y]) => `<line x1="${(x + nx * 0.4).toFixed(1)}" y1="${(y + ny * 0.4).toFixed(1)}" x2="${(x + nx * 1.2).toFixed(1)}" y2="${(y + ny * 1.2).toFixed(1)}" stroke="${MP.add}" stroke-width="1"/>`).join('')
+      + txt((x1 + x2) / 2 + nx * 1.6, (y1 + y2) / 2 + ny * 1.6 + 4, t, 'middle', rot);
+  };
+  const tan = Math.tan(m.g.ang), ceil = z => H - z * tan;
+  // Shelf heights, dashed across the frame
+  m.rows.forEach(r => { g += `<line x1="${X(0)}" y1="${Y(r.y0)}" x2="${X(r.dep)}" y2="${Y(r.y0)}" stroke="${ink}" stroke-width="1" stroke-dasharray="5 4"/>` + txt(X(w) + 8, Y(r.y0) - 6, `shelf ${r.i}: ${r.y0} up`, 'start'); });
+  g += dim(X(0), Y(0), X(D), Y(0), `bottom rail ${D}`, 26);
+  g += dim(X(0), Y(w), X(0), Y(m.front + w), `front post ${m.front}`, -26);
+  g += dim(X(D), Y(w), X(D), Y(m.back + w), `back post ${m.back}`, 26);
+  g += dim(X(0), Y(H), X(D), Y(ceil(D)), `top rail ${m.slope}`, -22);
+  g += txt(X(w) + 8, Y(H - m.tv) + 18 + w * Math.tan(m.g.ang) * sc, `${m.g.angDeg}°`, 'start');
+  g += txt(X(D / 2), Y(0) + 58, 'front', 'middle', 0, 'General Sans, sans-serif').replace('>front<', '>front on the left, knee wall on the right<');
+  const wd = 420 + pad * 2 + 90, ht = H * sc + pad * 2 + 20;
+  return `<svg viewBox="0 0 ${wd.toFixed(0)} ${ht.toFixed(0)}" class="m-iso" role="img" aria-label="One frame seen from the side, with every length, the roof angle and the shelf heights">${g}</svg>`;
+}
 function frameManualSteps() {
   if (isBuiltIn()) return builtinManualSteps();
+  if (isTimber()) return timberManualSteps();
   const m = frameModel(), c = frameCounts(m), tx = frameText(m), D = S.d, H = S.h;
   const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer'), doors = frameNames(m, 'door');
   const ex = (list, v) => Object.fromEntries(list.map(n => [n, v]));
@@ -2274,6 +2466,7 @@ function customCheck(g, upright) {
 }
 function frameBuildSteps() {
   if (isBuiltIn()) return builtinBuildSteps();
+  if (isTimber()) return timberBuildSteps();
   const m = frameModel(), tx = frameText(m), eaves = S.template === 'eaves', custom = S.template === 'custom', doors = R.parts.find(p => p.role === 'door');
   const studs = frameNames(m, 'stud'), divs = frameNames(m, 'divider'), shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer'), heads = frameNames(m, 'plate').filter(n => n.startsWith('Head Plate'));
   const timber = R.linear.map(g => `${g.count} x ${fmtLen(g.stock)} of ${g.section}`).join(' and ');
@@ -2426,7 +2619,7 @@ function partSolids(opt = {}) {
     for (let i = 0; i < n; i++) f.push([i, (i + 1) % n, n + (i + 1) % n, n + i]);
     out.push({ part, v, f });
   };
-  if (isFramed()) return frameModel().solids.map(o => ({ part: o.part, v: o.v, f: o.f }));
+  if (isFramed()) return frameModel().solids.map(o => ({ part: o.part, v: o.v, f: o.f, frame: o.frame }));
   const base = t === 'kitchenbase' ? 100 : 0, Hc = H - base, Lay = layout();
   // opt.box: only that box's carcass, moved to x = 0 (for the "build one box" steps)
   const only = opt.box != null ? Lay.boxes[opt.box] : null, dx = only ? -only.x0 : 0;
@@ -2617,7 +2810,7 @@ function hwArt(name) {
   if (/pocket/.test(n)) return { art: screw(32, 4), actual: true };
   if (/connector/.test(n)) return { art: mm(34, 12, `<rect x="1" y="2.5" width="3" height="7" rx="1" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/><rect x="4" y="4" width="26" height="4" fill="#fff" stroke="${ink}" stroke-width=".45"/><rect x="30" y="2.5" width="3" height="7" rx="1" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/>`), actual: true };
   if (/packer/.test(n)) return { art: `<svg viewBox="0 0 60 40" width="60" height="40" class="m-hw-art" aria-hidden="true"><path d="M4,32 L56,32 L56,24 L4,30 Z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><path d="M8,22 L52,22 L52,14 L8,20 Z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/></svg>` };
-  if (/screw/.test(n)) return { art: screw(/80/.test(n) ? 80 : /32/.test(n) ? 32 : /30/.test(n) ? 30 : 40, /5x/.test(n) ? 5 : 4), actual: true };
+  if (/screw/.test(n)) { const L = +((n.match(/\dx(\d+)/) || [])[1] || 40); return { art: screw(L, /5x/.test(n) ? 5 : 4), actual: true }; }
   if (/panel pin|nail/.test(n)) return { art: mm(27, 6, `<rect x="1" y="1.6" width="1" height="2.8" fill="${ink}"/><path d="M2,2.6 L24,2.6 L26,3 L24,3.4 L2,3.4 Z" fill="#fff" stroke="${ink}" stroke-width=".35"/>`), actual: true };
   if (/dowel/.test(n)) return { art: mm(32, 10, `<rect x="1" y="1" width="30" height="8" rx="2" fill="#F1E6D2" stroke="${ink}" stroke-width=".45"/>${[6, 11, 16, 21, 26].map(x => `<line x1="${x}" y1="1" x2="${x - 2}" y2="9" stroke="${ink}" stroke-width=".3"/>`).join('')}`), actual: true };
   if (/shelf pin/.test(n)) return { art: mm(16, 8, `<rect x="1" y="2.5" width="8" height="3" fill="#fff" stroke="${ink}" stroke-width=".4"/><rect x="9" y="1" width="1.4" height="6" fill="${ink}"/><rect x="10.4" y="2" width="4.6" height="4" rx=".6" fill="#fff" stroke="${ink}" stroke-width=".4"/>`), actual: true };
@@ -2738,18 +2931,18 @@ function renderManual(print = false) {
         : { ...s, fill: MP.done }));
       built = [...new Set(solids.filter(s => s.box != null).map(s => s.part))];
     }
-    else (st.scope === 'box' && oneBox ? oneBox : solids).forEach(s => {
+    else (st.frame != null ? solids.filter(s => s.frame === st.frame) : st.scope === 'box' && oneBox ? oneBox : solids).forEach(s => {
       if (built.includes(s.part)) items.push({ ...s, fill: MP.done, label: st.wall ? letterOf(s.part) : null });
       else if (st.add.includes(s.part)) items.push({ ...s, fill: MP.add, offset: st.ex && st.ex[s.part], label: letterOf(s.part) });
     });
     if (i === 0) items.forEach(it => { if (it.part === 'Left Side') it.label = letterOf('Left Side'); });
     const art = isoSVG(items, { alt: 'Step ' + (i + 1), animate: !print && items.some(it => it.offset) });
-    pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.times ? `<span class="m-2p"><i class="ph ph-copy" aria-hidden="true"></i>Make ${st.times} boxes</span>` : ''}${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
-      <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}
+    pages.push(page(`<div class="m-step-head"><span class="m-n">${i + 1}</span>${st.times ? `<span class="m-2p"><i class="ph ph-copy" aria-hidden="true"></i>${st.timesLabel || `Make ${st.times} boxes`}</span>` : ''}${st.twoPeople ? `<span class="m-2p"><i class="ph ph-users" aria-hidden="true"></i>2 people</span>` : ''}</div>
+      <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}${st.fig || ''}
       ${st.check ? `<div class="m-check"><svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="10" y="10" width="100" height="60" fill="none" stroke="${MP.ink}" stroke-width="2"/><line x1="10" y1="10" x2="110" y2="70" stroke="${MP.add}" stroke-width="2"/><line x1="110" y1="10" x2="10" y2="70" stroke="${MP.add}" stroke-width="2"/></svg><span>A = B</span></div>` : ''}
       ${st.wall ? `<div class="m-warn"><i class="ph ph-warning" aria-hidden="true"></i>Check for pipes and cables before you drill.</div>` : ''}
       <p class="m-note">${esc(st.note)}</p>`));
-    if (!st.join) built = built.concat(st.add);
+    if (!st.join && st.frame == null) built = built.concat(st.add);
   });
   pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight.${R.parts.some(p => p.role === 'door') ? ' Re-check the doors after a week as the hinges settle.' : ''}</p></div>`));
   const play = print ? '' : `<div class="m-play"><button type="button" class="chip" data-action="manual-anim" aria-pressed="${S.manualAnim !== false}"><i class="ph ph-${S.manualAnim !== false ? 'pause' : 'play'}" aria-hidden="true"></i>${S.manualAnim !== false ? 'Pause animations' : 'Play animations'}</button></div>`;
@@ -2777,6 +2970,11 @@ function orderNeeds() {
 // existing Associates ID. Replace it with the Made to Fit one once it is set up in Associates Central.
 const AMAZON_TAG = 'stayprepared2-21';
 const SHOP = [
+  [/timber screws 5x100/i, { q: 'wood screws 5x100mm', pack: 100, asin: '' }],
+  [/timber screws 5x70/i, { q: 'wood screws 5x70mm', pack: 100, asin: '' }],
+  [/wood screws 4x30/i, { q: 'wood screws 4x30mm', pack: 200, asin: '' }],
+  [/wood screws 4x16/i, { q: 'wood screws 4x16mm', pack: 200, asin: '' }],
+  [/shelf brackets/i, { q: 'steel shelf brackets 75mm', pack: 10, asin: '' }],
   [/hinge/i, { q: 'soft close cabinet hinges 35mm full overlay', pack: 10, asin: 'B015H9OY28' }],
   [/shelf pin/i, { q: 'shelf support pins 5mm metal', pack: 50, asin: 'B0711TZ4Q1' }],
   [/wood screws/i, { q: 'wood screws 4x40mm', pack: 200, asin: 'B0CPJQ8428' }],
@@ -3673,7 +3871,7 @@ function fmtVal(k, v) {
 }
 
 // Validate and apply. Never trust the server (or the parser) blindly.
-const BUILD_NAMES = { frame: 'Batten frame', builtin: 'Built-in shelving', boxes: 'Boxes' };
+const BUILD_NAMES = { frame: 'Batten frame', builtin: 'Built-in shelving', timber: 'Timber frame shelving', boxes: 'Boxes' };
 function applyChanges(ch) {
   const diff = [];
   if (!ch || typeof ch !== 'object') return diff;
@@ -3699,7 +3897,7 @@ function applyChanges(ch) {
   }
   if (S.template === 'eaves' && S.low >= S.h) { S.low = Math.round(S.h * 0.6); diff.push(`Back height: ${fmtVal('low', S.low)}`); }
   if (S.template === 'custom') refitOutline(oldH);
-  if (BUILD_NAMES[ch.build] && FRAME_TPL.has(S.template) && ch.build !== S.build && (ch.build !== 'builtin' || S.template === 'eaves')) { S.build = ch.build; S.overrides = {}; diff.push(`Build: ${BUILD_NAMES[ch.build]}`); }
+  if (BUILD_NAMES[ch.build] && FRAME_TPL.has(S.template) && ch.build !== S.build && (!['builtin', 'timber'].includes(ch.build) || S.template === 'eaves')) { S.build = ch.build; S.overrides = {}; diff.push(`Build: ${BUILD_NAMES[ch.build]}`); }
   if (ch.doors !== undefined && ch.doors !== null) {
     const v = ch.doors === 'auto' ? 'auto' : clamp(Math.round(Number(ch.doors)) || 0, 0, 8);
     if (v !== S.doors && isCabinet(S.template)) { S.doors = v; diff.push(`Doors: ${fmtVal('doors', v)}`); }
@@ -3817,13 +4015,15 @@ const ACTIONS = {
   unit: el => { S.unit = el.dataset.value === 'in' ? 'in' : 'mm'; saveDraft(); render(); },
   style: el => {
     // 'auto' gives the template's usual door count; shelving defaults to none, so force 2 there
-    if (el.dataset.value !== 'open' && isBuiltIn()) S.build = 'frame';
+    if (el.dataset.value !== 'open' && (isBuiltIn() || isTimber())) S.build = 'frame';
     if (el.dataset.value === 'open') S.doors = 0;
     else S.doors = S.template === 'shelving' ? 2 : 'auto';
     if (el.dataset.value === 'open' && S.template === 'eaves' && S.shelves < 2) S.shelves = 2;
     saveDraft(); render();
   },
-  build: el => { S.build = ['boxes', 'builtin'].includes(el.dataset.value) ? el.dataset.value : 'frame'; S.overrides = {}; saveDraft(); render(); },
+  build: el => { S.build = ['boxes', 'builtin', 'timber'].includes(el.dataset.value) ? el.dataset.value : 'frame'; S.overrides = {}; saveDraft(); render(); },
+  support: el => { S.support = SUPPORTS[el.dataset.value] ? el.dataset.value : 'bearers'; S.overrides = {}; saveDraft(); render(); },
+  timber: el => { S.timber = TF_SECTIONS[el.dataset.value] ? el.dataset.value : '38x89'; S.overrides = {}; saveDraft(); render(); },
   joinery: el => { S.joinery = JOINERY[el.dataset.value] ? el.dataset.value : 'screws'; saveDraft(); render(); },
   theme: () => {
     const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
