@@ -629,10 +629,16 @@ svg.elev .cap{fill:var(--ink-2);font-family:var(--body);font-weight:700}
 .m-call{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid #15181B;border-radius:var(--r);background:#fff}
 .m-call>div{display:flex;align-items:center;gap:2px}
 .m-call b{font-family:var(--mono);font-size:16px}
+.m-call{flex-wrap:wrap}
+.m-call small{flex-basis:100%;font-size:14px;font-weight:700;color:#15181B}
 .m-check{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-weight:600}
 .m-warn{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:#9A5B00}
 .m-warn i{font-size:22px}
 .m-note{font-size:15px;color:#454B51;max-width:60ch}
+.how-fig{margin-top:14px;display:grid;gap:14px;background:#FBFBFA;border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.how-fig .m-iso{display:block;width:100%;height:auto;max-width:520px;margin:0 auto}
+.m-notes{margin:0;padding-left:22px;display:grid;gap:8px;font-size:16px;color:#15181B;max-width:60ch}
+.m-notes li::marker{font-family:var(--mono);font-weight:700}
 .m-done{display:grid;place-items:center;text-align:center;gap:10px;padding:40px 0}
 .m-done i{font-size:56px;color:#1F7A4D}
 @media(min-width:768px){.m-page{padding:36px 40px}}

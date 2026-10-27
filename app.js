@@ -1200,11 +1200,13 @@ function frameFittings(parts, sum) {
 }
 
 function timberFittings(parts, sum) {
-  const m = timberModel(), nF = m.frames.length, t = m.sec.t, long = t >= 47 ? 100 : 80, side = sideScrew(t);
+  const m = timberModel(), nF = m.frames.length, t = m.sec.t, long = SKEW.len, raf = rafterLen(m.sec.w), side = sideScrew(t);
   const shelves = sum(p => p.role === 'shelf'), bearers = sum(p => p.role === 'bearer'), brackets = m.bars ? 0 : 4 * shelves;
   const out = [
-    // 2 screws through a rail into each end of both posts, 3 through the top rail into a rafter or noggin
-    { name: `Timber screws 5x${long}mm`, total_qty: 11 * nF + 10, unit_cost: 0.1, note: 'Through the rails into the posts, and the top rail into a rafter' },
+    // 2 skew screws at each of the 4 corners of a frame
+    { name: `Timber screws 5x${long}mm`, total_qty: 8 * nF + 10, unit_cost: 0.1, note: 'Two at each corner of every frame (8 per frame), driven in at 45 degrees' },
+    // 3 up through each top rail into a rafter or noggin
+    { name: `Timber screws 5x${raf}mm`, total_qty: 3 * nF + 4, unit_cost: 0.22, note: 'Three per frame, up through the top rail into a rafter. Long enough to pass the rail and any plasterboard' },
     { name: 'Angle brackets 40mm', total_qty: 2 * nF, unit_cost: 0.6, note: 'Two per frame, fixing the bottom rail to the floor' },
     // 4 per angle bracket, 2 per shelf bracket into the frame
     { name: 'Wood screws 4x30mm', total_qty: 8 * nF + 2 * brackets + 10, unit_cost: 0.04, note: brackets ? 'For the angle brackets, and the shelf brackets into the frame' : 'For the angle brackets' }
@@ -2379,16 +2381,39 @@ function builtinBuildSteps() {
 }
 // ── Timber frame shelving build guide ──
 function timberText(m) {
-  const L = layout(), { t, w } = m.sec, bars = m.bars, side = sideScrew(t), long = t >= 47 ? 100 : 80;
+  const L = layout(), { t, w } = m.sec, bars = m.bars, side = sideScrew(t), raf = rafterLen(w), sk = SKEW, cs = Math.cos(m.g.ang) || 1;
+  const gap = (m.D - 2 * w) / cs, along = [1 / 6, 1 / 2, 5 / 6].map(f => Math.round(gap * f / 10) * 10).join(', ');
   const pos = m.frames.map(x => fmt(Math.round(x))).join(', '), heights = m.rows.map(r => `shelf ${r.i} at ${r.y0}mm`).join(', ');
   return {
     mark: `Measure from the left-hand wall and mark where the left face of each frame goes: ${pos}. That leaves ${L.bayW}mm between frames for the shelves. Draw a line square out from the knee wall at each mark.`,
     rafters: 'Look up at each mark. A frame that lands beside a rafter screws straight into it. Where one does not, screw a noggin (an offcut of your timber) across between the two rafters either side, for the top rail to fix to.',
     cut: `Every frame is the same, and each needs four pieces. Bottom rail: ${m.D}mm, square ends. Front post: ${m.front}mm on its front edge, top cut at ${m.g.angDeg} degrees. Back post: ${m.back}mm on its front edge, top cut at ${m.g.angDeg} degrees. Top rail: ${m.slope}mm along each edge, both ends cut at ${m.g.angDeg} degrees and parallel.`,
     angle: `For the angled cuts, set a sliding bevel or your mitre saw to ${m.g.angDeg} degrees. Lay the timber on its wide face and cut across the ${w}mm width.`,
-    flat: `Lay the bottom rail on its edge on the floor. Stand the two posts on top of it, not beside it, the front post flush with the front end and the back post flush with the back end, and lay the top rail across their angled tops. Drill 4mm pilot holes and drive 2 ${long}mm screws through the rails into the end of each post.`,
+    lay: 'Lay the four pieces flat on the floor in the shape of the frame, like the drawing. The bottom rail runs along the bottom. The two posts stand on top of it, not beside it: the tall front post flush with the front end of the rail and the short back post flush with the back end. Lay the top rail across the angled tops of the posts. Push every post tight against the rail.',
+    screwShort: [
+      `2 screws at each of the 4 corners, so 8 per frame. Use 5 x ${sk.len}mm timber screws.`,
+      'Each screw goes in through the edge of a post that faces the front, angled at 45 degrees towards the back.',
+      `Bottom corners: mark ${sk.below}mm up from the rail. Top corners: mark ${sk.above}mm down from the top rail.`,
+      `Put the two screws side by side, ${sk.edge}mm in from each face. Drill a 3mm pilot hole first.`
+    ],
+    screwHow: [
+      `Every frame has 4 corners and each corner gets 2 screws, so 8 screws per frame. Use 5 x ${sk.len}mm timber screws (5mm thick, ${sk.len}mm long).`,
+      `Do not screw through the rail from outside. A rail is ${w}mm wide, which is longer than the screw, so it would never reach the post. Every screw goes in through the edge of a post instead.`,
+      `Use the edge of each post that faces the front. On the front post that is its outer edge. On the back post it is the edge facing into the frame.`,
+      `Bottom corners: mark that edge ${sk.below}mm up from the top of the rail. Top corners: mark it ${sk.above}mm down from the underside of the top rail.`,
+      `On each mark put one screw ${sk.edge}mm in from the left face and one ${sk.edge}mm in from the right face, so the two sit side by side without touching.`,
+      'Angle every screw at 45 degrees towards the back of the frame. If you cannot judge the angle, cut a scrap of timber at 45 degrees and hold it against the post as a guide for the drill.',
+      'Drill a 3mm pilot hole about 40mm deep, then drive the screw until its head is just below the surface.',
+      'Clamp each post tight against the rail, or ask someone to hold it, so it cannot slide as the screw pulls it in.'
+    ],
     square: 'Check the front post is at 90 degrees to the bottom rail with a square before the last screw. Lay the second frame on top of the first to check they match.',
-    stand: `Stand each frame on its line, front end on the front line, and check it is plumb with a level. Fix the bottom rail to the floor with 2 angle brackets, one near the front and one near the back, on the open side of the frame, through the boards into a joist where you can. Then drive 3 ${long}mm screws through the top rail into the rafter or noggin. Pack under the rail where the floor dips. You do not need cleats on the floor or the knee wall: the brackets, the rafter fixing and the screwed-down shelves hold everything.`,
+    standList: [
+      'Stand each frame on its line, front end on the front line, and check it is plumb with a level.',
+      'Floor: fix the bottom rail with 2 angle brackets (4x30mm screws), one near the front and one near the back, on the open side of the frame. Screw through the boards into a joist where you can.',
+      `Roof: drive 3 screws, ${raf}mm long, up through the top rail into the rafter or noggin above, at a right angle to the roof. Drill a 4mm pilot hole first. Space them evenly along the open part of the rail, ${along}mm along from the front post.`,
+      `If the slope has plasterboard, the screws go through that too and still reach about ${raf - w - 13}mm into the rafter.`,
+      'Pack under the rail where the floor dips. You do not need cleats on the floor or the knee wall: the brackets, the roof screws and the screwed-down shelves hold everything.'
+    ],
     supports: bars
       ? `Mark the shelf heights on both sides of every frame with a level: ${heights}. These are the tops of the bearers. Screw a bearer to the side of the frame at each mark, top edge on the line, with 2 ${side}mm screws into the front post and 2 into the back post or top rail. Check each bearer is level with its partner on the next frame.`
       : `Mark the shelf heights on both sides of every frame with a level: ${heights}. These are the tops of the brackets. At each mark screw one bracket to the front post, 40mm in from the front, and one to the back post or top rail, near the back of the shelf. Both screws of each bracket must go into timber.`,
@@ -2399,12 +2424,13 @@ function timberText(m) {
   };
 }
 function timberManualSteps() {
-  const m = frameModel(), tx = timberText(m), D = S.d, H = S.h, nF = m.frames.length, long = m.sec.t >= 47 ? 100 : 80;
+  const m = frameModel(), tx = timberText(m), D = S.d, H = S.h, nF = m.frames.length, raf = rafterLen(m.sec.w);
   const frame = ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer');
   const qr = role => R.parts.filter(p => p.role === role).reduce((a, p) => a + p.qty, 0);
   const steps = [];
-  steps.push({ frame: 0, times: nF, timesLabel: `Make ${nF} frames`, add: frame, ex: { 'Top Rail': [0, H * 0.75, 0], 'Front Post': [0, H * 0.2, 0], 'Back Post': [0, H * 0.2, 0] }, hw: [[`timber screws 5x${long}`, 8]], fig: timberFrameSVG(m), note: tx.flat + ' ' + tx.square });
-  steps.push({ add: [...frame, 'Floor Bracket'], ex: { ...Object.fromEntries(frame.map(n => [n, [0, H * 0.25, 0]])), 'Floor Bracket': [0, H * 0.1, 0] }, fig: timberFootSVG(m), hw: [['angle brackets', 2 * nF], ['wood screws 4x30', 8 * nF], [`timber screws 5x${long}`, 3 * nF], ['packers', 0]], wall: true, twoPeople: H > 1200, note: tx.stand });
+  steps.push({ frame: 0, times: nF, timesLabel: `Make ${nF} frames`, add: frame, ex: { 'Top Rail': [0, H * 0.75, 0], 'Front Post': [0, H * 0.2, 0], 'Back Post': [0, H * 0.2, 0] }, hw: [], fig: timberFrameSVG(m), note: [tx.lay, tx.square] });
+  steps.push({ frame: 0, times: nF, timesLabel: `Screw all ${nF} frames`, add: frame, hw: [[`timber screws 5x${SKEW.len}`, 8]], fig: timberScrewMapSVG(m) + timberCornerSVG(m, 'bottom') + timberCornerSVG(m, 'top') + timberEdgeSVG(m), note: tx.screwShort });
+  steps.push({ add: [...frame, 'Floor Bracket'], ex: { ...Object.fromEntries(frame.map(n => [n, [0, H * 0.25, 0]])), 'Floor Bracket': [0, H * 0.1, 0] }, fig: timberFootSVG(m), hw: [['angle brackets', 2 * nF], ['wood screws 4x30', 8 * nF], [`timber screws 5x${raf}`, 3 * nF], ['packers', 0]], wall: true, twoPeople: H > 1200, note: tx.standList });
   if (bearers.length) steps.push({ add: bearers, ex: Object.fromEntries(bearers.map(n => [n, [0, 0, -D * 0.8]])), hw: [[`timber screws 5x${sideScrew(m.sec.t)}`, 4 * qr('bearer')]], note: tx.supports });
   else if (m.solids.some(o => o.role === 'bracket')) steps.push({ add: ['Bracket'], ex: { Bracket: [0, 0, -D * 0.3] }, hw: [['shelf brackets', 4 * qr('shelf')], ['wood screws 4x30', 8 * qr('shelf')]], note: tx.supports });
   if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, H * 0.1, -D * 1.1]])), hw: m.bars ? [['wood screws 4x40', 4 * qr('shelf')]] : [['wood screws 4x16', 8 * qr('shelf')]], note: tx.shelves });
@@ -2417,14 +2443,87 @@ function timberBuildSteps() {
   steps.push({ title: 'Check your timber and shelves', parts: R.parts.filter(p => p.stock === 'sheet').map(p => p.name), tools: ['Tape measure', 'Pencil'], body: [`You need ${timber}. Pick straight lengths: sight down each one and put any bowed pieces aside for the short bearers.`, 'Lay out the shelf boards and match them to the cut list. Pencil the name on the underside of each.'] });
   steps.push({ title: 'Check the space', parts: [], tools: ['Tape measure', 'Spirit level', 'Stud and cable detector', 'Sliding bevel'], body: [`Measure the front height, back height and depth at both ends and in the middle. Your design is ${Math.round(S.h)}mm at the front and ${Math.round(S.low)}mm at the back.`, `Set a sliding bevel to the slope (about ${m.g.angDeg} degrees) and check it at each end. If it differs by more than a degree, change the angle in the design.`, 'Check the floor is boarded and solid. Find the rafters and floor joists and mark them on masking tape. Scan for cables and pipes.'], warn: 'Do not squash or cover the insulation or vents behind the knee wall.' });
   steps.push({ title: 'Mark where the frames go', parts: [], tools: ['Tape measure', 'Square', 'Pencil'], body: [tx.mark, tx.rafters] });
-  steps.push({ title: 'Cut one frame and try it in place', parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Saw', 'Sliding bevel', 'Square', 'Tape measure'], body: [tx.cut, tx.angle, 'Hold the first set in place before you cut the rest. Roofs are rarely true: if it is tight, trim the posts and use the trimmed pieces as templates.'] });
-  steps.push({ title: `Build all ${m.frames.length} frames flat`, parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Drill', '4mm drill bit', 'Square', 'Clamps'], body: [tx.flat, tx.square] });
-  steps.push({ title: 'Stand the frames up and fix them', parts: ['Bottom Rail', 'Top Rail'], tools: ['Spirit level', 'Drill', 'Packers'], twoPeople: true, body: [tx.stand, 'Fix the two end frames first, then stretch a string between them along the front to line up the rest.'] });
+  steps.push({ title: 'Cut one frame and try it in place', parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Saw', 'Sliding bevel', 'Square', 'Tape measure'], body: [tx.cut, tx.angle, 'Hold the first set in place before you cut the rest. Roofs are rarely true: if it is tight, trim the posts and use the trimmed pieces as templates.'], fig: timberFrameSVG(m) });
+  steps.push({ title: `Lay out the ${m.frames.length} frames flat`, parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Square', 'Clamps', 'Tape measure'], body: [tx.lay, tx.square] });
+  steps.push({ title: 'Screw each corner', parts: ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], tools: ['Drill', '3mm drill bit', 'Clamps', 'Pencil'], body: tx.screwHow, fig: timberScrewMapSVG(m) + timberCornerSVG(m, 'bottom') + timberCornerSVG(m, 'top') + timberEdgeSVG(m) });
+  steps.push({ title: 'Stand the frames up and fix them', parts: ['Bottom Rail', 'Top Rail'], tools: ['Spirit level', 'Drill', '4mm drill bit', 'Packers'], twoPeople: true, body: [...tx.standList, 'Fix the two end frames first, then stretch a string between them along the front to line up the rest.'] });
   steps.push({ title: m.bars ? 'Fit the bearers' : 'Fit the shelf brackets', parts: bearers, tools: ['Spirit level', 'Drill', 'Pencil'], body: [tx.supports, m.bars ? 'Cut the bearers from your offcuts: each is as long as its shelf is deep.' : 'Use a level across to the next frame so each pair of brackets is at the same height.'] });
   if (shelves.length) steps.push({ title: 'Fit the shelves', parts: shelves, tools: ['Drill'], body: [tx.shelves] });
   steps.push({ title: 'Finish', parts: [], tools: ['Sandpaper', 'Paint brush', 'Caulk gun'], body: [tx.finish] });
   return steps;
 }
+// ── Timber frame screws ──
+// A rail is as wide as the timber (89mm), longer than an 80mm screw, so a corner cannot be screwed straight through it.
+// Instead every corner gets 2 skew screws (5 x 80mm at 45 degrees) driven in through the front-facing edge of a post,
+// so each one stays inside the timber. All 8 screws in a frame look the same: in through the edge that faces the front,
+// angled towards the back. The two screws at a corner sit side by side, 12mm in from each face.
+const SKEW = { len: 80, below: 25, above: 30, edge: 12 };
+// Rafter screws: through the rail (its width), through 12.5mm of plasterboard if there is any, and 40mm into the rafter
+const rafterLen = w => Math.ceil((w + 13 + 40) / 10) * 10;
+function timberScrews(m) {
+  const { w } = m.sec, tan = Math.tan(m.g.ang), c = Math.SQRT1_2, L = SKEW.len, top = z => S.h - m.tv - z * tan;
+  const out = [];
+  [['Front post', 0], ['Back post', m.D - w]].forEach(([post, z0]) => {
+    const b = [z0, w + SKEW.below], t = [z0, top(z0) - SKEW.above];
+    out.push({ post, at: 'bottom', start: b, end: [b[0] + L * c, b[1] - L * c] });
+    out.push({ post, at: 'top', start: t, end: [t[0] + L * c, t[1] + L * c] });
+  });
+  return out;
+}
+const tfTxt = (x, y, s, o = {}) => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${o.size || 16}" text-anchor="${o.a || 'start'}" fill="${o.fill || MP.ink}" font-weight="${o.bold ? 700 : 400}" font-family="${o.mono ? 'JetBrains Mono, monospace' : 'General Sans, sans-serif'}">${s}</text>`;
+const tfLine = (x1, y1, x2, y2, col, w = 2, dash = '') => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ''} stroke-linecap="round"/>`;
+// A screw drawn as a thick line with a round head, in drawing units
+const tfScrew = (x1, y1, x2, y2, r = 7) => tfLine(x1, y1, x2, y2, MP.add, r * 0.8) + `<circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="${r}" fill="#fff" stroke="${MP.ink}" stroke-width="1.8"/>`;
+// All 8 screws of one frame, seen from the side
+function timberScrewMapSVG(m) {
+  const D = m.D, H = S.h, sc = Math.min(330 / D, 330 / H), padL = 110, padT = 56;
+  const X = z => padL + z * sc, Y = y => padT + (H - y) * sc;
+  let g = tfTxt(14, 26, 'All 8 screws in one frame', { size: 18, bold: true });
+  m.solids.filter(o => o.frame === 0 && ['rail', 'stud', 'plate'].includes(o.role)).forEach(o => {
+    g += `<polygon points="${hull(o.v.map(([, y, z]) => [X(z), Y(y)])).map(q => q.map(n => n.toFixed(1)).join(',')).join(' ')}" fill="${MP.wood}" stroke="${MP.ink}" stroke-width="1.4"/>`;
+  });
+  timberScrews(m).forEach(s => {
+    g += tfScrew(X(s.start[0]), Y(s.start[1]), X(s.end[0]), Y(s.end[1]), 6) + tfTxt(X(s.start[0]) - 14, Y(s.start[1]) + 6, '2 screws', { a: 'end', bold: true });
+  });
+  g += tfTxt(X(0), Y(0) + 34, 'front', { a: 'start' }) + tfTxt(X(D), Y(0) + 34, 'back (knee wall)', { a: 'end' });
+  g += tfTxt(14, Y(0) + 64, 'Each corner: 2 screws, side by side, in through the front-facing edge of the post.', { size: 14 });
+  return `<svg viewBox="0 0 520 ${Math.round(Y(0) + 80)}" class="m-iso" role="img" aria-label="One frame from the side with its 8 screws, 2 at each corner, going in through the front-facing edge of each post at 45 degrees">${g}</svg>`;
+}
+// One corner enlarged: the post, the rail and a single screw with its measurements (the two screws look the same from the side)
+function timberCornerSVG(m, at) {
+  const { w } = m.sec, tan = Math.tan(m.g.ang), H = S.h, top = z => H - m.tv - z * tan, bot = at === 'bottom', f = n => n.toFixed(1);
+  const s = timberScrews(m).find(q => q.post === 'Front post' && q.at === at), zr = [-76, bot ? 124 : 134];
+  const yr = bot ? [-14, w + 76] : [top(0) - 72, top(0) + m.tv + 12], k = bot ? 2.5 : 2.1;
+  const X = z => (z - zr[0]) * k, Y = y => 64 + (yr[1] - y) * k, Wd = (zr[1] - zr[0]) * k, Hh = (yr[1] - yr[0]) * k + 64 + 76;
+  const poly = (pts, fill) => `<polygon points="${pts.map(([z, y]) => f(X(z)) + ',' + f(Y(y))).join(' ')}" fill="${fill}" stroke="${MP.ink}" stroke-width="1.8" stroke-linejoin="round"/>`;
+  let g = tfTxt(8, 24, bot ? 'Bottom corner, from the side' : 'Top corner, from the side', { size: 18, bold: true });
+  if (bot) g += poly([[0, 0], [zr[1], 0], [zr[1], w], [0, w]], MP.wood) + poly([[0, w], [w, w], [w, yr[1]], [0, yr[1]]], MP.wood);
+  else g += poly([[0, top(0)], [zr[1], top(zr[1])], [zr[1], top(zr[1]) + m.tv], [0, top(0) + m.tv]], MP.wood) + poly([[0, yr[0]], [w, yr[0]], [w, top(w)], [0, top(0)]], MP.wood);
+  g += tfScrew(X(s.start[0]), Y(s.start[1]), X(s.end[0]), Y(s.end[1]), 8);
+  // How far from the joint the screw starts
+  const j = bot ? w : top(0), a = s.start[1];
+  g += tfLine(X(-6), Y(j), X(-26), Y(j), MP.ink, 1, '3 3') + tfLine(X(-6), Y(a), X(-26), Y(a), MP.ink, 1, '3 3') + tfLine(X(-22), Y(j), X(-22), Y(a), MP.add, 2.4);
+  g += tfTxt(X(-26), (Y(j) + Y(a)) / 2 + 5, (bot ? SKEW.below : SKEW.above) + 'mm', { a: 'end', bold: true, mono: true });
+  g += tfTxt(8, 46, '5 x ' + SKEW.len + 'mm screw, at 45 degrees', { bold: true, fill: '#C2410C' });
+  g += tfTxt(X(w / 2), Y(bot ? w + 60 : yr[0] + 18), 'post', { a: 'middle' }) + tfTxt(X(zr[1]) - 8, Y(bot ? w / 2 : top(zr[1]) + m.tv / 2) + 5, bot ? 'bottom rail' : 'top rail', { a: 'end' });
+  g += tfTxt(8, Hh - 32, 'The front of the frame is on the left.', { size: 14 }) + tfTxt(8, Hh - 12, bot ? 'Measure up the edge from the top of the rail.' : 'Measure down the edge from the underside of the top rail.', { size: 14 });
+  return `<svg viewBox="0 0 ${f(Wd)} ${f(Hh)}" class="m-iso" role="img" aria-label="${bot ? 'Bottom' : 'Top'} corner of a frame from the side: one 80mm screw at 45 degrees, starting ${bot ? SKEW.below + 'mm above the rail' : SKEW.above + 'mm below the top rail'}">${g}</svg>`;
+}
+// The front-facing edge of a post, looking straight at it: where the two screw heads go across its width
+function timberEdgeSVG(m) {
+  const { t } = m.sec, k = 4.2, ox = 150, f = n => n.toFixed(1), e = SKEW.edge;
+  const X = x => ox + x * k, Y = y => 62 + (60 - y) * k, Hh = Y(-20) + 50;
+  let g = tfTxt(14, 26, 'The front-facing edge of the post, head on', { size: 18, bold: true });
+  g += `<rect x="${f(X(0))}" y="${f(Y(0))}" width="${f(t * k)}" height="${f(20 * k)}" fill="${MP.wood}" stroke="${MP.ink}" stroke-width="1.8"/>` + `<rect x="${f(X(0))}" y="${f(Y(60))}" width="${f(t * k)}" height="${f(60 * k)}" fill="${MP.wood}" stroke="${MP.ink}" stroke-width="1.8"/>`;
+  g += tfTxt(X(t) + 14, Y(-10) + 5, 'rail (or top rail)') + tfTxt(X(t) + 14, Y(30) + 5, 'post');
+  [e, t - e].forEach(x => { g += `<circle cx="${f(X(x))}" cy="${f(Y(25))}" r="${f(4.75 * k)}" fill="#fff" stroke="${MP.ink}" stroke-width="1.8"/>` + tfLine(X(x) - 7, Y(25), X(x) + 7, Y(25), MP.ink, 1.6) + tfLine(X(x), Y(25) - 7, X(x), Y(25) + 7, MP.ink, 1.6); });
+  const dy = Y(48);
+  [[0, e, e + ''], [e, t - e, (t - 2 * e) + ''], [t - e, t, e + '']].forEach(([a, b, lab]) => { g += tfLine(X(a), dy, X(b), dy, MP.add, 2.2) + tfLine(X(a), dy - 7, X(a), dy + 7, MP.add, 2.2) + tfLine(X(b), dy - 7, X(b), dy + 7, MP.add, 2.2) + tfTxt((X(a) + X(b)) / 2, dy - 12, lab, { a: 'middle', mono: true, bold: true, size: 15 }); });
+  g += tfLine(X(-8), Y(0), X(-24), Y(0), MP.ink, 1, '3 3') + tfLine(X(-8), Y(25), X(-24), Y(25), MP.ink, 1, '3 3') + tfLine(X(-20), Y(0), X(-20), Y(25), MP.add, 2.4) + tfTxt(X(-24), Y(12.5) + 5, '25mm', { a: 'end', mono: true, bold: true });
+  g += tfTxt(14, Hh - 22, 'Both screws start here, side by side, ' + e + 'mm in from each face.', { size: 14 }) + tfTxt(14, Hh - 4, 'Top corners: the same, ' + SKEW.above + 'mm down from the top rail.', { size: 14 });
+  return `<svg viewBox="0 0 520 ${f(Hh)}" class="m-iso" role="img" aria-label="The front-facing edge of a post, ${t}mm wide, with two screw heads ${e}mm in from each face and ${SKEW.below}mm above the rail">${g}</svg>`;
+}
+
 // Close-up of the foot of a frame: the bottom rail seen end on, with its angle bracket screwed to the floor
 function timberFootSVG(m) {
   const { t, w } = m.sec, ink = MP.ink, k = 2.2, ox = 120, fy = 240, FB = 40;
@@ -2610,6 +2709,7 @@ function renderBuildPage() {
         <div class="build-count">Step ${S.buildIdx + 1} of ${steps.length}</div>
         <h3>${esc(st.title)}</h3>
         <ul class="how-to">${st.body.map(b => `<li>${esc(b)}</li>`).join('')}</ul>
+        ${st.fig ? `<div class="how-fig">${st.fig}</div>` : ''}
         ${st.warn ? `<div class="callout warn" style-mt><i class="ph ph-warning" aria-hidden="true"></i><span>${esc(st.warn)}</span></div>` : ''}
         <div class="label">Parts in this step</div>
         <div class="tags">${[...new Set(st.parts)].slice(0, 14).map(p => `<span class="tag acc">${esc(p)}</span>`).join('')}</div>
@@ -2826,7 +2926,7 @@ function manualHardware() {
 // Simple technical line drawings. Screws, pins and dowels are drawn at actual size (mm units).
 function hwArt(name) {
   const n = name.toLowerCase(), ink = MP.ink;
-  const mm = (w, h, body) => `<svg width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}" class="m-hw-art" aria-hidden="true">${body}</svg>`;
+  const mm = (w, h, body) => { const q = w > 100 ? 100 / w : 1; return `<svg width="${(w * q).toFixed(1)}mm" height="${(h * q).toFixed(1)}mm" viewBox="0 0 ${w} ${h}" class="m-hw-art" aria-hidden="true">${body}</svg>`; };
   const screw = (L, d) => {
     let th = '';
     for (let x = 6; x < L - 3; x += 1.8) th += `<line x1="${x}" y1="${5 - d / 2}" x2="${x + 1.1}" y2="${5 + d / 2}" stroke="${ink}" stroke-width=".3"/>`;
@@ -2835,7 +2935,7 @@ function hwArt(name) {
   if (/pocket/.test(n)) return { art: screw(32, 4), actual: true };
   if (/connector/.test(n)) return { art: mm(34, 12, `<rect x="1" y="2.5" width="3" height="7" rx="1" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/><rect x="4" y="4" width="26" height="4" fill="#fff" stroke="${ink}" stroke-width=".45"/><rect x="30" y="2.5" width="3" height="7" rx="1" fill="#E9EAEC" stroke="${ink}" stroke-width=".45"/>`), actual: true };
   if (/packer/.test(n)) return { art: `<svg viewBox="0 0 60 40" width="60" height="40" class="m-hw-art" aria-hidden="true"><path d="M4,32 L56,32 L56,24 L4,30 Z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/><path d="M8,22 L52,22 L52,14 L8,20 Z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/></svg>` };
-  if (/screw/.test(n)) { const L = +((n.match(/\dx(\d+)/) || [])[1] || 40); return { art: screw(L, /5x/.test(n) ? 5 : 4), actual: true }; }
+  if (/screw/.test(n)) { const L = +((n.match(/\dx(\d+)/) || [])[1] || 40); return { art: screw(L, /5x/.test(n) ? 5 : 4), actual: L <= 98 }; }
   if (/panel pin|nail/.test(n)) return { art: mm(27, 6, `<rect x="1" y="1.6" width="1" height="2.8" fill="${ink}"/><path d="M2,2.6 L24,2.6 L26,3 L24,3.4 L2,3.4 Z" fill="#fff" stroke="${ink}" stroke-width=".35"/>`), actual: true };
   if (/dowel/.test(n)) return { art: mm(32, 10, `<rect x="1" y="1" width="30" height="8" rx="2" fill="#F1E6D2" stroke="${ink}" stroke-width=".45"/>${[6, 11, 16, 21, 26].map(x => `<line x1="${x}" y1="1" x2="${x - 2}" y2="9" stroke="${ink}" stroke-width=".3"/>`).join('')}`), actual: true };
   if (/shelf pin/.test(n)) return { art: mm(16, 8, `<rect x="1" y="2.5" width="8" height="3" fill="#fff" stroke="${ink}" stroke-width=".4"/><rect x="9" y="1" width="1.4" height="6" fill="${ink}"/><rect x="10.4" y="2" width="4.6" height="4" rx=".6" fill="#fff" stroke="${ink}" stroke-width=".4"/>`), actual: true };
@@ -2892,7 +2992,7 @@ function hwCallouts(hwList, find) {
     const f = find(key);
     if (!f) return '';
     const a = hwArt(f.name);
-    return `<div class="m-call">${a.art}<div><b>${qty ? qty + 'x' : ''}</b><span>${f.id}</span></div></div>`;
+    return `<div class="m-call">${a.art}<div><b>${qty ? qty + 'x' : ''}</b><span>${f.id}</span></div><small>${esc(f.name)}</small></div>`;
   }).join('');
 }
 
@@ -2966,7 +3066,7 @@ function renderManual(print = false) {
       <div class="m-calls">${hwCallouts(st.hw, hw.find)}</div>${art}${st.fig || ''}
       ${st.check ? `<div class="m-check"><svg viewBox="0 0 120 80" width="120" height="80" aria-hidden="true"><rect x="10" y="10" width="100" height="60" fill="none" stroke="${MP.ink}" stroke-width="2"/><line x1="10" y1="10" x2="110" y2="70" stroke="${MP.add}" stroke-width="2"/><line x1="110" y1="10" x2="10" y2="70" stroke="${MP.add}" stroke-width="2"/></svg><span>A = B</span></div>` : ''}
       ${st.wall ? `<div class="m-warn"><i class="ph ph-warning" aria-hidden="true"></i>Check for pipes and cables before you drill.</div>` : ''}
-      <p class="m-note">${esc(st.note)}</p>`));
+      ${Array.isArray(st.note) ? `<ol class="m-notes">${st.note.map(n => `<li>${esc(n)}</li>`).join('')}</ol>` : `<p class="m-note">${esc(st.note)}</p>`}`));
     if (!st.join && st.frame == null) built = built.concat(st.add);
   });
   pages.push(page(`<div class="m-done"><i class="ph ph-check-circle" aria-hidden="true"></i><h4 class="m-h">Done</h4><p class="m-note">Check every screw is tight.${R.parts.some(p => p.role === 'door') ? ' Re-check the doors after a week as the hinges settle.' : ''}</p></div>`));
@@ -2995,6 +3095,8 @@ function orderNeeds() {
 // existing Associates ID. Replace it with the Made to Fit one once it is set up in Associates Central.
 const AMAZON_TAG = 'stayprepared2-21';
 const SHOP = [
+  [/timber screws 5x150/i, { q: 'wood screws 5x150mm', pack: 100, asin: '' }],
+  [/timber screws 5x160/i, { q: 'wood screws 5x160mm', pack: 100, asin: '' }],
   [/timber screws 5x100/i, { q: 'wood screws 5x100mm', pack: 100, asin: '' }],
   [/timber screws 5x70/i, { q: 'wood screws 5x70mm', pack: 100, asin: '' }],
   [/wood screws 4x30/i, { q: 'wood screws 4x30mm', pack: 200, asin: '' }],
