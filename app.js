@@ -813,6 +813,16 @@ function timberModel() {
     hx('Top Rail', 'plate', x0, x1, 0, D, under(tv), under(0), fr);
   });
   // Posts round down, so a rounded length can never lift the rail above the roof
+  // Two 40mm angle brackets per frame fix the bottom rail to the floor, on the open side (end frames sit against a wall)
+  const FB = 40;
+  frames.forEach((x0, i) => {
+    const sides = i === 0 ? [1] : i === nF - 1 ? [-1] : [1, -1];
+    [[100, sides[0]], [D - 100, sides[sides.length - 1]]].forEach(([zc, dir]) => {
+      const fx = dir > 0 ? x0 + t : x0, a = dir > 0 ? fx : fx - 3, b = dir > 0 ? fx + FB : fx - FB, fr = { frame: i };
+      hx('Floor Bracket', 'fixing', a, a + 3, zc - 15, zc + 15, flat(0), flat(FB), fr);
+      hx('Floor Bracket', 'fixing', Math.min(fx, b), Math.max(fx, b), zc - 15, zc + 15, flat(0), flat(3), fr);
+    });
+  });
   const front = Math.floor(H - tv - w), back = Math.floor(ceil(D - w) - tv - w), drop = Math.round(w * tan);
   lin({ name: 'Bottom Rail', w: D, h: w, qty: nF, role: 'rail', note: 'Square both ends. Stands on edge on the floor' });
   lin({ name: 'Front Post', w: front, h: w, qty: nF, role: 'stud', angle: g.angDeg, note: `Top cut at ${g.angDeg} deg: ${front} on the front edge, ${front - drop} on the back edge` });
@@ -1272,8 +1282,8 @@ function hull(pts) {
   return half(p).concat(half(p.slice().reverse()));
 }
 // Front view of the batten frame: each solid's outline seen from the front, back members first
-const FRAME_ORDER = ['rail', 'cleat', 'divider', 'panel', 'base', 'bearer', 'bracket', 'shelf', 'plate', 'stud', 'plinth', 'facing', 'bead', 'door'];
-const FRAME_CLASS = { bracket: 'dr', cleat: 'p', divider: 'bk', bearer: 'p', shelf: 'p2', plate: 'p', stud: 'p', door: 'dr', rail: 'p', panel: 'bk', base: 'p2', plinth: 'p', facing: 'p', bead: 'p' };
+const FRAME_ORDER = ['fixing', 'rail', 'cleat', 'divider', 'panel', 'base', 'bearer', 'bracket', 'shelf', 'plate', 'stud', 'plinth', 'facing', 'bead', 'door'];
+const FRAME_CLASS = { fixing: 'dr', bracket: 'dr', cleat: 'p', divider: 'bk', bearer: 'p', shelf: 'p2', plate: 'p', stud: 'p', door: 'dr', rail: 'p', panel: 'bk', base: 'p2', plinth: 'p', facing: 'p', bead: 'p' };
 function framedFront() {
   const m = frameModel(), H = S.h;
   return m.solids.slice().sort((a, b) => FRAME_ORDER.indexOf(a.role) - FRAME_ORDER.indexOf(b.role)).map(o => {
@@ -2376,9 +2386,9 @@ function timberText(m) {
     rafters: 'Look up at each mark. A frame that lands beside a rafter screws straight into it. Where one does not, screw a noggin (an offcut of your timber) across between the two rafters either side, for the top rail to fix to.',
     cut: `Every frame is the same, and each needs four pieces. Bottom rail: ${m.D}mm, square ends. Front post: ${m.front}mm on its front edge, top cut at ${m.g.angDeg} degrees. Back post: ${m.back}mm on its front edge, top cut at ${m.g.angDeg} degrees. Top rail: ${m.slope}mm along each edge, both ends cut at ${m.g.angDeg} degrees and parallel.`,
     angle: `For the angled cuts, set a sliding bevel or your mitre saw to ${m.g.angDeg} degrees. Lay the timber on its wide face and cut across the ${w}mm width.`,
-    flat: `Lay the bottom rail on its edge on the floor. Stand the two posts on it, the front post flush with the front end and the back post flush with the back end, and lay the top rail across their angled tops. Drill 4mm pilot holes and drive 2 ${long}mm screws through the rails into the end of each post.`,
+    flat: `Lay the bottom rail on its edge on the floor. Stand the two posts on top of it, not beside it, the front post flush with the front end and the back post flush with the back end, and lay the top rail across their angled tops. Drill 4mm pilot holes and drive 2 ${long}mm screws through the rails into the end of each post.`,
     square: 'Check the front post is at 90 degrees to the bottom rail with a square before the last screw. Lay the second frame on top of the first to check they match.',
-    stand: `Stand each frame on its line, front end on the front line, and check it is plumb with a level. Screw 2 angle brackets to the floor beside the bottom rail, through the boards into a joist where you can. Then drive 3 ${long}mm screws through the top rail into the rafter or noggin. Pack under the rail where the floor dips.`,
+    stand: `Stand each frame on its line, front end on the front line, and check it is plumb with a level. Fix the bottom rail to the floor with 2 angle brackets, one near the front and one near the back, on the open side of the frame, through the boards into a joist where you can. Then drive 3 ${long}mm screws through the top rail into the rafter or noggin. Pack under the rail where the floor dips. You do not need cleats on the floor or the knee wall: the brackets, the rafter fixing and the screwed-down shelves hold everything.`,
     supports: bars
       ? `Mark the shelf heights on both sides of every frame with a level: ${heights}. These are the tops of the bearers. Screw a bearer to the side of the frame at each mark, top edge on the line, with 2 ${side}mm screws into the front post and 2 into the back post or top rail. Check each bearer is level with its partner on the next frame.`
       : `Mark the shelf heights on both sides of every frame with a level: ${heights}. These are the tops of the brackets. At each mark screw one bracket to the front post, 40mm in from the front, and one to the back post or top rail, near the back of the shelf. Both screws of each bracket must go into timber.`,
@@ -2393,8 +2403,8 @@ function timberManualSteps() {
   const frame = ['Bottom Rail', 'Front Post', 'Back Post', 'Top Rail'], shelves = frameNames(m, 'shelf'), bearers = frameNames(m, 'bearer');
   const qr = role => R.parts.filter(p => p.role === role).reduce((a, p) => a + p.qty, 0);
   const steps = [];
-  steps.push({ frame: 0, times: nF, timesLabel: `Make ${nF} frames`, add: frame, ex: { 'Top Rail': [0, H * 0.3, 0], 'Front Post': [0, H * 0.12, -D * 0.12], 'Back Post': [0, H * 0.12, D * 0.12] }, hw: [[`timber screws 5x${long}`, 8]], fig: timberFrameSVG(m), note: tx.flat + ' ' + tx.square });
-  steps.push({ add: frame, ex: Object.fromEntries(frame.map(n => [n, [0, H * 0.25, 0]])), hw: [['angle brackets', 2 * nF], ['wood screws 4x30', 8 * nF], [`timber screws 5x${long}`, 3 * nF], ['packers', 0]], wall: true, twoPeople: H > 1200, note: tx.stand });
+  steps.push({ frame: 0, times: nF, timesLabel: `Make ${nF} frames`, add: frame, ex: { 'Top Rail': [0, H * 0.75, 0], 'Front Post': [0, H * 0.2, 0], 'Back Post': [0, H * 0.2, 0] }, hw: [[`timber screws 5x${long}`, 8]], fig: timberFrameSVG(m), note: tx.flat + ' ' + tx.square });
+  steps.push({ add: [...frame, 'Floor Bracket'], ex: { ...Object.fromEntries(frame.map(n => [n, [0, H * 0.25, 0]])), 'Floor Bracket': [0, H * 0.1, 0] }, fig: timberFootSVG(m), hw: [['angle brackets', 2 * nF], ['wood screws 4x30', 8 * nF], [`timber screws 5x${long}`, 3 * nF], ['packers', 0]], wall: true, twoPeople: H > 1200, note: tx.stand });
   if (bearers.length) steps.push({ add: bearers, ex: Object.fromEntries(bearers.map(n => [n, [0, 0, -D * 0.8]])), hw: [[`timber screws 5x${sideScrew(m.sec.t)}`, 4 * qr('bearer')]], note: tx.supports });
   else if (m.solids.some(o => o.role === 'bracket')) steps.push({ add: ['Bracket'], ex: { Bracket: [0, 0, -D * 0.3] }, hw: [['shelf brackets', 4 * qr('shelf')], ['wood screws 4x30', 8 * qr('shelf')]], note: tx.supports });
   if (shelves.length) steps.push({ add: shelves, ex: Object.fromEntries(shelves.map(n => [n, [0, H * 0.1, -D * 1.1]])), hw: m.bars ? [['wood screws 4x40', 4 * qr('shelf')]] : [['wood screws 4x16', 8 * qr('shelf')]], note: tx.shelves });
@@ -2414,6 +2424,20 @@ function timberBuildSteps() {
   if (shelves.length) steps.push({ title: 'Fit the shelves', parts: shelves, tools: ['Drill'], body: [tx.shelves] });
   steps.push({ title: 'Finish', parts: [], tools: ['Sandpaper', 'Paint brush', 'Caulk gun'], body: [tx.finish] });
   return steps;
+}
+// Close-up of the foot of a frame: the bottom rail seen end on, with its angle bracket screwed to the floor
+function timberFootSVG(m) {
+  const { t, w } = m.sec, ink = MP.ink, k = 2.2, ox = 120, fy = 240, FB = 40;
+  const X = x => ox + x * k, Y = y => fy - y * k;
+  const txt = (x, y, s, a = 'start') => `<text x="${x}" y="${y}" font-size="12" text-anchor="${a}" fill="${ink}" font-family="General Sans, sans-serif">${s}</text>`;
+  let g = `<line x1="20" y1="${fy}" x2="400" y2="${fy}" stroke="${ink}" stroke-width="2"/>`;
+  for (let x = 24; x < 400; x += 12) g += `<line x1="${x}" y1="${fy + 2}" x2="${x - 8}" y2="${fy + 12}" stroke="${ink}" stroke-width=".8"/>`;
+  g += `<rect x="${X(0)}" y="${Y(w)}" width="${t * k}" height="${w * k}" fill="${MP.wood}" stroke="${ink}" stroke-width="1.6"/>`;
+  g += `<path d="M${X(t)} ${Y(FB)} h${3 * k} v${(FB - 3) * k} h${(FB - 3) * k} v${3 * k} h${-FB * k} z" fill="#E9EAEC" stroke="${ink}" stroke-width="1.4"/>`;
+  g += `<line x1="${X(t) - 26}" y1="${Y(FB * 0.6)}" x2="${X(t) + 12}" y2="${Y(FB * 0.6)}" stroke="${MP.add}" stroke-width="2.4"/><line x1="${X(t + FB * 0.65)}" y1="${Y(3) - 12}" x2="${X(t + FB * 0.65)}" y2="${Y(0) + 26}" stroke="${MP.add}" stroke-width="2.4"/>`;
+  g += txt(X(t / 2), Y(w) - 10, 'bottom rail, end on', 'middle') + txt(X(t + FB) + 14, Y(FB) + 4, 'angle bracket on the open side') + txt(X(t + FB) + 14, Y(FB) + 20, 'screws into the rail and the floor');
+  g += txt(20, fy + 34, 'One near the front and one near the back of every frame. No floor or wall cleats needed.');
+  return `<svg viewBox="0 0 520 290" class="m-iso" role="img" aria-label="Close-up of the bottom rail seen end on, with an angle bracket screwed to its side and to the floor">${g}</svg>`;
 }
 // One frame drawn from the side with every length, angle and shelf height on it
 function timberFrameSVG(m) {
