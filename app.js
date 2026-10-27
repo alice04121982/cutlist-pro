@@ -1874,7 +1874,7 @@ function renderControls() {
           ${BAY_TEMPLATES.has(S.template) && !framed ? boxesControl() : ''}
           ${layoutPreview()}
         </div>
-        ${S.template === 'eaves' && R.parts.filter(p => p.role === 'shelf').length < S.shelves ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Some shelves would sit too close to the slope, so we left them out.</span></div>` : ''}
+        ${S.template === 'eaves' && shelfRows() < S.shelves ? `<div class="callout warn"><i class="ph ph-warning" aria-hidden="true"></i><span>Some shelves would sit too close to the slope, so we left them out.</span></div>` : ''}
       </div>
       <div class="group"${framed ? ' hidden' : ''}>
         <h2 class="group-title">How it joins</h2>
@@ -2048,10 +2048,14 @@ function boxesControl() {
 }
 
 // Tiny front view so the numbers above read as a picture
+// How many rows of shelves the design really has. A row is cut as 2 parts when the end bays differ in width
+// (End Shelf 1 and Shelf 1) and as one part per width on an odd shape (Shelf 1A and Shelf 1B), so count the number in the name.
+function shelfRows() {
+  return new Set(R.parts.filter(p => p.role === 'shelf').map(p => (p.name.match(/\d+/) || [p.yc ?? p.name])[0])).size;
+}
 function layoutPreview() {
   const L = layout(), W = 160, H = 64, t = 3, k = W / S.w;
-  const sp = R.parts.filter(p => p.role === 'shelf');
-  const shelves = L.custom ? new Set(sp.map(p => p.yc)).size : sp.length; // an odd shape splits each row by width
+  const shelves = shelfRows();
   let g = '';
   L.boxes.forEach(b => { g += `<rect x="${b.x0 * k + 1}" y="0" width="${b.w * k - 2}" height="${H}" rx="2" fill="none" stroke="currentColor" stroke-width="${t}"/>`; });
   L.verticals.filter(v => v.kind === 'divider').forEach(v => { const x = (v.x + S.thickness / 2) * k; g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="currentColor" stroke-width="${t}"/>`; });
