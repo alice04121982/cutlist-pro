@@ -840,3 +840,19 @@ dialog.ask{width:min(620px,100%)}
 .rail{counter-reset:step}
 .rail-item{position:relative;counter-increment:step}
 .rail-item::before{content:"Step " counter(step);position:absolute;top:12px;left:12px;z-index:1;background:var(--measure);color:var(--on-measure);font:500 12px/1 var(--mono);padding:6px 9px;border-radius:2px}
+
+/* Cutter waiting list */
+.waitlist{display:grid;gap:10px;margin-top:8px;padding-top:16px;border-top:1px solid var(--line)}
+.waitlist h4{margin:0;font-size:16px}
+.waitlist .sub{margin:0}
+.waitlist .err:empty{display:none}
+.waitlist .btn{justify-self:start}
+.waitlist .check a{color:inherit;text-decoration:underline}
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+
+/* Privacy notice */
+.legal{max-width:68ch;padding-top:32px;padding-bottom:48px;display:grid;gap:12px;font-size:15px;color:var(--ink-2)}
+.legal h1{font-size:28px;color:var(--ink);margin:0 0 4px}
+.legal h2{font-size:18px;color:var(--ink);margin:16px 0 0}
+.legal p,.legal ul{margin:0}
+.legal a{color:var(--accent-ink);text-decoration:underline}

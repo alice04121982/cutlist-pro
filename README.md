@@ -10,7 +10,17 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 2. **Design**: material, doors, compartments (upright dividers), shelves per compartment, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
 3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
 4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
-5. **Order**: itemised estimate, an order pack (cut list CSV plus a DXF with true shapes and every hole to drill), and "Send to a cutter": what to ask a UK cutting service for, given what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. Named cutters (`SUPPLIERS` in `app.js`) are hidden until they agree to be listed; set `NAME_CUTTERS` to `true` to show them. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md).
+5. **Order**: itemised estimate, an order pack (cut list CSV plus a DXF with true shapes and every hole to drill), and "Send to a cutter": what to ask a UK cutting service for, given what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. Named cutters (`SUPPLIERS` in `app.js`) are hidden until they agree to be listed; set `NAME_CUTTERS` to `true` to show them. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md). Until cutters are named, the step also offers a waiting list ("Want us to arrange the cutting?").
+
+## Cutter waiting list
+
+`api/cutter-waitlist.js` stores the email, postcode area, project type and consent version in a Supabase table, nothing more. To switch it on:
+
+1. Create a Supabase project (EU region) and run [docs/cutter-waitlist.sql](docs/cutter-waitlist.sql) in its SQL editor. Row level security is on with no policies, so the public key can neither read nor write.
+2. In Vercel, add `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (the secret key, server only) and redeploy. Until then the form says sign-ups are not open yet.
+3. Put the contact email into `privacy.html` (marked TODO). The notice promises deletion on request and after 12 months; the SQL file has the query.
+
+The endpoint is same-origin only, JSON only, rate-limited, has a honeypot, and answers the same for new and existing addresses.
 
 Templates: under-eaves cupboard, under-stairs cupboard (tall end left or right, every upright, top and door cut to the stair angle), wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 

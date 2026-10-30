@@ -3074,6 +3074,44 @@ function postcodeField() {
             ${pcErr ? '<span class="err">That does not look like a UK postcode.</span>' : ''}
           </div>`;
 }
+// Cutter waiting list. The email lives in memory only; this device remembers just that you joined.
+const WL = { email: '', consent: false, sending: false, err: '' };
+function waitlistBlock() {
+  if (store.get('mtf_waitlist', false)) return `<div class="callout ok waitlist" role="status"><i class="ph ph-check-circle" aria-hidden="true"></i><span><strong>You're on the list.</strong> We'll email you when a cutter can take your order pack as it is.</span></div>`;
+  return `<form class="waitlist" id="waitlistForm" method="post" novalidate>
+    <h4>Want us to arrange the cutting?</h4>
+    <p class="sub">We're lining up UK cutters who will work straight from your order pack. Leave your email and we'll tell you when one can cut this for you.</p>
+    <div class="field">
+      <label for="wl-email">Email</label>
+      <input id="wl-email" class="input" type="email" name="email" autocomplete="email" inputmode="email" maxlength="254" value="${esc(WL.email)}" aria-invalid="${WL.err === 'email'}" aria-describedby="wl-msg">
+    </div>
+    <div class="hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+    <label class="check"><input type="checkbox" id="wl-consent"${WL.consent ? ' checked' : ''}><span>Email me about getting this project cut<small>We keep your email, your postcode area (such as SW) and the type of project, and use them only for this. Delete it any time. <a href="privacy.html">Privacy notice</a></small></span></label>
+    <span class="err" id="wl-msg" role="alert">${WL.err ? esc({ email: 'Enter an email address like name@example.com.', consent: 'Tick the box so we can email you.', closed: 'Sign-ups are not open yet. Please try again soon.', busy: 'Too many tries. Wait a few minutes and try again.', fail: 'Could not save that. Check your connection and try again.' }[WL.err]) : ''}</span>
+    <button type="submit" class="btn btn-ghost btn-sm"${WL.sending ? ' disabled' : ''}><i class="ph ph-envelope-simple" aria-hidden="true"></i>${WL.sending ? 'Saving' : 'Keep me posted'}</button>
+  </form>`;
+}
+async function waitlistSend(form) {
+  if (WL.sending) return;
+  const email = WL.email.trim();
+  WL.err = email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'email' : !WL.consent ? 'consent' : '';
+  if (WL.err) { render(); $(WL.err === 'email' ? '#wl-email' : '#wl-consent')?.focus(); return; }
+  const pc = (S.postcode || '').trim().toUpperCase();
+  const area = /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(pc) ? pc.match(/^[A-Z]{1,2}/)[0] : null;
+  WL.sending = true; render();
+  let status = 0;
+  try {
+    const r = await fetch('/api/cutter-waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', signal: AbortSignal.timeout(12000),
+      body: JSON.stringify({ email, consent: true, area, template: S.template, website: form.elements.website?.value || '' }) });
+    status = r.status;
+  } catch { /* offline or timed out */ }
+  WL.sending = false;
+  if (status === 200) { WL.email = ''; WL.consent = false; WL.err = ''; store.set('mtf_waitlist', true); toast("You're on the list"); }
+  else WL.err = status === 503 ? 'closed' : status === 429 ? 'busy' : status === 400 ? 'email' : 'fail';
+  render();
+}
+document.addEventListener('submit', e => { if (e.target.id === 'waitlistForm') { e.preventDefault(); waitlistSend(e.target); } });
+
 function cutterCard() {
   if (!isCabinet(S.template)) return `<div class="card"><h3><i class="ph ph-storefront" aria-hidden="true"></i>Where to buy</h3><p class="sub">Timber merchants deliver C16 and boards cut to length. Take the timber list to your nearest merchant.</p></div>`;
   const need = orderNeeds(), pc = (S.postcode || '').trim().toUpperCase(), area = (pc.match(/^([A-Z]{1,2})\d/) || [])[1];
@@ -3109,6 +3147,7 @@ function cutterCard() {
     </ol>
     ${orderedRow}
     <p class="fine">Cutting services price each job by quote.</p>
+    ${waitlistBlock()}
   </div>`;
   }
   const top = list.find(sup => sup.area !== 'store') || list[0], rest = list.filter(sup => sup !== top);
@@ -4174,6 +4213,7 @@ function liveUpdate() {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'heroSlider') return;
+  if (el.id === 'wl-email') { WL.email = el.value.slice(0, 254); return; }
   if (el.dataset.ov) {
     const v = Number(el.value);
     if (!Number.isFinite(v) || v < 0 || v > 15000) return;
@@ -4210,6 +4250,7 @@ document.addEventListener('input', e => {
 
 document.addEventListener('change', e => {
   const el = e.target;
+  if (el.id === 'wl-consent') { WL.consent = el.checked; return; }
   if (el.dataset.ov) { render(); return; }
   if (el.dataset.ol) { saveDraft(); return; }
   const k = el.dataset.field;
