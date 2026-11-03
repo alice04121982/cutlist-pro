@@ -2,9 +2,16 @@
   "name": "cutlist-pro",
   "private": true,
   "type": "module",
-  "description": "Static site plus one serverless function (api/assistant.js) for the design assistant.",
+  "description": "Static site plus serverless functions for the design assistant (api/assistant.js) and DXF files (api/dxf.js).",
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.212",
+    "@tarikjabiri/dxf": "2.9.0",
     "ai": "^6.0.303"
+  },
+  "devDependencies": {
+    "dxf-parser": "1.1.2"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
   }
 }

@@ -486,6 +486,7 @@ details.more .fields{margin-top:12px}
 .suppliers .sn{font-weight:700}
 .suppliers .sd{color:var(--ink-3);font-size:13px;text-align:right}
 .files{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.dxf-summary{margin-top:12px;padding-top:12px;border-top:1px solid var(--line, currentColor)}.dxf-summary h4{margin:0 0 6px}.dxf-summary ul{margin:4px 0 8px;padding-left:18px}.dxf-summary strong{overflow-wrap:anywhere}
 
 /* ---------- Sheets / dialogs ---------- */
 dialog.sheet{border:0;padding:0;background:var(--surface);color:var(--ink);width:min(560px,100%);max-height:92dvh;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.35)}

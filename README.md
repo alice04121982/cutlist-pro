@@ -2,7 +2,7 @@
 
 Photograph the space for a first sketch, confirm every size with a tape, pick a design, and get exact cuts, build steps and a supplier-ready order.
 
-Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverless function, `api/assistant.js`, for the design assistant. No build step.
+Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus two serverless functions: `api/assistant.js` for the design assistant and `api/dxf.js`, which lays the cut list out on sheets and writes the DXF files. No build step. Tests: `npm test` (Node's built-in runner).
 
 ## The flow
 
@@ -10,7 +10,7 @@ Static site: `index.html`, `styles.css`, `app.js`, `assets/`, plus one serverles
 2. **Design**: material, doors, compartments (upright dividers), shelves per compartment, joinery (screws, pocket screws, cam and dowel). Preview on your photo with a before/after slider, as a dimensioned drawing, or in 3D.
 3. **Cut list**: every panel, sheet layouts, timber lengths, hinge holes, hardware. Sizes can be edited.
 4. **Build**: an IKEA-style picture manual (lettered parts, actual-size hardware, exploded assembly drawings, printable as PDF) plus a step-by-step text guide.
-5. **Order**: itemised estimate, an order pack (cut list CSV plus a DXF with true shapes and every hole to drill), and "Send to a cutter": what to ask a UK cutting service for, given what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. Named cutters (`SUPPLIERS` in `app.js`) are hidden until they agree to be listed; set `NAME_CUTTERS` to `true` to show them. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md).
+5. **Order**: itemised estimate, an order pack (cut list CSV plus one DXF per material and thickness, parts laid out on sheets at true shape with every hole to drill; settings for the cutter in `api/_lib/dxf-settings.js`), and "Send to a cutter": what to ask a UK cutting service for, given what the design needs (angled cuts, drilling, edging), with a pre-filled quote email. Named cutters (`SUPPLIERS` in `app.js`) are hidden until they agree to be listed; set `NAME_CUTTERS` to `true` to show them. The file format is described for partners in [docs/ORDER-PACK.md](docs/ORDER-PACK.md).
 
 Templates: under-eaves cupboard, under-stairs cupboard (tall end left or right, every upright, top and door cut to the stair angle), wardrobe, open shelving, kitchen base, wall cupboard, plus stud wall, partition, floor joists, flat roof and pitched roof.
 
@@ -47,7 +47,7 @@ UX patterns referenced on Mobbin: Zillow virtual staging (before/after slider, s
 
 ## Privacy and security
 
-- Photos are processed in the browser and never uploaded or stored. The assistant only receives the typed request and the design sizes.
+- Photos are processed in the browser and never uploaded or stored. The assistant only receives the typed request and the design sizes. The DXF endpoint only receives part sizes, quantities, grain and holes (never the project name), checks every value again, stores nothing and puts no personal data in the files.
 - Projects are stored in `localStorage` on the device only and validated on load.
 - Strict Content Security Policy (no inline scripts or handlers), Subresource Integrity on the icon stylesheet, escaped output everywhere, spreadsheet formula injection guarded in CSV exports.
 
