@@ -18,12 +18,20 @@ One row per physical panel (quantities are expanded). Columns:
 | Holes | Count of holes, positions in the DXF |
 | Notes | Angled tops (`ANGLED TOP 800mm front to 400mm back`), bevels, hinge positions |
 
-## 2. Drawing (`<project>.dxf`, millimetres)
+## 2. Drawings (`madetofit-order-{reference}-{material}-{thickness}mm.dxf`)
 
-- One outline per part type on layer `CUT`, drawn at true shape (angled eaves sides and under-stairs doors are not rectangles).
-- Holes as circles on layers named by diameter and depth, for example `DRILL_5MM_10DEEP` (shelf pins), `DRILL_5MM_18DEEP` (shelf pins drilled through dividers), `DRILL_35MM_13DEEP` (hinge cups).
-- Each part's origin is its bottom-left corner. x is measured from the front edge (the hinge edge on doors), y up from the bottom edge.
-- A `LABEL` text under each part gives the name, quantity and size.
+One DXF per material and thickness (for example the 18mm plywood and the 3mm hardboard backs are two files). Made on the server by `api/dxf.js`, written with the `@tarikjabiri/dxf` library.
+
+- Units are millimetres (`$INSUNITS` 4, `$MEASUREMENT` 1). DXF version AC1021 (AutoCAD 2007).
+- Parts are laid out on stock sheets (default 2440 x 1220, set per material), 10mm from the sheet edge and 6mm apart for the cutter. Every sheet for that material is in the same file, side by side along x, 300mm apart.
+- Layer `SHEET`: the stock sheet outline and a title under it (sheet number, material, size, order reference). For reference only, not to be cut.
+- Layer `CUT`: one closed polyline per piece at true shape (angled eaves sides are not rectangles). Quantities are expanded, so 4 doors are 4 outlines.
+- Layers `DRILL_<dia>MM_<depth>DEEP`, for example `DRILL_5MM_10DEEP` (shelf pins), `DRILL_5MM_18DEEP` (through holes in 18mm board), `DRILL_35MM_13DEEP` (hinge cups): holes as circles at true diameter and position.
+- Layer `LABELS`: inside each piece, a number (`P1`, `P2` ...), the part name as in the CSV (`Box Side #2`) and its size. Small pieces get smaller text or just the number. Text never touches the outline.
+- Grain: plywood and melamine pieces keep their grain along the sheet length (the longer side of each piece follows the sheet's long side). MDF, OSB and hardboard pieces may be turned 90 degrees.
+- No customer names, addresses or emails are in the file. The order reference is random.
+
+Layer names, colours, text size, units and DXF version are all in `api/_lib/dxf-settings.js`, so they can change to suit a partner's software.
 
 ## What we would like from a partner
 

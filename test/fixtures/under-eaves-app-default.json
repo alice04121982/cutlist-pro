@@ -1,0 +1,580 @@
+{
+ "note": "Stand-in until the real under-eaves sizes arrive: the app's own default under-eaves design (1800 wide, 1200 front, 700 back, 600 deep, 3 bays, 1 shelf each, plywood boxes, screws), exported with dxfPayload() on 3 November 2026.",
+ "settings": {
+  "w": 1800,
+  "h": 1200,
+  "d": 600,
+  "low": 700,
+  "compartments": 3,
+  "shelves": 1,
+  "joinery": "screws",
+  "material": "plywood",
+  "thickness": 18
+ },
+ "payload": {
+  "materials": [
+   {
+    "id": "m0",
+    "material": "plywood",
+    "thickness": 18,
+    "sheetW": 2440,
+    "sheetH": 1220
+   },
+   {
+    "id": "m1",
+    "material": "hardboard",
+    "thickness": 3,
+    "sheetW": 2440,
+    "sheetH": 1220
+   }
+  ],
+  "parts": [
+   {
+    "name": "Left Side",
+    "material": "m0",
+    "w": 598,
+    "h": 1200,
+    "qty": 1,
+    "grain": "length",
+    "shape": {
+     "front": 1200,
+     "back": 700
+    },
+    "holes": [
+     {
+      "x": 37,
+      "y": 555,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 555,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 37,
+      "y": 587,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 587,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 37,
+      "y": 619,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 619,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 50,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 216,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 382,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 548,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 50,
+      "y": 1146,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 216,
+      "y": 1008,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 382,
+      "y": 869,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 548,
+      "y": 730,
+      "dia": 4,
+      "depth": 18
+     }
+    ]
+   },
+   {
+    "name": "Right Side",
+    "material": "m0",
+    "w": 598,
+    "h": 1200,
+    "qty": 1,
+    "grain": "length",
+    "shape": {
+     "front": 1200,
+     "back": 700
+    },
+    "holes": [
+     {
+      "x": 37,
+      "y": 555,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 555,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 37,
+      "y": 587,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 587,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 37,
+      "y": 619,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 619,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 50,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 216,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 382,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 548,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 50,
+      "y": 1146,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 216,
+      "y": 1008,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 382,
+      "y": 869,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 548,
+      "y": 730,
+      "dia": 4,
+      "depth": 18
+     }
+    ]
+   },
+   {
+    "name": "Box Side",
+    "material": "m0",
+    "w": 598,
+    "h": 1200,
+    "qty": 2,
+    "grain": "length",
+    "shape": {
+     "front": 1200,
+     "back": 700
+    },
+    "holes": [
+     {
+      "x": 37,
+      "y": 555,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 555,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 37,
+      "y": 587,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 587,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 37,
+      "y": 619,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 554,
+      "y": 619,
+      "dia": 5,
+      "depth": 10
+     },
+     {
+      "x": 50,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 216,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 382,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 548,
+      "y": 9,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 50,
+      "y": 1146,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 216,
+      "y": 1008,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 382,
+      "y": 869,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 548,
+      "y": 730,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 60,
+      "y": 100,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 60,
+      "y": 1050,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 538,
+      "y": 100,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 538,
+      "y": 650,
+      "dia": 5,
+      "depth": 18
+     }
+    ]
+   },
+   {
+    "name": "Bottom A",
+    "material": "m0",
+    "w": 1158,
+    "h": 598,
+    "qty": 1,
+    "grain": "length",
+    "shape": null,
+    "holes": [
+     {
+      "x": 579,
+      "y": 50,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 216,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 382,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 548,
+      "dia": 4,
+      "depth": 18
+     }
+    ]
+   },
+   {
+    "name": "Sloped Top A",
+    "material": "m0",
+    "w": 1158,
+    "h": 779,
+    "qty": 1,
+    "grain": "length",
+    "shape": null,
+    "holes": [
+     {
+      "x": 579,
+      "y": 50,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 186,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 322,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 457,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 593,
+      "dia": 4,
+      "depth": 18
+     },
+     {
+      "x": 579,
+      "y": 729,
+      "dia": 4,
+      "depth": 18
+     }
+    ]
+   },
+   {
+    "name": "Back Panel A",
+    "material": "m1",
+    "w": 1190,
+    "h": 696,
+    "qty": 1,
+    "grain": null,
+    "shape": null,
+    "holes": []
+   },
+   {
+    "name": "Bottom B",
+    "material": "m0",
+    "w": 570,
+    "h": 598,
+    "qty": 1,
+    "grain": "length",
+    "shape": null,
+    "holes": []
+   },
+   {
+    "name": "Sloped Top B",
+    "material": "m0",
+    "w": 570,
+    "h": 779,
+    "qty": 1,
+    "grain": "length",
+    "shape": null,
+    "holes": []
+   },
+   {
+    "name": "Back Panel B",
+    "material": "m1",
+    "w": 602,
+    "h": 696,
+    "qty": 1,
+    "grain": null,
+    "shape": null,
+    "holes": []
+   },
+   {
+    "name": "Shelf 1",
+    "material": "m0",
+    "w": 570,
+    "h": 591,
+    "qty": 3,
+    "grain": "length",
+    "shape": null,
+    "holes": []
+   },
+   {
+    "name": "Divider",
+    "material": "m0",
+    "w": 598,
+    "h": 1159,
+    "qty": 1,
+    "grain": "length",
+    "shape": {
+     "front": 1159,
+     "back": 659
+    },
+    "holes": [
+     {
+      "x": 37,
+      "y": 555,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 554,
+      "y": 555,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 37,
+      "y": 587,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 554,
+      "y": 587,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 37,
+      "y": 619,
+      "dia": 5,
+      "depth": 18
+     },
+     {
+      "x": 554,
+      "y": 619,
+      "dia": 5,
+      "depth": 18
+     }
+    ]
+   },
+   {
+    "name": "Door",
+    "material": "m0",
+    "w": 602,
+    "h": 1196,
+    "qty": 1,
+    "grain": "length",
+    "shape": null,
+    "holes": [
+     {
+      "x": 22.5,
+      "y": 1106,
+      "dia": 35,
+      "depth": 13
+     },
+     {
+      "x": 22.5,
+      "y": 90,
+      "dia": 35,
+      "depth": 13
+     }
+    ]
+   },
+   {
+    "name": "Door B",
+    "material": "m0",
+    "w": 593,
+    "h": 1196,
+    "qty": 2,
+    "grain": "length",
+    "shape": null,
+    "holes": [
+     {
+      "x": 22.5,
+      "y": 1106,
+      "dia": 35,
+      "depth": 13
+     },
+     {
+      "x": 22.5,
+      "y": 90,
+      "dia": 35,
+      "depth": 13
+     }
+    ]
+   }
+  ]
+ }
+}

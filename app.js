@@ -3087,9 +3087,9 @@ function cutterCard() {
     const body = [`Hello${sup ? ' ' + sup.name : ''},`, '', `Please quote for cutting this project${pc ? ' and delivery to ' + pc : ''}.`, '',
       unTaped().length ? 'Note: some sizes are still estimates and will be confirmed before cutting.' : 'All sizes measured with a tape.', '',
       `Material: ${MATERIALS[S.material].name} ${S.thickness}mm${R.sheets.ply3 ? ', plus 3mm backs' : ''}`, `Pieces: ${need.pieces} (about ${R.nMain} sheets)`,
-      need.angles ? 'Some panels have angled cuts (shown in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes, all on the panel faces: shelf pins, hinge cups, joint screws and connector screws. They are in the DXF on layers starting DRILL_, named by diameter and depth. Through holes for screws should be countersunk on the outside face.` : '',
+      need.angles ? 'Some panels have angled cuts (drawn to true shape in the DXF).' : '', need.holes ? `Drilling: ${need.holes} holes, all on the panel faces: shelf pins, hinge cups, joint screws and connector screws. They are in the DXF on layers starting DRILL_, named by diameter and depth. Through holes for screws should be countersunk on the outside face.` : '',
       S.joinery === 'cam' ? 'Cam fittings also need an 8mm hole into the end edge of each top and bottom. Please say if you can edge-bore; if not we will drill those.' : '',
-      need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and ${safeName(S.name)}.dxf`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+      need.edging ? 'Edge banding: see the Edge columns in the CSV.' : '', '', `Attached: ${safeName(S.name)}-CNC.csv and the DXF drawing (one file per material and thickness, parts laid out on sheets)`, '', 'Thank you'].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
     return `mailto:${(sup && sup.email) || ''}?subject=${encodeURIComponent('Cut-to-size quote: ' + S.name)}&body=${encodeURIComponent(body)}`;
   };
   const orderedRow = S.ordered
@@ -3186,6 +3186,7 @@ function renderOrderPage() {
           <button type="button" class="chip" data-action="export-dxf"><i class="ph ph-file-text" aria-hidden="true"></i>DXF</button>
           <button type="button" class="chip" data-action="export-json"><i class="ph ph-file-text" aria-hidden="true"></i>JSON</button>
         </div>
+        ${dxfSummaryHtml()}
         <div class="callout"><i class="ph ph-info" aria-hidden="true"></i><span>Coming next: order and pay here, with cut, drilled and edged panels delivered in 3 to 4 working days. Until then, send the order pack to a cutter.</span></div>
       </aside>
     </div>
@@ -3589,26 +3590,56 @@ function exportJSON() {
   const data = { project: S.name, template: S.template, material: S.material, thickness: S.thickness, dimensions: { w: S.w, h: S.h, d: S.d, low: S.low }, parts: R.parts.map(({ hinges, ...p }) => ({ ...p, hinges })), sheets: R.nMain, timber: R.linear.map(g => ({ section: g.section, lengths: g.count, stock: g.stock })), fittings: R.fittings, estimate: Math.round(R.total) };
   downloadFile(safeName(S.name) + '.json', JSON.stringify(data, null, 2), 'application/json');
 }
-function exportDXF() {
-  // One outline per part, true shape, holes on layer DRILL_<dia>_<depth>, and a label with the quantity.
-  // Units mm, origin bottom-left of each part, x = front edge (hinge edge on doors).
-  const E = [];
-  const line = (layer, a, b) => E.push(`0\nLINE\n8\n${layer}\n10\n${a[0]}\n20\n${a[1]}\n30\n0\n11\n${b[0]}\n21\n${b[1]}\n31\n0`);
-  const circle = (layer, c, r) => E.push(`0\nCIRCLE\n8\n${layer}\n10\n${c[0]}\n20\n${c[1]}\n30\n0\n40\n${r}`);
-  const text = (layer, at, hgt, str) => E.push(`0\nTEXT\n8\n${layer}\n10\n${at[0]}\n20\n${at[1]}\n30\n0\n40\n${hgt}\n1\n${str.replace(/[\r\n]/g, ' ')}`);
-  let x = 0, y = 0, rowH = 0;
-  const maxRow = 6000;
+// The DXF is made on the server (api/dxf.js), which checks every value again, lays the parts out
+// on sheets and writes one file per material and thickness. Only sizes, quantities, grain and holes
+// are sent: never the project name or anything about the customer.
+const GRAIN_MATERIALS = new Set(['plywood', 'melamine']); // boards with a visible grain or decor direction
+function dxfPayload() {
+  const materials = [], ids = {};
+  const matId = (material, thickness, sheetW, sheetH) => {
+    const k = material + '|' + thickness;
+    if (!ids[k]) { ids[k] = 'm' + materials.length; materials.push({ id: ids[k], material, thickness, sheetW, sheetH }); }
+    return ids[k];
+  };
+  const parts = [];
   R.parts.filter(p => p.stock === 'sheet' || p.stock === 'ply3' || p.stock === 'ply6').forEach(p => {
-    if (x > 0 && x + p.w > maxRow) { x = 0; y += rowH + 150; rowH = 0; }
-    const pts = p.shape ? [[0, 0], [p.w, 0], [p.w, p.shape.back], [0, p.shape.front]] : [[0, 0], [p.w, 0], [p.w, p.h], [0, p.h]];
-    pts.forEach((a, k) => line('CUT', [x + a[0], y + a[1]], [x + pts[(k + 1) % pts.length][0], y + pts[(k + 1) % pts.length][1]]));
-    panelHoles(p).forEach(h => circle(`DRILL_${h.dia}MM_${h.depth}DEEP`, [x + h.x, y + h.y], h.dia / 2));
-    const thick = p.stock === 'ply3' ? 3 : p.stock === 'ply6' ? 6 : S.thickness;
-    text('LABEL', [x, y - 40], 25, `${p.name} x${p.qty}  ${p.w} x ${p.h} x ${thick}mm${p.scribed ? '  SCRIBE' : ''}`);
-    x += p.w + 150; rowH = Math.max(rowH, p.h);
+    const main = p.stock === 'sheet';
+    const material = main ? S.material : p.stock === 'ply3' ? 'hardboard' : 'plywood';
+    const thickness = main ? S.thickness : p.stock === 'ply3' ? 3 : 6;
+    const id = main ? matId(material, thickness, S.sheetW, S.sheetH) : matId(material, thickness, 2440, 1220);
+    const shape = p.shape ? { front: p.shape.front, back: p.shape.back } : null;
+    parts.push({
+      name: p.name, material: id, w: p.w, h: shape ? Math.max(shape.front, shape.back) : p.h, qty: p.qty,
+      grain: main && GRAIN_MATERIALS.has(S.material) ? 'length' : null, shape,
+      holes: panelHoles(p).map(h => ({ x: h.x, y: h.y, dia: h.dia, depth: h.depth }))
+    });
   });
-  const dxf = `0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${E.join('\n')}\n0\nENDSEC\n0\nEOF\n`;
-  downloadFile(safeName(S.name) + '.dxf', dxf, 'application/dxf');
+  return { materials, parts };
+}
+let dxfSummary = null, dxfBusy = false;
+async function exportDXF() {
+  if (dxfBusy) return false;
+  const payload = dxfPayload();
+  if (!payload.parts.length) { toast('There are no panels to draw.'); return false; }
+  dxfBusy = true;
+  try {
+    const r = await fetch('/api/dxf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'same-origin' });
+    const out = await r.json().catch(() => null);
+    if (!r.ok || !out || !Array.isArray(out.files)) { toast('DXF not made: ' + String(out?.message || 'the server could not be reached. Try again.').slice(0, 200)); return false; }
+    out.files.forEach((f, i) => setTimeout(() => downloadFile(String(f.filename), String(f.content), 'application/dxf'), i * 400));
+    // Kept with the cut list it describes, so a changed design never shows an old summary
+    dxfSummary = Array.isArray(out.summary) ? { key: JSON.stringify(payload), files: out.summary } : null;
+    render();
+    return true;
+  } catch {
+    toast('DXF not made: the server could not be reached. Try again.');
+    return false;
+  } finally { dxfBusy = false; }
+}
+function dxfSummaryHtml() {
+  if (!dxfSummary || dxfSummary.key !== JSON.stringify(dxfPayload())) return '';
+  return `<div class="dxf-summary" role="status"><h4>Your DXF files</h4>${dxfSummary.files.map(f => `<p class="fine"><strong>${esc(f.filename)}</strong><br>${esc(f.material)} ${esc(f.thickness)}mm, ${esc(f.sheets.length)} sheet${f.sheets.length === 1 ? '' : 's'} of ${esc(f.sheetW)} x ${esc(f.sheetH)}mm, ${esc(f.parts)} parts</p>
+    <ul class="fine">${f.sheets.map(s => `<li>Sheet ${esc(s.sheet)}: ${esc(s.parts)} part${s.parts === 1 ? '' : 's'}, ${esc(s.wastePercent)}% waste</li>`).join('')}</ul>${(f.warnings || []).map(w => `<p class="fine">${esc(w)}</p>`).join('')}`).join('')}</div>`;
 }
 
 function printSheet() {
@@ -4093,7 +4124,7 @@ const ACTIONS = {
   'toggle-edit': () => { S.editParts = !S.editParts; render(); },
   'reset-overrides': () => { S.overrides = {}; saveDraft(); render(); },
   print: () => printSheet(),
-  'order-pack': () => { exportCNC(); setTimeout(exportDXF, 400); toast('Order pack downloaded. Attach both files when you send it.'); },
+  'order-pack': async () => { exportCNC(); if (await exportDXF()) toast('Order pack downloaded. Attach every file when you send it.'); },
   'tape-ok': el => { const k = el.dataset.k; if (TAPE_KEYS.includes(k) && !S.taped.includes(k)) S.taped.push(k); delete S.est[k]; saveDraft(); render(); },
   'mark-ordered': () => {
     S.ordered = !S.ordered; saveDraft(); render();
